@@ -296,3 +296,8 @@ The Agents screen (build step 5) later becomes the full editor for these same fi
 - **Implementation** is a placeholder; it will later split into website, mobile and backend.
 - **New shared prerequisites:** Product Brief, Voice Guide, Sitemap, Deck Outline, Model Reference, Part Spec.
 - **The kit keeps growing:** gaps become kit addition requests, routed by the Orchestrator to Brand Kit. Additions only, approved by the user, and logged in `prereqs/kit-changelog.md`. The rule is in the Orchestrator, Brand Kit and the house rules.
+- **Slice 2 (picker) is done, Nov 1.**
+  - The Create tab opens on a searchable, multi-select grid of the library's Musicians, grouped by category.
+  - A sticky footer shows the foundations in build order, worked out live by `plan.ts` (`foundationOrder`).
+  - The selection saves to the project's `deliverables.md`: ids in the front matter, plus a readable build order.
+  - "Add your own" is a placeholder until the Create chat exists.

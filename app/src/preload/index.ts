@@ -1,14 +1,21 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Project } from '../main/projects'
+import type { Instrument, Musician } from '../main/library'
 import type { Reference, Site, Tag } from '../main/research'
 
-export type { Project, Reference, Site, Tag }
+export type { Instrument, Musician, Project, Reference, Site, Tag }
 
 export interface ResearchState {
   references: Reference[]
   interpretation: string | null
   sites: Site[]
+}
+
+export interface CreateState {
+  musicians: Musician[]
+  instruments: Instrument[]
+  selected: string[] // deliverable (Musician) ids saved in deliverables.md
 }
 
 const api = {
@@ -39,7 +46,11 @@ const api = {
     ipcRenderer.invoke('research:openFile', project, file),
   interpret: (project: string): Promise<string> =>
     ipcRenderer.invoke('research:interpret', project),
-  addSite: (site: Site): Promise<Site[]> => ipcRenderer.invoke('sites:add', site)
+  addSite: (site: Site): Promise<Site[]> => ipcRenderer.invoke('sites:add', site),
+
+  loadCreate: (project: string): Promise<CreateState> => ipcRenderer.invoke('create:load', project),
+  saveDeliverables: (project: string, ids: string[]): Promise<string[]> =>
+    ipcRenderer.invoke('create:save', project, ids)
 }
 
 export type OrchestraApi = typeof api

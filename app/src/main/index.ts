@@ -4,7 +4,9 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
+import { loadLibrary } from './library'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
 import { createProject, listProjects, type Project } from './projects'
 import {
@@ -120,6 +122,15 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('research:interpret', (_, project: string) => interpret(projectDir(project)))
   ipcMain.handle('sites:add', (_, site: Site) => addSite(ORCHESTRA_HOME, site))
+
+  ipcMain.handle('create:load', async (_, project: string) => {
+    const dir = projectDir(project)
+    const [lib, selected] = await Promise.all([loadLibrary(ORCHESTRA_HOME), readSelection(dir)])
+    return { musicians: lib.musicians, instruments: lib.instruments, selected }
+  })
+  ipcMain.handle('create:save', async (_, project: string, ids: string[]) =>
+    saveSelection(projectDir(project), await loadLibrary(ORCHESTRA_HOME), ids)
+  )
 
   // orchestra://ref/<project>/<file> serves uploaded reference files for thumbnails, and
   // nothing else: both parts are validated by projectDir and referenceFilePath.

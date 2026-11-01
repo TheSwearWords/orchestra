@@ -15,6 +15,7 @@ export type IconName =
   | 'arrow-left-double-line'
   | 'arrow-right-double-line'
   | 'arrow-right-up-line'
+  | 'check-line'
   | 'close-line'
   | 'folder-line'
   | 'logo-mark'

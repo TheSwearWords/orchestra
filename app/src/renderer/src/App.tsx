@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Project } from '../../preload'
 import { Ascii, type AsciiName } from './components/Ascii'
+import { Deliverables } from './components/Deliverables'
 import { NewProject } from './components/NewProject'
 import { Research } from './components/Research'
 import { Sidebar, type Page } from './components/Sidebar'
@@ -113,6 +114,8 @@ function App(): React.JSX.Element {
             <PhaseTabs active={phase} onChange={setPhase} />
             {phase === 'research' ? (
               <Research key={project.id} project={project.id} />
+            ) : phase === 'create' ? (
+              <Deliverables key={project.id} project={project.id} />
             ) : (
               <section key={phase} className="stagger px-6 py-8">
                 <p className="type-body-m text-fg-2">

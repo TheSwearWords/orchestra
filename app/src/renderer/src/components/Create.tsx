@@ -5,7 +5,8 @@ import type {
   CreateState,
   LogEntry,
   Musician,
-  Output
+  Output,
+  Project
 } from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
 import { splitSuggestion } from '../suggest'
@@ -27,11 +28,15 @@ const outlineButton =
  * chosen deliverable. With no chat open, it shows them all to choose from. */
 export function Create({
   project,
+  info,
+  onInfoSaved,
   chat,
   onChat,
   onChatsChanged
 }: {
   project: string
+  info: Project // name, client, concept: shown and edited at the top of the overview
+  onInfoSaved: () => void
   chat: string | null // null: the overview of all chats
   onChat: (chat: string | null) => void
   onChatsChanged: () => void // deliverables changed, so the sidebar's chat list did too
@@ -73,7 +78,14 @@ export function Create({
     )
   if (chat === null)
     return (
-      <Overview project={project} plan={plan} onOpen={onChat} onPick={() => setPicking(true)} />
+      <Overview
+        project={project}
+        info={info}
+        onInfoSaved={onInfoSaved}
+        plan={plan}
+        onOpen={onChat}
+        onPick={() => setPicking(true)}
+      />
     )
   return (
     <ChatView
@@ -95,11 +107,15 @@ let seenOverview = false
 /** "What do you want to work on first?": the project's chats under the Orchestrator. */
 function Overview({
   project,
+  info,
+  onInfoSaved,
   plan,
   onOpen,
   onPick
 }: {
   project: string
+  info: Project
+  onInfoSaved: () => void
   plan: CreateState
   onOpen: (chat: string) => void
   onPick: () => void
@@ -115,9 +131,10 @@ function Overview({
 
   return (
     <div className="stagger min-h-0 flex-1 overflow-y-auto px-6 pt-8 pb-12">
-      <div className="flex items-end justify-between gap-6">
+      <ProjectInfo project={info} onSaved={onInfoSaved} />
+      <div className="mt-8 flex items-end justify-between gap-6 border-t border-line pt-6">
         <div>
-          <h2 className="type-heading-s">What do you want to work on first?</h2>
+          <h2 className="type-heading-xs">What do you want to work on first?</h2>
           <p className="mt-1 type-caption text-fg-2">
             Each deliverable has its own chat with the Orchestrator. General is for the whole
             project.
@@ -164,6 +181,118 @@ function Overview({
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/** The project's name and description, with a settings button that edits them in place. */
+function ProjectInfo({
+  project,
+  onSaved
+}: {
+  project: Project
+  onSaved: () => void
+}): React.JSX.Element {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(project)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const field =
+    'w-full border border-line bg-canvas px-3 type-body-s outline-none placeholder:text-fg-2 focus:border-focus'
+
+  async function save(): Promise<void> {
+    setSaving(true)
+    setError('')
+    try {
+      await window.api.editProject(project.id, {
+        name: draft.name,
+        client: draft.client,
+        concept: draft.concept
+      })
+      onSaved()
+      setEditing(false)
+    } catch (e) {
+      setError(reason(e))
+    }
+    setSaving(false)
+  }
+
+  const description = [project.client, project.concept.split('\n')[0]].filter(Boolean).join(' · ')
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0">
+          <h1 className="truncate type-heading-m">{project.name}</h1>
+          <p className="mt-1 type-body-s text-fg-2">{description || 'No client or concept yet.'}</p>
+        </div>
+        <button
+          onClick={() => {
+            setDraft(project)
+            setEditing(!editing)
+          }}
+          aria-expanded={editing}
+          aria-label="Project settings"
+          title="Edit the name, client and concept"
+          className={`flex size-9 shrink-0 items-center justify-center border transition-[background-color,color,scale] duration-150 active:scale-[0.95] ${editing ? 'border-line-strong bg-muted text-fg' : 'border-line text-fg-2 hover:bg-muted hover:text-fg'}`}
+        >
+          <Icon name="settings-3-line" />
+        </button>
+      </div>
+      {editing && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void save()
+          }}
+          className="stagger mt-4 grid max-w-2xl gap-3 border border-line bg-subtle p-4"
+        >
+          <label className="grid gap-1.5 type-label-s">
+            Name
+            <input
+              autoFocus
+              required
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              className={`h-9 ${field}`}
+            />
+          </label>
+          <label className="grid gap-1.5 type-label-s">
+            Client
+            <input
+              value={draft.client}
+              onChange={(e) => setDraft({ ...draft, client: e.target.value })}
+              placeholder="Optional"
+              className={`h-9 ${field}`}
+            />
+          </label>
+          <label className="grid gap-1.5 type-label-s">
+            Concept
+            <textarea
+              value={draft.concept}
+              onChange={(e) => setDraft({ ...draft, concept: e.target.value })}
+              rows={3}
+              placeholder="What is this project trying to say?"
+              className={`resize-y py-2 ${field}`}
+            />
+          </label>
+          {error && <p className="type-caption text-signal-fg">{error}</p>}
+          <div className="flex items-center gap-4">
+            <button type="submit" disabled={saving || !draft.name.trim()} className={solidButton}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="type-label-m text-fg-2 hover:text-fg"
+            >
+              Cancel
+            </button>
+            <span className="type-caption text-fg-2">
+              Saved to concept.md. The folder name stays.
+            </span>
+          </div>
+        </form>
+      )}
     </div>
   )
 }

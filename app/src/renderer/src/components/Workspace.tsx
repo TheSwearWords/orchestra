@@ -191,7 +191,7 @@ export function TabStrip({
           onClick={() => onSelect(t.id)}
           onAuxClick={(e) => e.button === 1 && onClose(t.id)}
           title={other ? `${t.name} (in the other pane)` : t.name}
-          className={`h-full max-w-52 truncate pr-1 pl-4 ${here ? 'type-current-s' : other ? 'type-label-s' : 'type-label-s text-fg-2'}`}
+          className={`h-full max-w-52 truncate pr-1 pl-4 ${here ? 'type-current-s text-brand' : other ? 'type-label-s' : 'type-label-s text-fg-2'}`}
         >
           {t.name}
         </button>

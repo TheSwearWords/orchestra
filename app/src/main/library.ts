@@ -38,7 +38,7 @@ type Fields = Record<string, string | string[]>
 
 /** Front matter with `key: value` and `key: [a, b]` lines, then the body. */
 export function parseDoc(md: string): { fields: Fields; body: string } | null {
-  const m = /^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(md)
+  const m = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(md)
   if (!m) return null
   const fields: Fields = {}
   for (const line of m[1].split(/\r?\n/)) {
@@ -59,13 +59,22 @@ const str = (f: Fields, k: string): string => (typeof f[k] === 'string' ? (f[k] 
 const list = (f: Fields, k: string): string[] => (Array.isArray(f[k]) ? (f[k] as string[]) : [])
 
 function agent(id: string, f: Fields, body: string): AgentDoc {
-  return { id, name: str(f, 'name') || id, prompt: body, tools: list(f, 'tools'), source: str(f, 'source') }
+  return {
+    id,
+    name: str(f, 'name') || id,
+    prompt: body,
+    tools: list(f, 'tools'),
+    source: str(f, 'source')
+  }
 }
 
 async function readFolder(dir: string): Promise<{ id: string; fields: Fields; body: string }[]> {
   const names = (await readdir(dir).catch(() => [] as string[])).filter((n) => n.endsWith('.md'))
   const docs = await Promise.all(
-    names.map(async (n) => ({ id: n.slice(0, -3), doc: parseDoc(await readFile(join(dir, n), 'utf8')) }))
+    names.map(async (n) => ({
+      id: n.slice(0, -3),
+      doc: parseDoc(await readFile(join(dir, n), 'utf8'))
+    }))
   )
   return docs.flatMap(({ id, doc }) => (doc ? [{ id, ...doc }] : []))
 }

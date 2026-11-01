@@ -62,6 +62,32 @@ export async function listProjects(dir: string): Promise<Project[]> {
   return projects.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/** Changes the display name in concept.md. The folder (id) keeps its name so paths and links hold;
+ * the rest of the file, including anything written in Obsidian, is left as it was. */
+export async function renameProject(dir: string, id: string, name: string): Promise<Project> {
+  const clean = name.replace(/\s*\r?\n\s*/g, ' ').trim()
+  if (!clean) throw new Error('Give the project a name.')
+  const file = join(dir, id, 'concept.md')
+  const md = (await readFile(file, 'utf8').catch(() => '')).replace(/^\uFEFF/, '')
+  const old = parseConcept(id, md)
+  const front = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(md)
+  let next: string
+  if (!front) next = `---\nname: ${clean}\nclient: \n---\n\n${md}`
+  else {
+    const fields = /^name:.*$/m.test(front[1])
+      ? front[1].replace(/^name:.*$/m, `name: ${clean}`)
+      : `name: ${clean}\n${front[1]}`
+    next = `---\n${fields}\n---\n` + md.slice(front[0].length)
+  }
+  // the title heading follows the name only while it still matches the old one
+  next = next.replace(
+    new RegExp(`^# ${old.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm'),
+    `# ${clean}`
+  )
+  await writeFile(file, next)
+  return parseConcept(id, next)
+}
+
 export async function createProject(dir: string, input: Omit<Project, 'id'>): Promise<Project> {
   const name = input.name.trim()
   const base = slugify(name)

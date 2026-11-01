@@ -3,7 +3,27 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, readdir, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { slugify, parseConcept, createProject, listProjects } from './projects.ts'
+import { slugify, parseConcept, createProject, listProjects, renameProject } from './projects.ts'
+import { writeFile } from 'fs/promises'
+
+test('renameProject changes the name, keeps the folder and the rest of the file', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'orchestra-rename-'))
+  try {
+    const p = await createProject(dir, { name: 'Forma', client: 'Atelier', concept: 'Quiet.' })
+    const r = await renameProject(dir, p.id, 'Forma Editorial\n')
+    assert.deepEqual(r, { id: 'forma', name: 'Forma Editorial', client: 'Atelier', concept: 'Quiet.' })
+    const md = await readFile(join(dir, 'forma', 'concept.md'), 'utf8')
+    assert.match(md, /^---\nname: Forma Editorial\nclient: Atelier\n---\n\n# Forma Editorial\n/)
+    await assert.rejects(renameProject(dir, p.id, '  '))
+    // a hand-made file without front matter gains it, and its own heading is left alone
+    await writeFile(join(dir, 'forma', 'concept.md'), '# My notes\n\n## Concept\n\nHi.\n')
+    const s = await renameProject(dir, p.id, 'Still')
+    assert.equal(s.name, 'Still')
+    assert.match(await readFile(join(dir, 'forma', 'concept.md'), 'utf8'), /# My notes/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
 
 test('slugify', () => {
   assert.equal(slugify('  Hermès Rebrand / 2026 '), 'hermes-rebrand-2026')

@@ -12,7 +12,11 @@ export async function readSelection(project: string): Promise<string[]> {
   return Array.isArray(list) ? list : []
 }
 
-export async function saveSelection(project: string, lib: Library, ids: string[]): Promise<string[]> {
+export async function saveSelection(
+  project: string,
+  lib: Library,
+  ids: string[]
+): Promise<string[]> {
   const unknown = ids.filter((id) => !lib.musicians.some((m) => m.id === id))
   if (unknown.length) throw new Error(`Unknown deliverable: ${unknown.join(', ')}`)
   const chosen = lib.musicians.filter((m) => ids.includes(m.id)) // library order, no duplicates

@@ -101,6 +101,7 @@ function App(): React.JSX.Element {
           select(t)
         }}
         onToggle={toggle}
+        onChanged={() => void window.api.listProjects().then(setProjects)}
       />
       <main className="relative isolate flex min-w-0 flex-1 flex-col overflow-y-auto bg-canvas">
         {/* a barely-there figure in the open space; content always reads over it */}

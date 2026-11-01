@@ -12,8 +12,9 @@ const ADVANCE = 0.6 // IBM Plex Mono character width, in em
 interface Props {
   name: AsciiName
   // Scale the figure to fill its box's height (cropping the left edge) or its width, both
-  // anchored bottom-right; or to fit entirely inside the box, centered.
-  fit: 'height' | 'width' | 'contain'
+  // anchored bottom-right; to fit entirely inside the box, centered; or to fill the height
+  // standing on the bottom edge, centered, cropping the sides of wider figures.
+  fit: 'height' | 'width' | 'contain' | 'stand'
   className?: string // positions and colors the box
 }
 
@@ -25,11 +26,13 @@ export function Ascii({ name, fit, className = '' }: Props): React.JSX.Element {
   const byHeight = `${100 / lines.length}cqh`
   const byWidth = `${100 / (cols * ADVANCE)}cqw`
   const fontSize =
-    fit === 'height' ? byHeight : fit === 'width' ? byWidth : `min(${byHeight}, ${byWidth})`
-  const place =
-    fit === 'contain'
-      ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
-      : 'right-0 bottom-0'
+    fit === 'width' ? byWidth : fit === 'contain' ? `min(${byHeight}, ${byWidth})` : byHeight
+  const place = {
+    height: 'right-0 bottom-0',
+    width: 'right-0 bottom-0',
+    contain: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
+    stand: 'bottom-0 left-1/2 -translate-x-1/2'
+  }[fit]
   return (
     <div
       aria-hidden

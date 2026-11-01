@@ -88,7 +88,11 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
   return (
     <div className="flex flex-1 flex-col">
       <div className="stagger flex-1">
-        <div role="radiogroup" aria-label="Category" className="flex flex-wrap gap-2 px-6 pt-6 pb-4">
+        <div
+          role="radiogroup"
+          aria-label="Category"
+          className="flex flex-wrap gap-2 px-6 pt-6 pb-4"
+        >
           {[null, ...categories].map((c) => (
             <button
               key={c ?? 'all'}

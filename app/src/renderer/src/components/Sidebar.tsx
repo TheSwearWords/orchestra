@@ -19,6 +19,7 @@ interface Props {
   art: AsciiName
   onSelect: (target: string) => void
   onToggle: () => void
+  onChanged: () => void // a project was renamed or deleted; reload the list
 }
 
 export function Sidebar({
@@ -27,14 +28,42 @@ export function Sidebar({
   collapsed,
   art,
   onSelect,
-  onToggle
+  onToggle,
+  onChanged
 }: Props): React.JSX.Element {
   const [query, setQuery] = useState('')
+  const [renaming, setRenaming] = useState<string | null>(null)
   const shown = projects.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
 
   // One element in both states, so its width can animate. Each layout keeps a fixed width
   // and fades in, so nothing reflows while the rail slides.
   const fadeIn = 'transition-opacity duration-200 ease-out-strong starting:opacity-0'
+
+  // Every project button: click selects, Ctrl/middle-click opens a window, right-click shows
+  // Rename / Open in new window / Delete.
+  const projectProps = (p: Project): React.ButtonHTMLAttributes<HTMLButtonElement> => ({
+    'aria-current': selected === p.id ? ('page' as const) : undefined,
+    onClick: (e: React.MouseEvent) =>
+      e.ctrlKey || e.metaKey ? void window.api.openWindow(p.id) : onSelect(p.id),
+    onAuxClick: (e: React.MouseEvent) => e.button === 1 && void window.api.openWindow(p.id),
+    onContextMenu: async (e: React.MouseEvent) => {
+      e.preventDefault()
+      const choice = await window.api.projectMenu(p.id, p.name)
+      if (choice === 'deleted') onChanged()
+      if (choice === 'rename') {
+        if (collapsed) onToggle()
+        setRenaming(p.id)
+      }
+    }
+  })
+
+  async function rename(p: Project, name: string): Promise<void> {
+    setRenaming(null)
+    if (name.trim() && name.trim() !== p.name) {
+      await window.api.renameProject(p.id, name).catch(() => {}) // an empty or failed rename keeps the old name
+      onChanged()
+    }
+  }
   return (
     <nav
       aria-label="Workspace"
@@ -75,12 +104,8 @@ export function Sidebar({
             {projects.map((p) => (
               <li key={p.id}>
                 <button
-                  title={`${p.name} (Ctrl+click opens a new window)`}
-                  aria-current={selected === p.id ? 'page' : undefined}
-                  onClick={(e) =>
-                    e.ctrlKey || e.metaKey ? void window.api.openWindow(p.id) : onSelect(p.id)
-                  }
-                  onAuxClick={(e) => e.button === 1 && void window.api.openWindow(p.id)}
+                  title={p.name}
+                  {...projectProps(p)}
                   className={`flex w-14 flex-col items-center py-2 transition-colors duration-150 hover:bg-muted ${selected === p.id ? 'bg-muted' : ''}`}
                 >
                   <span className={selected === p.id ? 'type-current-m' : 'type-label-l'}>
@@ -151,18 +176,31 @@ export function Sidebar({
             <ul className="-mx-4 mt-2 flex flex-col gap-2">
               {shown.map((p) => (
                 <li key={p.id}>
-                  <button
-                    aria-current={selected === p.id ? 'page' : undefined}
-                    onClick={(e) =>
-                      e.ctrlKey || e.metaKey ? void window.api.openWindow(p.id) : onSelect(p.id)
-                    }
-                    onAuxClick={(e) => e.button === 1 && void window.api.openWindow(p.id)}
-                    title="Ctrl+click opens it in a new window"
-                    className={`flex h-10 w-full items-center gap-2 px-6 text-left transition-colors duration-150 hover:bg-muted ${selected === p.id ? 'bg-muted type-current-m' : 'type-label-m'}`}
-                  >
-                    <Icon name="folder-line" />
-                    <span className="truncate">{p.name}</span>
-                  </button>
+                  {renaming === p.id ? (
+                    <div className="flex h-10 items-center gap-2 bg-muted px-6">
+                      <Icon name="folder-line" />
+                      <input
+                        autoFocus
+                        defaultValue={p.name}
+                        aria-label={`Rename ${p.name}`}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onBlur={(e) => void rename(p, e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur()
+                          if (e.key === 'Escape') setRenaming(null)
+                        }}
+                        className="min-w-0 flex-1 border border-focus bg-canvas px-1.5 py-0.5 type-label-m outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      {...projectProps(p)}
+                      className={`flex h-10 w-full items-center gap-2 px-6 text-left transition-colors duration-150 hover:bg-muted ${selected === p.id ? 'bg-muted type-current-m' : 'type-label-m'}`}
+                    >
+                      <Icon name="folder-line" />
+                      <span className="truncate">{p.name}</span>
+                    </button>
+                  )}
                 </li>
               ))}
               {shown.length === 0 && (
@@ -173,13 +211,14 @@ export function Sidebar({
             </ul>
           </div>
 
-          {/* the open space between the two solid sections holds the whole figure, scaled to fit */}
+          {/* the open space between the two solid sections: the figure stands on the line above
+          Files, fills the height, and wider figures crop at the sides */}
           <div className="relative min-h-0 flex-1">
             <Ascii
               key={art}
               name={art}
-              fit="contain"
-              className="absolute inset-4 text-line-strong/40 transition-opacity duration-700 ease-out-strong starting:opacity-0"
+              fit="stand"
+              className="absolute inset-x-0 top-4 bottom-0 text-line-strong/40 transition-opacity duration-700 ease-out-strong starting:opacity-0"
             />
           </div>
 

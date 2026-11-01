@@ -1,4 +1,4 @@
-import { app, dialog, net, protocol, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, dialog, net, protocol, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -8,7 +8,7 @@ import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { loadLibrary } from './library'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
-import { createProject, listProjects, type Project } from './projects'
+import { createProject, listProjects, renameProject, type Project } from './projects'
 import {
   addFiles,
   addLink,
@@ -85,6 +85,51 @@ app.whenReady().then(() => {
     createWindow(project)
   })
   ipcMain.handle('projects:list', () => listProjects(PROJECTS_DIR))
+  ipcMain.handle('projects:rename', (_, id: string, name: string) => {
+    projectDir(id)
+    return renameProject(PROJECTS_DIR, id, name)
+  })
+
+  // Right-click on a project. Opening and deleting happen here; renaming is answered with
+  // 'rename' so the sidebar can edit the name in place.
+  ipcMain.handle('projects:menu', (e, id: string, name: string) => {
+    const dir = projectDir(id)
+    const win = BrowserWindow.fromWebContents(e.sender)!
+    return new Promise<'rename' | 'opened' | 'deleted' | null>((resolve) => {
+      Menu.buildFromTemplate([
+        { label: 'Rename', click: () => resolve('rename') },
+        {
+          label: 'Open in new window',
+          click: () => {
+            createWindow(id)
+            resolve('opened')
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Delete…',
+          click: async () => {
+            const { response } = await dialog.showMessageBox(win, {
+              type: 'warning',
+              message: `Move “${name}” to the Recycle Bin?`,
+              detail:
+                'Its references, research and deliverables go with it. You can restore it from the Recycle Bin.',
+              buttons: ['Move to Recycle Bin', 'Cancel'],
+              defaultId: 1,
+              cancelId: 1
+            })
+            if (response !== 0) return resolve(null)
+            await shell.trashItem(dir)
+            resolve('deleted')
+          }
+        }
+      ]).popup({
+        window: win,
+        // closing without a choice; a click resolves first, so this is ignored then
+        callback: () => setTimeout(() => resolve(null), 200)
+      })
+    })
+  })
   ipcMain.handle('projects:create', (_, input: Omit<Project, 'id'>) =>
     createProject(PROJECTS_DIR, input)
   )

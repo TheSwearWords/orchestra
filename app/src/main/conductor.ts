@@ -9,9 +9,16 @@ import { join } from 'path'
 
 export interface ChatMessage {
   t: string // ISO time
-  role: 'user' | 'orchestrator'
+  role: 'user' | 'orchestrator' | 'note' // a note is the app's own line, e.g. a context hand-over
   text: string
 }
+
+// Before the Orchestrator's context fills up, it writes everything a fresh session needs to this
+// file (visible in Obsidian), and the next session starts from it. Claude's context is ~200k
+// tokens; hand over well before Claude Code would compact on its own.
+export const HANDOFF_FILE = 'notes/orchestrator.md'
+const HANDOFF_AT = Number(process.env.ORCHESTRA_HANDOFF_TOKENS) || 140_000
+const HANDOFF_PROMPT = `This conversation is getting long, so you'll continue in a fresh session. Write a handoff note to ${HANDOFF_FILE} (replace the file) so that session can pick up exactly where you are: the user's goals and every decision so far, what has been made (with file paths), what is planned next and in what order, open questions, and anything the user asked you to remember. Write it for yourself, plainly. Then reply only: Saved.`
 
 export type ChatEvent = { project: string } & (
   | { kind: 'live'; text: string } // the reply so far, while it streams
@@ -32,7 +39,7 @@ export async function readChat(project: string): Promise<ChatMessage[]> {
     .flatMap((l) => {
       try {
         const m = JSON.parse(l) as ChatMessage
-        return m && (m.role === 'user' || m.role === 'orchestrator') ? [m] : []
+        return m && ['user', 'orchestrator', 'note'].includes(m.role) ? [m] : []
       } catch {
         return [] // a half-written line from a crash; skip it rather than lose the rest
       }
@@ -63,6 +70,8 @@ interface Running {
   partial: string // the assistant message streaming now
   heard: boolean // any output yet: a resume that fails says nothing first
   stopping: boolean
+  context: number // tokens in the latest request: how full the conversation is
+  handingOver: boolean // the current turn is the hidden handoff, not shown in the chat
 }
 
 export interface ConductorOptions {
@@ -127,7 +136,16 @@ export class Conductor {
       '--disallowedTools=Task,Agent,Bash'
     ]
     const proc = spawn('claude', args, { cwd: projectDir })
-    const r: Running = { proc, busy: false, done: [], partial: '', heard: false, stopping: false }
+    const r: Running = {
+      proc,
+      busy: false,
+      done: [],
+      partial: '',
+      heard: false,
+      stopping: false,
+      context: 0,
+      handingOver: false
+    }
     this.running.set(projectId, r)
     const emit = this.opts.emit
     const live = (): string => [...r.done, r.partial].filter(Boolean).join('\n\n')
@@ -150,8 +168,14 @@ export class Conductor {
         }
         if (ev.type === 'stream_event' && ev.event?.delta?.type === 'text_delta') {
           r.partial += ev.event.delta.text ?? ''
-          emit({ project: projectId, kind: 'live', text: live() })
+          if (!r.handingOver) emit({ project: projectId, kind: 'live', text: live() })
         } else if (ev.type === 'assistant') {
+          const u = ev.message?.usage
+          if (u)
+            r.context =
+              (u.input_tokens ?? 0) +
+              (u.cache_read_input_tokens ?? 0) +
+              (u.cache_creation_input_tokens ?? 0)
           const text = (ev.message?.content ?? [])
             .filter((c) => c.type === 'text')
             .map((c) => c.text ?? '')
@@ -161,9 +185,13 @@ export class Conductor {
           r.partial = ''
         } else if (ev.type === 'result') {
           const text = live() || (typeof ev.result === 'string' ? ev.result.trim() : '')
-          r.busy = false
           r.done = []
           r.partial = ''
+          if (r.handingOver) {
+            void this.finishHandoff(projectId, projectDir, r, !ev.is_error)
+            continue
+          }
+          r.busy = false
           if (ev.is_error)
             emit({
               project: projectId,
@@ -176,7 +204,8 @@ export class Conductor {
               emit({ project: projectId, kind: 'message', message: m })
             )
           }
-          emit({ project: projectId, kind: 'busy', busy: false })
+          if (r.context > HANDOFF_AT && !ev.is_error) this.handOver(projectId, r)
+          else emit({ project: projectId, kind: 'busy', busy: false })
         }
       }
     })
@@ -209,6 +238,43 @@ export class Conductor {
     return r
   }
 
+  /** Asks the Orchestrator, out of sight, to write its handoff note before the context fills. */
+  private handOver(projectId: string, r: Running): void {
+    r.handingOver = true
+    r.busy = true // the user waits a moment; the chat says why
+    this.opts.emit({ project: projectId, kind: 'live', text: '' })
+    r.proc.stdin.write(
+      JSON.stringify({ type: 'user', message: { role: 'user', content: HANDOFF_PROMPT } }) + '\n'
+    )
+  }
+
+  /** The note is written: end this session; the next message starts a fresh one that reads it. */
+  private async finishHandoff(
+    projectId: string,
+    projectDir: string,
+    r: Running,
+    saved: boolean
+  ): Promise<void> {
+    const note: ChatMessage = {
+      t: new Date().toISOString(),
+      role: 'note',
+      text: saved
+        ? `The conversation was getting long, so the Orchestrator saved its context to ${HANDOFF_FILE} and continues in a fresh session.`
+        : 'The Orchestrator couldn’t save its context; it continues in the same session.'
+    }
+    await appendChat(projectDir, note)
+    this.opts.emit({ project: projectId, kind: 'message', message: note })
+    if (saved) {
+      r.stopping = true
+      if (process.platform === 'win32') spawn('taskkill', ['/pid', String(r.proc.pid), '/T', '/F'])
+      else r.proc.kill()
+      this.running.delete(projectId)
+      await rm(sessionFile(projectDir), { force: true })
+    } else r.handingOver = false
+    r.busy = false
+    this.opts.emit({ project: projectId, kind: 'busy', busy: false })
+  }
+
   stopAll(): void {
     for (const r of this.running.values()) {
       r.stopping = true
@@ -224,7 +290,14 @@ export class Conductor {
 interface StreamLine {
   type?: string
   event?: { delta?: { type?: string; text?: string } }
-  message?: { content?: { type: string; text?: string }[] }
+  message?: {
+    content?: { type: string; text?: string }[]
+    usage?: {
+      input_tokens?: number
+      cache_read_input_tokens?: number
+      cache_creation_input_tokens?: number
+    }
+  }
   result?: unknown
   is_error?: boolean
 }

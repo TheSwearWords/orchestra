@@ -5,7 +5,7 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { Conductor, readChat } from './conductor'
+import { Conductor, HANDOFF_FILE, readChat } from './conductor'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { loadLibrary } from './library'
@@ -33,20 +33,39 @@ const conductor = new Conductor({
       if (!w.isDestroyed()) w.webContents.send('chat:event', e)
   },
   systemPrompt: async (id) => {
-    const [lib, rules, projects] = await Promise.all([
+    const dir = join(PROJECTS_DIR, id)
+    const [lib, rules, projects, selected, handoff] = await Promise.all([
       loadLibrary(ORCHESTRA_HOME),
       readFile(join(ORCHESTRA_HOME, 'library', 'house-rules.md'), 'utf8').catch(() => ''),
-      listProjects(PROJECTS_DIR)
+      listProjects(PROJECTS_DIR),
+      readSelection(dir),
+      readFile(join(dir, HANDOFF_FILE), 'utf8').catch(() => '')
     ])
     const name = projects.find((p) => p.id === id)?.name ?? id
+    const catalogue = lib.musicians.map((m) => `- ${m.id}: ${m.name}. ${m.deliverable}`).join('\n')
     return [
       lib.orchestrator?.prompt ?? '',
       rules,
       `## This project
-You are working in the project "${name}"; your current directory is its folder. Read concept.md, research.md and deliverables.md before planning. The agent library (Musicians and Instruments, as markdown) is at ${join(ORCHESTRA_HOME, 'library')}.
+You are working in the project "${name}"; your current directory is its folder. Read concept.md, research.md and deliverables.md before planning, and read deliverables.md again whenever the plan matters: the user can change it at any time. The agent library (Musicians and Instruments, as markdown) is at ${join(ORCHESTRA_HOME, 'library')}.
+
+Deliverables chosen so far: ${selected.length ? selected.join(', ') : 'none yet'}.
+
+## The conversation is open-ended
+The user may start with no deliverables, add more at any point, or just think out loud with you. When they want something that one of the library's deliverables covers and it isn't chosen yet, say so, and end your reply with exactly one line of this form (ids from the list below, comma-separated):
+Suggest deliverables: website, slide-deck
+Orchestra turns that line into an "Add to deliverables" button; nothing is added until the user clicks it. If nothing in the library fits, say so and describe the Musician you would propose instead.
+
+Library deliverables (id: name):
+${catalogue}
 
 ## What you can do in this version of Orchestra
-You can talk with the user, read files, and write files inside the project folder. Briefing Musicians is not connected yet: plan the work with the user, and say plainly that the Musicians start once that is connected. Never say a Musician or Instrument is working. Write foundation files into prereqs/ only when the user asks you to.`
+You can talk with the user, read files, and write files inside the project folder. Briefing Musicians is not connected yet: plan the work with the user, and say plainly that the Musicians start once that is connected. Never say a Musician or Instrument is working. Write foundation files into prereqs/ only when the user asks you to.`,
+      handoff &&
+        `## Your handoff note from the previous session (${HANDOFF_FILE})
+You wrote this before your last session ended. Continue from it.
+
+${handoff}`
     ]
       .filter(Boolean)
       .join('\n\n')

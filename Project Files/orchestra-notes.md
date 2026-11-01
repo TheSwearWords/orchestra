@@ -319,3 +319,11 @@ The Agents screen (build step 5) later becomes the full editor for these same fi
   - Part 2: an Orchestra MCP with `brief_musician`; Musicians run as their own sessions with their Instruments, and the tree shows live status.
   - Part 3: "Before we move forward" decision cards and agent-creation approvals.
   - Part 4: the preview card.
+- **Create, part 1b (Nov 1):**
+  - **Open-ended chat:** Create opens on the conversation with or without deliverables.
+  - **Suggesting deliverables:** the Orchestrator ends a reply with `Suggest deliverables: a, b` when the user wants something the library covers. The chat shows an "Add to deliverables" card, and nothing is added until the user clicks it. The parser is `renderer/src/suggest.ts`, with tests.
+  - **Context hand-over, like Pitcrew:** the conductor tracks how full each request's context is. Past 140k tokens (override with `ORCHESTRA_HANDOFF_TOKENS`), it quietly asks the Orchestrator to write `notes/orchestrator.md`, then starts a fresh session that loads that note. The chat shows a note line.
+  - **"Agents and work" node tree:**
+    - Agents are round markers: the Orchestrator filled, Musicians ringed with their icon, Instruments small.
+    - Work (foundation files and deliverables) is a dashed square, or a green check when ready.
+    - Work is named after the file it makes.

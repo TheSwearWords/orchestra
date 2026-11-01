@@ -88,6 +88,42 @@ export async function renameProject(dir: string, id: string, name: string): Prom
   return parseConcept(id, next)
 }
 
+/** Edits a project's details in concept.md: name and client in the front matter, the concept as
+ * the "## Concept" section. Everything else in the file is left as it was. */
+export async function editProject(
+  dir: string,
+  id: string,
+  change: { name?: string; client?: string; concept?: string }
+): Promise<Project> {
+  if (change.name !== undefined) await renameProject(dir, id, change.name)
+  const file = join(dir, id, 'concept.md')
+  let md = await readFile(file, 'utf8').catch(() => '')
+  if (md.charCodeAt(0) === 0xfeff) md = md.slice(1) // a byte-order mark from a Windows editor
+
+  if (change.client !== undefined) {
+    const client = change.client.replace(/\s*\r?\n\s*/g, ' ').trim()
+    const front = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(md)
+    if (!front) md = `---\nname: ${parseConcept(id, md).name}\nclient: ${client}\n---\n\n${md}`
+    else {
+      const fields = /^client:.*$/m.test(front[1])
+        ? front[1].replace(/^client:.*$/m, () => `client: ${client}`)
+        : `${front[1]}\nclient: ${client}`
+      md = `---\n${fields}\n---\n` + md.slice(front[0].length)
+    }
+  }
+
+  if (change.concept !== undefined) {
+    const body = change.concept.trim()
+    const section = /(## Concept[^\S\r\n]*\r?\n)([\s\S]*?)(?=\r?\n## |$)/
+    md = section.test(md)
+      ? md.replace(section, (_, heading: string) => `${heading}\n${body}\n`)
+      : `${md.trimEnd()}\n\n## Concept\n\n${body}\n`
+  }
+
+  await writeFile(file, md)
+  return parseConcept(id, md)
+}
+
 export async function createProject(dir: string, input: Omit<Project, 'id'>): Promise<Project> {
   const name = input.name.trim()
   const base = slugify(name)

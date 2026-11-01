@@ -12,7 +12,7 @@ import { loadLibrary } from './library'
 import { foundationOrder } from './plan'
 import { listOutputs, outputPath } from './outputs'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
-import { createProject, listProjects, renameProject, type Project } from './projects'
+import { createProject, editProject, listProjects, renameProject, type Project } from './projects'
 import {
   addFiles,
   addLink,
@@ -278,6 +278,19 @@ app.whenReady().then(() => {
     }
   )
   ipcMain.handle('projects:list', () => listProjects(PROJECTS_DIR))
+  ipcMain.handle(
+    'projects:edit',
+    (_, id: string, change: { name?: string; client?: string; concept?: string }) => {
+      projectDir(id)
+      if (change.name !== undefined && !String(change.name).trim())
+        throw new Error('Give the project a name.')
+      return editProject(PROJECTS_DIR, id, {
+        name: change.name === undefined ? undefined : String(change.name),
+        client: change.client === undefined ? undefined : String(change.client),
+        concept: change.concept === undefined ? undefined : String(change.concept)
+      })
+    }
+  )
   ipcMain.handle('projects:rename', (_, id: string, name: string) => {
     projectDir(id)
     return renameProject(PROJECTS_DIR, id, name)

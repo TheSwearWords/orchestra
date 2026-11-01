@@ -69,6 +69,10 @@ const api = {
     items: { id: string; label: string; enabled?: boolean; separator?: boolean }[]
   ): Promise<string | null> => ipcRenderer.invoke('menu:popup', items),
   listProjects: (): Promise<Project[]> => ipcRenderer.invoke('projects:list'),
+  editProject: (
+    id: string,
+    change: { name?: string; client?: string; concept?: string }
+  ): Promise<Project> => ipcRenderer.invoke('projects:edit', id, change),
   renameProject: (id: string, name: string): Promise<Project> =>
     ipcRenderer.invoke('projects:rename', id, name),
   projectMenu: (

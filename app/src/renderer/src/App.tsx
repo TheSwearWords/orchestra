@@ -169,7 +169,13 @@ function App(): React.JSX.Element {
         selected={current ?? view}
         collapsed={collapsed}
         art={current ? PHASE_ART[phaseOf(current)].rail : 'violin'}
-        onSelect={(t) => (t === 'new' || t in PAGE_TITLES ? setMode(t as Mode) : show(t))}
+        onSelect={(t) => {
+          if (t === 'new' || t in PAGE_TITLES) return setMode(t as Mode)
+          // a project opens on its overview: its chats, with its name and description on top
+          show(t)
+          setPhases((all) => ({ ...all, [t]: 'create' }))
+          setOpenChats((all) => ({ ...all, [t]: null }))
+        }}
         onSide={(id) => {
           setTabs((t) => openToSide(t, id))
           setMode('projects')
@@ -215,6 +221,7 @@ function App(): React.JSX.Element {
                     chat={openChats[id] ?? null}
                     onChat={(c) => setOpenChats((all) => ({ ...all, [id]: c }))}
                     onChatsChanged={() => setChatsVersion((v) => v + 1)}
+                    onInfoSaved={refresh}
                     split={tabs.panes.length === 2}
                     side={i}
                     focused={tabs.focus === i}
@@ -274,7 +281,8 @@ function ProjectPane({
   onClose,
   chat,
   onChat,
-  onChatsChanged
+  onChatsChanged,
+  onInfoSaved
 }: {
   project: Project
   phase: Phase
@@ -287,6 +295,7 @@ function ProjectPane({
   chat: string | null
   onChat: (chat: string | null) => void
   onChatsChanged: () => void
+  onInfoSaved: () => void
 }): React.JSX.Element {
   return (
     <section
@@ -306,28 +315,25 @@ function ProjectPane({
         key={phase}
         name={PHASE_ART[phase].workspace}
         fit="width"
-        className="absolute top-[174px] right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0"
+        className={`absolute ${split ? 'top-[102px]' : 'top-[66px]'} right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0`}
       />
       {/* header and phase tabs stay put; each phase scrolls its own content below them */}
       <div key={project.id} className="stagger flex min-h-0 flex-1 flex-col">
-        <WorkspaceHeader
-          title={project.name}
-          context={[project.client, project.concept.split('\n')[0]].filter(Boolean).join(' · ')}
-          status={
-            split ? (
-              <button
-                onClick={onClose}
-                aria-label="Close this side of the split"
-                title="Close this side"
-                className="flex size-8 items-center justify-center text-fg-2 transition-colors duration-150 hover:bg-muted hover:text-fg"
-              >
-                <Icon name="close-line" />
-              </button>
-            ) : (
-              <span className="type-caption text-fg-2">Private workspace</span>
-            )
-          }
-        />
+        {split && (
+          <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-line bg-subtle pr-1.5 pl-6">
+            <span className={`truncate type-label-s ${focused ? 'text-link' : 'text-fg-2'}`}>
+              {project.name}
+            </span>
+            <button
+              onClick={onClose}
+              aria-label="Close this side of the split"
+              title="Close this side"
+              className="flex size-7 items-center justify-center text-fg-2 transition-colors duration-150 hover:bg-muted hover:text-fg"
+            >
+              <Icon name="close-line" size={14} />
+            </button>
+          </div>
+        )}
         <PhaseTabs active={phase} onChange={onPhase} />
         {phase === 'research' ? (
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -337,6 +343,8 @@ function ProjectPane({
           <Create
             key={project.id}
             project={project.id}
+            info={project}
+            onInfoSaved={onInfoSaved}
             chat={chat}
             onChat={onChat}
             onChatsChanged={onChatsChanged}

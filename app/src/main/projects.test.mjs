@@ -3,7 +3,43 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, readdir, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { slugify, parseConcept, createProject, listProjects, renameProject } from './projects.ts'
+import {
+  slugify,
+  parseConcept,
+  createProject,
+  editProject,
+  listProjects,
+  renameProject
+} from './projects.ts'
+
+test('editProject changes name, client and concept and keeps the rest of the file', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'orchestra-edit-'))
+  try {
+    await createProject(dir, { name: 'Forma', client: 'Atelier', concept: 'Quiet.' })
+    const file = join(dir, 'forma', 'concept.md')
+    // notes added in Obsidian below the concept must survive
+    await writeFile(file, (await readFile(file, 'utf8')) + '\n## References\n\nAre.na board.\n')
+    const p = await editProject(dir, 'forma', {
+      name: 'Forma Editorial',
+      client: 'North\nStudio',
+      concept: 'Loud type, $1 budget.'
+    })
+    assert.deepEqual(p, {
+      id: 'forma',
+      name: 'Forma Editorial',
+      client: 'North Studio',
+      concept: 'Loud type, $1 budget.'
+    })
+    const md = await readFile(file, 'utf8')
+    assert.match(md, /## References\n\nAre.na board./)
+    assert.equal(md.match(/## Concept/g).length, 1)
+    // a file without a concept section gets one
+    await writeFile(file, '---\nname: X\nclient: \n---\n\n# X\n')
+    assert.equal((await editProject(dir, 'forma', { concept: 'New.' })).concept, 'New.')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
 import { writeFile } from 'fs/promises'
 
 test('renameProject changes the name, keeps the folder and the rest of the file', async () => {

@@ -23,6 +23,8 @@ Already customizable today:
 - It gives you a prompt to copy into your own Claude Code terminal, so you can keep developing Orchestra yourself.
 - Show a **warning**: if you pull official updates from the GitHub repo, they may overwrite your changes. Alternatively, your fork runs as a separate application.
 - Anything can change: features, systems, UI layout, styling.
+- **Orchestra as a project inside Orchestra.** Turning on Advanced mode adds an "Orchestra" project to your project list. Inside it you pick what to change (color palette, logo, motion, UI, and so on) and make the change either in the app (talking to the Orchestrator like any other project) or through the Claude CLI.
+  - How self-updating could work: the project points at the app's own source. In dev mode, renderer changes (styling, layout, palette) reload live; main-process changes need a restart. Every change goes on a git commit so a broken edit can be rolled back, ideally with a "revert last change" button outside the part being edited, so a broken UI can't lock you out.
 - Principle: **architect the whole app so other users can change and customize it however they like.**
 
 ## 3. Onboarding flow (first launch)
@@ -55,6 +57,7 @@ Already customizable today:
 ## Open questions
 - Exact compute adapters: how ChatGPT and other providers hook into the Orchestrator/Musician/Instrument model.
 - Per-agent model assignment: where it's set (agent file? settings?), what happens if a provider isn't connected (fall back to the default?), and whether onboarding Step 2 lets you pick several providers.
+- Self-editing safety: does a shipped (packaged) build need to switch into a source/dev copy before Advanced mode can edit it? How does the user recover if an edit breaks the app?
 - Update path for users who've customized: separate app vs. fork vs. merge.
 - Which tools map to which MCPs (the recommendation list).
 - Installer format: one bundled installer vs. guided step-by-step installs.

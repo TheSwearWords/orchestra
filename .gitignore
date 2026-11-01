@@ -1,0 +1,23 @@
+# Dependencies and builds
+node_modules/
+out/
+dist/
+*.log*
+.DS_Store
+.eslintcache
+
+# Third-party tools, private archives and installers
+Tools/
+AgentOriginal/
+*.exe
+.taste-skill/
+
+# Generated
+graphify-out/
+
+# Obsidian per-device state
+**/.obsidian/workspace*.json
+
+# Client projects stay out of the app repo; only Orchestra's own brand project is tracked
+Orchestra/projects/*
+!Orchestra/projects/orchestra-brand/

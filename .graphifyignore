@@ -1,0 +1,18 @@
+# Graphify map of Orchestra: app code, agent library, notes, brand project
+Tools/
+AgentOriginal/
+Exports/
+assets/
+.taste-skill/
+graphify-out/
+app/out/
+app/dist/
+app/resources/
+app/build/
+app/src/renderer/src/assets/
+Orchestra/.obsidian/
+Orchestra/projects/test*/
+Orchestra/projects/*/references/files/
+*.exe
+*.json
+*.lock

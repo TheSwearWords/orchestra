@@ -1,0 +1,100 @@
+                                                                                                                                           
+                                                                                                                                           
+                                                                                                                                           
+                                                        sca                                                                                
+                                                       nner.read.                                                                          
+                                                        8.of.8.re                                                                          
+                                                      ferences...                                                                          
+                                                c   o lor.drafted                                                                          
+                                                .  a.palet te.fro                                                                          
+                                                m.#0538FF...type                                                                           
+                                                .paus   ed:.Sohn                                                                           
+                                               e.nee       d  s.                                                                           
+                                                a.l        ic en                                                                           
+                                                 ce.       ..or                                                                            
+                                                 che       stra                                                                            
+                                                 to     r    .w                                                                            
+                                                  a    iting.                                                                              
+                                                       o n.1.                                                                              
+                                                          deci                                                                             
+                                                         s  ion..  .layout.                                                                
+                                              qu           eued...asse    t-bu                                                             
+                                            ilde         r.q           ueued.  ..man                                               y       
+                                                         .       h   ands.   one.scor                                           e...sc     
+                                                   anne r.        read.8  .of.8.r                                              ef eren     
+                                                               c es...color.draft                                             ed    .      
+                                                       a.palette.from.#0538FF...ty                     pe.  paused:           .S  ohne     
+                                                   .needs.a.lice       nce...orchest                 rator.waiting         .o n.   1.d     
+                                                                       ecision...layout            .queue  d...         asse  t-build      
+                                      e                                r.queued...many.han        ds.o ne .sco       re..       .sca       
+                                       n                          n er.read.8.o   f.8.reference  s ...col or.d   rafted                    
+                                       .                           a.palette.fro m.#05    38FF. . .type.  paused:.Sohne                    
+                                       .n                          eeds.a.licenc   e..           .orche   s trator.w ai                    
+                                      ting                         .on.1.decision  ...          layout.   qu   eued  ..                    
+                                      .ass                        et-builder.qu e       ued    .. .many   .h   ands  .o                    
+                                      ne.                        score...scanner .           read.8.of.  8.r   efer  en                    
+                                     ces                     ...color.drafted.a. pa        lette.fro m.  #05   38FF  ..                    
+                                     .ty                      pe.paused:.Sohne.ne e   ds.a.licence.  ..  orc   hest  ra                    
+                                    tor                      .waiting.on.1.decision     ...layout.q  u   eue   d...a sse                   
+                                   t-bu                      ilder.queued...many      .hands.one.s  co    re  ...scanner                   
+                                  .rea                      d.8.of.8.reference   s     ... color.d  ra    ft  ed.a.palet                   
+                                  te.                      from.#0538FF...type .p         aused:.  So     hn  e.ne  eds.                   
+                                a.li                       cence...orchestrator .        waiting  .on     .1  .dec isi o                   
+                              n...l                        ayout.queued...ass et          -buil  der.     q   ueue d..                     
+                             .many                         .hand s.one.score.   .     .scanner   .re    a d   .8.o f.8                     
+                             .refe                        rences...color.dra          fted.a.   pa l   e  t   te.f rom.                    
+                             #053                          8FF...type.paused           :.Soh   ne.     n  e  eds.a.lice                    
+                            nce.                           ..orchestrator.wai           tin    g. o   n  .1  .decision.                    
+                           ..la                            yout.queued...as s            e    t-b     u  il  der.queued                    
+                          ...m                             any.hands.one.sc  o             r e.. .       sc   anner.rea                    
+                        d.8.                              of.8.references... co             lor. d   ra fte     d.a . p                    
+                      alet                               te.from.#0538FF...ty               pe. p     aused      :.So                      
+                    hne.                                needs.a.licence...orc              hestra     to r.                                
+                  waitin                               g.on.1.de cision...layo           ut.qu e     ued ..                                
+                .asset-buil                              der.que  ued...many. h      ands.o n  e      .s                                   
+              core...scanne                     r.     r   ead.   8.of.8.refe  r  ences... co lo      r                                    
+     .drafted.a.palette.fro                 m.  #           05    38FF...typ    e    .pau  s  e       d :.                                 
+     Sohne.needs.a.licence..                .orc             h    estrator.wa          i  ti n        g .o                                 
+    n.1.decision...layout.qu                eued   ..    .a   s    set-builde          r  .  q       ueued                                 
+   .. .man    y.hands.one.sco               re...s         c       anner.read.        8             .o  f.                                 
+     8. r    eferences...colo               r.draf         te      d.a.palette.       f             ro  m.                                 
+                #0538FF...type              .pause        d:       .Sohne.needs.     a                . li                                 
+                cence...orches    t         rator.wa    iti         ng.on.1.decis   io                 n..                                 
+                .layou    t.    queu        ed...asset-bui          lder.queued   ...              m  an                                   
+                y.han     d    s.one        .score... sca           nner.read.8.of.8   .           re                                      
+               feren   ces..   .colo        r.drafted .a.           palette.from.  #  0            53                                      
+               8F F   ...typ   e.pau        sed:.Sohn  e.           needs.a.licence                                                        
+                ...o  rchest    rato        r.waitin   g.o          n.1.decision...  l ay     ou                                           
+                t.q  ueue       d...        asset-bu    ild         er.queued...man  y.h       a                                           
+                  nd s.o        ne.s        core...s    can         ner.read.8.of   .8.                                                    
+                    refe  re    nces        ...colo      r.d        rafted.a.palette.                                                      
+                      f   ro    m.#05        38FF..       .ty       pe.paused:.Sohne                                                       
+                         .ne   eds.a.        licen        ce.       ..o                                                                    
+                       rche    strato        r.wai        tin       g.o                                                                    
+                     n.1.   d  ecision       ...la         yo       ut.                                                                    
+                    q          ueued..       .ass          et-     buil                                                                    
+                    d         er.queued     ...ma          ny.h     and                                                                    
+                    s         .one.scor      e...           sca    nne                                                                     
+                    r          .read.8.     of.8.            re    fer                                                                     
+                   e              nces..   .color            .d     ra                                                                     
+                              ft ed.a.pa    lette            .fr    om                                                                     
+                               .#0538FF.   ..typ              e.paused:                                                                    
+                                  .Sohne   .needs             .a.licenc                                                                    
+                                 e...orc   hestrat            or.waitin                                                                    
+                                g.on.1.d    ecisio            n...layout                                                                   
+                         .     que ued..    .asset-             builder.                                                                   
+                                 queued.    ..many.             hands.on                                                                   
+                         e.                  score.             ..scanne                                                                   
+                                       r     .read.8            .of.8.re                                                                   
+                    fe               ren     ces...c         ol or.draf                                                                    
+                     t                ed.     a.pale          tte.from.                                                                    
+                                      #053     8FF..          .type.pau                                                                    
+                                  sed:.Soh     ne.ne          eds.a.li                                                                     
+                                  cence...     orche          strator.                                                                     
+                        wai    ti   ng.on.1    .deci          sion...                                                                      
+                           l    ayout.queued   ...as           set-bu                                                                      
+                                 ilder.queue    d...           many.                                                                       
+                                 hands.one.sc   ore.           ..sca                                                                       
+                            n    ner.read.8.o    f.8          .refer                                                                       
+                            e    nces...color.   dra          fted.a                                                                       
+                            .    palette.from.   #05         38FF...t

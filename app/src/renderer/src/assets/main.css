@@ -1,0 +1,134 @@
+@import 'tailwindcss';
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+@import '@fontsource-variable/instrument-sans';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import './tokens.css';
+
+/* Short Tailwind names for the Figma semantic tokens, e.g. bg-subtle, text-fg-2, border-line */
+@theme inline {
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-sans: 'Instrument Sans Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --radius-*: initial;
+  --radius-sm: 2px;
+  --radius-full: 9999px;
+  /* motion: strong curves read as intentional; stock CSS easings feel weak */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+
+  --color-canvas: var(--color-bg-default);
+  --color-subtle: var(--color-bg-subtle);
+  --color-muted: var(--color-bg-muted);
+  --color-inverse: var(--color-bg-inverse);
+  --color-surface: var(--color-surface-default);
+  --color-raised: var(--color-surface-raised);
+  --color-sunken: var(--color-surface-sunken);
+  --color-line: var(--color-border-default);
+  --color-line-strong: var(--color-border-strong);
+  --color-focus: var(--color-border-focus);
+  --color-fg: var(--color-text-primary);
+  --color-fg-2: var(--color-text-secondary);
+  --color-fg-disabled: var(--color-text-disabled);
+  --color-link: var(--color-text-link);
+  --color-on-brand: var(--color-text-on-brand);
+  --color-brand: var(--color-brand-default);
+  --color-brand-hover: var(--color-brand-hover);
+  --color-brand-pressed: var(--color-brand-pressed);
+  --color-brand-subtle: var(--color-brand-subtle);
+  --color-agent: var(--color-agent-default);
+  --color-agent-subtle: var(--color-agent-subtle);
+  --color-agent-fg: var(--color-agent-text);
+  --color-success: var(--color-status-success-default);
+  --color-success-subtle: var(--color-status-success-subtle);
+  --color-success-fg: var(--color-status-success-text);
+  --color-signal: var(--color-status-signal-default);
+  --color-signal-subtle: var(--color-status-signal-subtle);
+  --color-signal-fg: var(--color-status-signal-text);
+  --color-on-signal: var(--color-status-signal-on);
+  --color-danger: var(--color-status-danger-default);
+  --color-danger-subtle: var(--color-status-danger-subtle);
+  --color-danger-fg: var(--color-status-danger-text);
+  --color-logo: var(--color-logo-default);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-default);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* "You are here": whatever is selected (project, page, phase) switches to the display
+   serif italic. Sizes are a step up so the serif's smaller x-height reads at the same weight as
+   the sans it replaces. Swap these in for the type-label/body style, never stack them. */
+@utility type-current-s {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 18px;
+  font-weight: 400;
+}
+@utility type-current-m {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  line-height: 20px;
+  font-weight: 400;
+}
+@utility type-current-l {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 400;
+}
+
+/* Screen entrance: each child of .stagger rises in 40ms after the one before it.
+   --stagger-start offsets a nested group so it follows the header and tabs. A child that
+   holds its own .stagger group doesn't move as a block; its group cascades instead.
+   Purely visual: nothing waits on it, so the screen is usable immediately. */
+.stagger > :not(:has(.stagger)) {
+  animation: stagger-in 380ms var(--ease-out-strong) both;
+  animation-delay: calc(var(--stagger-start, 0ms) + (sibling-index() - 1) * 40ms);
+}
+
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+/* Reduced motion keeps fades (they aid comprehension) and drops movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-property: opacity, color, background-color, border-color !important;
+  }
+  .stagger > :not(:has(.stagger)) {
+    animation-name: stagger-fade;
+  }
+}
+
+@keyframes stagger-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* base layer, so a field's own focus border (outline-none) can override it */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+  }
+}

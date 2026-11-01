@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { CreateState, Musician } from '../../../preload'
+import type { CreateState } from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
 import { Icon } from './Icon'
 
@@ -13,6 +13,9 @@ const rank = (c: string): number => {
 const solidButton =
   'h-9 shrink-0 bg-brand px-4 type-label-m text-on-brand transition-[background-color,scale] duration-150 hover:bg-brand-hover active:scale-[0.97] active:bg-brand-pressed disabled:bg-muted disabled:text-fg-disabled'
 
+// Grid cells, like the Research site buttons: four across, hairlines between, none on the right edge
+const cell = 'border-r border-b border-line [&:nth-child(4n)]:border-r-0'
+
 // Electron prefixes IPC errors with the channel name; show only the reason
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 
@@ -22,6 +25,8 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
   const [chosen, setChosen] = useState<string[]>([])
   const [saved, setSaved] = useState<string[]>([])
   const [query, setQuery] = useState('')
+  const [category, setCategory] = useState<string | null>(null) // null = all
+  const [explaining, setExplaining] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -42,18 +47,25 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
   )
 
   if (!data)
-    return error ? <p className="px-6 py-8 type-body-s text-signal-fg">{error}</p> : <div className="flex-1" />
+    return error ? (
+      <p className="px-6 py-8 type-body-s text-signal-fg">{error}</p>
+    ) : (
+      <div className="flex-1" />
+    )
 
   const names = new Map(data.instruments.map((i) => [i.id, i.name]))
-  const q = query.trim().toLowerCase()
-  const shown = data.musicians.filter(
-    (m) =>
-      !q ||
-      [m.name, m.deliverable, m.category, ...m.keywords].some((s) => s.toLowerCase().includes(q))
-  )
-  const categories = [...new Set(shown.map((m) => m.category))].sort(
+  const categories = [...new Set(data.musicians.map((m) => m.category))].sort(
     (a, b) => rank(a) - rank(b) || a.localeCompare(b)
   )
+  const q = query.trim().toLowerCase()
+  const shown = data.musicians
+    .filter((m) => !category || m.category === category)
+    .filter(
+      (m) =>
+        !q ||
+        [m.name, m.deliverable, m.category, ...m.keywords].some((s) => s.toLowerCase().includes(q))
+    )
+    .sort((a, b) => rank(a.category) - rank(b.category) || a.name.localeCompare(b.name))
   const dirty = chosen.length !== saved.length || chosen.some((id) => !saved.includes(id))
 
   function toggle(id: string): void {
@@ -75,64 +87,78 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="stagger flex-1 px-6 pt-8 pb-12">
-        <div className="flex items-end justify-between gap-6">
-          <div>
-            <h2 className="type-heading-s">Deliverables</h2>
-            <p className="mt-1 type-caption text-fg-2">
-              Pick everything this project needs. Shared foundations are built once, first.
-            </p>
-          </div>
-          <label className="flex h-9 w-64 items-center gap-2 border border-line bg-canvas px-2 focus-within:border-focus">
-            <Icon name="search-line" className="text-fg-2" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search deliverables"
-              aria-label="Search deliverables"
-              className="min-w-0 flex-1 bg-transparent type-body-s outline-none placeholder:text-fg-2"
-            />
-          </label>
+      <div className="stagger flex-1">
+        <div role="radiogroup" aria-label="Category" className="flex flex-wrap gap-2 px-6 pt-6 pb-4">
+          {[null, ...categories].map((c) => (
+            <button
+              key={c ?? 'all'}
+              role="radio"
+              aria-checked={category === c}
+              onClick={() => setCategory(c)}
+              className={`h-8 border px-3 transition-[background-color,scale] duration-150 active:scale-[0.97] ${category === c ? 'border-line-strong bg-muted type-current-s' : 'border-line type-label-s text-fg-2 hover:bg-subtle hover:text-fg'}`}
+            >
+              {c ?? 'All'}
+            </button>
+          ))}
         </div>
 
-        {categories.map((c) => (
-          <section key={c} className="mt-8">
-            <h3 className="type-label-m text-fg-2">{c}</h3>
-            <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-              {shown
-                .filter((m) => m.category === c)
-                .map((m) => (
-                  <li key={m.id}>
-                    <Card
-                      musician={m}
-                      on={chosen.includes(m.id)}
-                      needs={m.prerequisites.map((p) => names.get(p) ?? p)}
-                      onToggle={() => toggle(m.id)}
-                    />
-                  </li>
-                ))}
-            </ul>
-          </section>
-        ))}
+        <label className="flex h-12 items-center gap-3 border-y border-line bg-canvas px-6 focus-within:bg-subtle">
+          <Icon name="search-line" className="text-fg-2" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search deliverables"
+            aria-label="Search deliverables"
+            className="min-w-0 flex-1 bg-transparent type-body-m outline-none placeholder:text-fg-2"
+          />
+        </label>
+
+        <ul className="grid grid-cols-4">
+          {shown.map((m) => {
+            const on = chosen.includes(m.id)
+            const needs = m.prerequisites.map((p) => names.get(p) ?? p).join(', ')
+            return (
+              <li key={m.id} className={cell}>
+                <button
+                  role="checkbox"
+                  aria-checked={on}
+                  onClick={() => toggle(m.id)}
+                  title={`${m.deliverable}${needs ? `\nNeeds ${needs}` : ''}`}
+                  className={`flex h-14 w-full items-center justify-center gap-2 px-3 transition-[background-color,scale] duration-150 active:scale-[0.97] ${on ? 'bg-brand type-current-m text-on-brand' : 'bg-subtle type-label-m hover:bg-muted'}`}
+                >
+                  {on && <Icon name="check-line" />}
+                  {m.name}
+                </button>
+              </li>
+            )
+          })}
+          <li className={cell}>
+            <button
+              onClick={() => setExplaining(!explaining)}
+              aria-expanded={explaining}
+              className={`flex h-14 w-full items-center justify-center gap-2 transition-colors duration-150 hover:bg-muted ${explaining ? 'bg-muted type-current-m' : 'bg-canvas type-label-m text-link'}`}
+            >
+              <Icon name="add-line" />
+              Add your own
+            </button>
+          </li>
+        </ul>
 
         {shown.length === 0 && (
-          <p className="mt-8 type-body-s text-fg-2">Nothing in the library matches “{query}”.</p>
+          <p className="px-6 pt-6 type-body-s text-fg-2">
+            Nothing {category ? `in ${category} ` : ''}matches “{query}”.
+          </p>
         )}
-
-        <div className="mt-8 max-w-md border border-dashed border-line-strong px-4 py-4">
-          <p className="flex items-center gap-2 type-label-l">
-            <Icon name="add-line" />
-            Add your own
+        {explaining && (
+          <p className="mx-6 mt-6 max-w-xl border-l-2 border-agent bg-agent-subtle px-3 py-2 type-body-s text-agent-fg">
+            You’ll describe a new deliverable to the Orchestrator, and it drafts a Musician for your
+            approval. That arrives with the Create chat, the next build step.
           </p>
-          <p className="mt-1 pl-6 type-body-s text-fg-2">
-            Describe a deliverable to the Orchestrator and it drafts a new Musician for your
-            approval. Arrives with the Create chat.
-          </p>
-        </div>
+        )}
       </div>
 
       {/* the build order, always in view while picking */}
-      <div className="sticky bottom-0 flex items-center gap-6 border-t border-line bg-canvas px-6 py-3">
+      <div className="sticky bottom-0 mt-12 flex items-center gap-6 border-t border-line bg-canvas px-6 py-3">
         <div className="min-w-0 flex-1">
           <p className="type-caption text-fg-2">
             {chosen.length} deliverable{chosen.length === 1 ? '' : 's'}
@@ -161,39 +187,5 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
         </button>
       </div>
     </div>
-  )
-}
-
-function Card({
-  musician: m,
-  on,
-  needs,
-  onToggle
-}: {
-  musician: Musician
-  on: boolean
-  needs: string[]
-  onToggle: () => void
-}): React.JSX.Element {
-  return (
-    <button
-      role="checkbox"
-      aria-checked={on}
-      onClick={onToggle}
-      className={`flex h-full w-full flex-col border p-4 text-left transition-[background-color,border-color,scale] duration-150 active:scale-[0.98] ${on ? 'border-brand bg-brand-subtle' : 'border-line bg-canvas hover:bg-subtle'}`}
-    >
-      <span className="flex items-start justify-between gap-3">
-        <span className={on ? 'type-current-l' : 'type-label-l'}>{m.name}</span>
-        <span
-          className={`flex size-5 shrink-0 items-center justify-center border transition-colors duration-150 ${on ? 'border-brand bg-brand text-on-brand' : 'border-line-strong bg-canvas'}`}
-        >
-          {on && <Icon name="check-line" size={14} />}
-        </span>
-      </span>
-      <span className="mt-2 line-clamp-3 type-body-s text-fg-2">{m.deliverable}</span>
-      {needs.length > 0 && (
-        <span className="mt-auto pt-4 type-caption text-fg-2">Needs {needs.join(', ')}</span>
-      )}
-    </button>
   )
 }

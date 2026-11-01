@@ -86,7 +86,7 @@ function App(): React.JSX.Element {
           key={workspaceArt} // remount so a new figure fades in
           name={workspaceArt}
           fit="width"
-          className={`absolute right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0 ${page ? 'top-28' : 'top-[174px]'}`} // below the header and tabs
+          className={`absolute right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0 ${view === 'project' ? 'top-[174px]' : 'top-28'}`} // below the header, and the tabs when shown
         />
         {view === 'new' && (
           <div key="new" className="stagger flex flex-1 flex-col">
@@ -95,7 +95,6 @@ function App(): React.JSX.Element {
               context="A new space for research, creation and refinement."
               status={<span className="type-caption text-fg-2">Only you can see this</span>}
             />
-            <PhaseTabs active={null} onChange={setPhase} />
             <NewProject
               onCreated={(p) => {
                 setProjects([...projects, p].sort((a, b) => a.name.localeCompare(b.name)))

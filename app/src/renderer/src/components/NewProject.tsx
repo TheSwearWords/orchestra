@@ -31,7 +31,7 @@ export function NewProject({ onCreated }: Props): React.JSX.Element {
   return (
     <div className="grid flex-1 grid-cols-[minmax(0,640px)_minmax(0,1fr)] gap-16 px-10 pt-14 pb-10">
       <form onSubmit={submit} className="stagger flex flex-col [--stagger-start:100ms]">
-        <h2 className="type-heading-s">Start with a point of view.</h2>
+        <h2 className="type-heading-m text-fg italic">Start with a point of view.</h2>
 
         <label htmlFor="np-name" className="mt-6 type-label-m">
           Name

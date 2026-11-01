@@ -95,7 +95,7 @@ function Sites({
   }
 
   return (
-    <div className="border-b border-line">
+    <div className="mt-6 border-y border-line">
       <ul className="grid grid-cols-4">
         {sites.map((s) => (
           <li key={s.url} className="border-r border-b border-line [&:nth-child(4n)]:border-r-0">

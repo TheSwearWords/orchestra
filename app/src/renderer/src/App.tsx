@@ -88,9 +88,15 @@ function App(): React.JSX.Element {
       }
     }
     window.addEventListener('keydown', keys)
+    // a tab from another window was dropped on this one's tab strip
+    const stopAdopting = window.api.onAdoptTab((id) => {
+      setTabs((t) => openTab(t, id))
+      setMode('projects')
+    })
     return () => {
       window.removeEventListener('focus', load)
       window.removeEventListener('keydown', keys)
+      stopAdopting()
     }
   }, [])
 
@@ -148,9 +154,6 @@ function App(): React.JSX.Element {
             onSelect={show}
             onClose={(id) => setTabs((t) => closeTab(t, id))}
             onSplitWith={(id) => setTabs((t) => openToSide(t, id))}
-            onPopOut={(id, at) =>
-              void window.api.openWindow(id, at).then(() => setTabs((t) => closeTab(t, id)))
-            }
           />
         )}
 

@@ -1,4 +1,4 @@
-import { app, dialog, net, protocol, shell, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -36,14 +36,21 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'orchestra', privileges: { standard: true, secure: true } }
 ])
 
+// Where the cursor sits on a torn-off window: over its tab strip, as if still holding the tab
+const GRIP = { x: 300, y: 20 }
+// How far down a window's content its tab strip reaches, for dropping a dragged tab onto it
+const STRIP_DEPTH = 48
+
 /** Opens an Orchestra window; with a project id it opens on that project (passed in the URL hash),
- * and with a screen point (a tab dropped outside a window) it opens there. */
-function createWindow(project?: string, at?: { x: number; y: number }): void {
+ * and with a screen point (a tab dragged out of a window) it opens there. */
+function createWindow(
+  project?: string,
+  at?: { x: number; y: number; width?: number; height?: number }
+): BrowserWindow {
   const mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    // the cursor lands on the new window's tab strip, as if still holding the tab
-    ...(at ? { x: Math.round(at.x) - 300, y: Math.round(at.y) - 20 } : {}),
+    width: Math.round(at?.width ?? 1440),
+    height: Math.round(at?.height ?? 900),
+    ...(at ? { x: Math.round(at.x) - GRIP.x, y: Math.round(at.y) - GRIP.y } : {}),
     minWidth: 1024,
     minHeight: 640,
     backgroundColor: '#FFFFFF',
@@ -73,6 +80,38 @@ function createWindow(project?: string, at?: { x: number; y: number }): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash })
   }
+  return mainWindow
+}
+
+/** The other Orchestra window whose tab strip is under a screen point, if any. */
+function stripUnder(point: { x: number; y: number }, except: BrowserWindow): BrowserWindow | null {
+  return (
+    BrowserWindow.getAllWindows().find((w) => {
+      if (w === except || w.isDestroyed() || !w.isVisible()) return false
+      const b = w.getContentBounds()
+      return (
+        point.x >= b.x && point.x < b.x + b.width && point.y >= b.y && point.y < b.y + STRIP_DEPTH
+      )
+    }) ?? null
+  )
+}
+
+// A tab being dragged outside its window. The window under the cursor (a new one torn off for
+// the tab, or the tab's own window when it was the only tab) follows the cursor until release.
+let drag: {
+  project: string
+  follower: BrowserWindow
+  created: boolean // torn off for this drag, so closed if the drag is cancelled or merged
+  grip: { x: number; y: number }
+  target: BrowserWindow | null
+  timer: NodeJS.Timeout
+} | null = null
+
+function endDrag(): void {
+  if (!drag) return
+  clearInterval(drag.timer)
+  if (!drag.follower.isDestroyed()) drag.follower.setOpacity(1)
+  drag = null
 }
 
 app.whenReady().then(() => {
@@ -83,10 +122,54 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.handle('window:open', (_, project?: string, at?: { x: number; y: number }) => {
+  ipcMain.handle('window:open', (_, project?: string) => {
     if (project !== undefined) projectDir(project) // only real projects
-    const point = at && Number.isFinite(at.x) && Number.isFinite(at.y) ? at : undefined
-    createWindow(project, point)
+    createWindow(project)
+  })
+
+  // Tear-off: a tab dragged past its window's edge. `alone` means it was the window's only
+  // tab, so the window itself follows the cursor instead of a new one.
+  ipcMain.handle(
+    'drag:start',
+    (e, project: string, at: { x: number; y: number; width: number; height: number }, alone) => {
+      projectDir(project)
+      if (![at.x, at.y, at.width, at.height].every(Number.isFinite)) throw new Error('Bad point.')
+      endDrag()
+      const own = BrowserWindow.fromWebContents(e.sender)!
+      const follower = alone ? own : createWindow(project, at)
+      const [wx, wy] = own.getPosition()
+      const grip = alone ? { x: at.x - wx, y: at.y - wy } : GRIP
+      const timer = setInterval(() => {
+        if (!drag || drag.follower.isDestroyed()) return endDrag()
+        const p = screen.getCursorScreenPoint()
+        drag.follower.setPosition(Math.round(p.x - drag.grip.x), Math.round(p.y - drag.grip.y))
+        // over another window's tab strip: dropping here merges, so show the window as see-through
+        const target = stripUnder(p, drag.follower)
+        if (target !== drag.target) drag.follower.setOpacity(target ? 0.55 : 1)
+        drag.target = target
+      }, 16)
+      drag = { project, follower, created: !alone, grip, target: null, timer }
+    }
+  )
+  // Back inside the window it came from before release: the torn-off window goes away.
+  ipcMain.handle('drag:cancel', () => {
+    if (drag?.created && !drag.follower.isDestroyed()) drag.follower.close()
+    endDrag()
+  })
+  // Released. Over another window's tab strip, the tab joins that window and the dragged window
+  // closes; anywhere else, the window stays where it was dropped.
+  ipcMain.handle('drag:end', (): 'merged' | 'placed' => {
+    if (!drag) return 'placed'
+    const { project, follower, target } = drag
+    endDrag()
+    if (target && !target.isDestroyed()) {
+      target.webContents.send('tabs:adopt', project)
+      target.focus()
+      if (!follower.isDestroyed()) follower.close()
+      return 'merged'
+    }
+    if (!follower.isDestroyed()) follower.focus()
+    return 'placed'
   })
 
   // A native context menu built from the renderer's items; resolves to the chosen id, or null.

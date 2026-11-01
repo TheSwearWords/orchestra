@@ -19,8 +19,20 @@ export interface CreateState {
 }
 
 const api = {
-  openWindow: (project?: string, at?: { x: number; y: number }): Promise<void> =>
-    ipcRenderer.invoke('window:open', project, at),
+  openWindow: (project?: string): Promise<void> => ipcRenderer.invoke('window:open', project),
+  dragStart: (
+    project: string,
+    at: { x: number; y: number; width: number; height: number },
+    alone: boolean
+  ): Promise<void> => ipcRenderer.invoke('drag:start', project, at, alone),
+  dragCancel: (): Promise<void> => ipcRenderer.invoke('drag:cancel'),
+  dragEnd: (): Promise<'merged' | 'placed'> => ipcRenderer.invoke('drag:end'),
+  // another window's tab was dropped on this one's tab strip
+  onAdoptTab: (cb: (project: string) => void): (() => void) => {
+    const listener = (_: unknown, project: string): void => cb(project)
+    ipcRenderer.on('tabs:adopt', listener)
+    return () => ipcRenderer.removeListener('tabs:adopt', listener)
+  },
   menu: (
     items: { id: string; label: string; enabled?: boolean; separator?: boolean }[]
   ): Promise<string | null> => ipcRenderer.invoke('menu:popup', items),

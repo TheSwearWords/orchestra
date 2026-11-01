@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Icon, type IconName } from './Icon'
 
 export type Phase = 'research' | 'create' | 'refine'
@@ -35,11 +35,14 @@ interface TabStripProps {
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onSplitWith: (id: string) => void // show this tab beside the current one
-  onPopOut: (id: string, at: { x: number; y: number }) => void // dragged out of the window
 }
 
-/** Open projects. The focused pane's tab reads as current; the other pane's tab is lit but plain.
- * Right-click a tab to split it beside the current one; drag it out to give it its own window. */
+type Tab = { id: string; name: string }
+
+/** Open projects. The focused pane's tab reads as current; the other pane's tab is lit but plain,
+ * and the two sit together inside one border while split. Right-click a tab to split it beside
+ * the current one. Drag a tab past the window's edge and it tears off into its own window that
+ * follows the cursor; drop it on another window's tabs to move it there. */
 export function TabStrip({
   open,
   panes,
@@ -47,16 +50,22 @@ export function TabStrip({
   live,
   onSelect,
   onClose,
-  onSplitWith,
-  onPopOut
+  onSplitWith
 }: TabStripProps): React.JSX.Element {
   const currentName = open.find((t) => t.id === panes[focus])?.name
+  // a press on a tab that may turn into a drag, and then into a tear-off past the window's edge
+  const press = useRef<{
+    id: string
+    x: number
+    y: number
+    moved: boolean
+    out: boolean
+    alone: boolean // the window's only tab: the window itself follows the cursor
+  } | null>(null)
+  const swallowClick = useRef(false)
+  const [tearing, setTearing] = useState<string | null>(null)
 
-  async function menu(
-    t: { id: string; name: string },
-    here: boolean,
-    other: boolean
-  ): Promise<void> {
+  async function menu(t: Tab, here: boolean, other: boolean): Promise<void> {
     const choice = await window.api.menu([
       {
         id: 'split',
@@ -75,6 +84,118 @@ export function TabStrip({
     }
   }
 
+  const outsideWindow = (e: React.PointerEvent): boolean =>
+    e.screenX < window.screenX ||
+    e.screenX >= window.screenX + window.outerWidth ||
+    e.screenY < window.screenY ||
+    e.screenY >= window.screenY + window.outerHeight
+
+  function finish(cancelled: boolean): void {
+    const p = press.current
+    press.current = null
+    if (!p?.moved) return
+    swallowClick.current = true // the release after a drag isn't a click
+    setTimeout(() => (swallowClick.current = false))
+    if (!p.out) return
+    setTearing(null)
+    if (cancelled) {
+      void window.api.dragCancel()
+      return
+    }
+    void window.api.dragEnd().then((how) => {
+      // Torn off into its own window, or moved into another one: it leaves this window. When it
+      // was the only tab, this window was the one being dragged, and stays unless it merged.
+      if (!p.alone || how === 'merged') onClose(p.id)
+    })
+  }
+
+  function tab(t: Tab): React.JSX.Element {
+    const here = live && panes[focus] === t.id
+    const other = live && !here && panes.includes(t.id)
+    return (
+      <div
+        key={t.id}
+        onPointerDown={(e) => {
+          if (e.button === 0)
+            press.current = {
+              id: t.id,
+              x: e.screenX,
+              y: e.screenY,
+              moved: false,
+              out: false,
+              alone: open.length === 1
+            }
+        }}
+        onPointerMove={(e) => {
+          const p = press.current
+          if (!p || p.id !== t.id || !(e.buttons & 1)) return
+          if (!p.moved) {
+            if (Math.hypot(e.screenX - p.x, e.screenY - p.y) < 6) return
+            p.moved = true
+            e.currentTarget.setPointerCapture(e.pointerId) // keep the moves coming outside the window
+          }
+          if (p.alone && p.out) return // this window now moves with the cursor
+          const out = outsideWindow(e)
+          if (out === p.out) return
+          p.out = out
+          setTearing(out ? t.id : null)
+          if (out)
+            void window.api.dragStart(
+              t.id,
+              { x: e.screenX, y: e.screenY, width: window.outerWidth, height: window.outerHeight },
+              p.alone
+            )
+          else void window.api.dragCancel() // pushed back in before letting go
+        }}
+        onPointerUp={() => finish(false)}
+        onPointerCancel={() => finish(true)}
+        onClickCapture={(e) => {
+          if (swallowClick.current) {
+            e.stopPropagation()
+            e.preventDefault()
+          }
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          void menu(t, here, other)
+        }}
+        className={`group flex shrink-0 touch-none items-center transition-[background-color,opacity] duration-150 ${here || other ? 'bg-canvas' : 'hover:bg-muted'} ${tearing === t.id ? 'opacity-40' : ''}`}
+      >
+        <button
+          role="tab"
+          aria-selected={here}
+          onClick={() => onSelect(t.id)}
+          onAuxClick={(e) => e.button === 1 && onClose(t.id)}
+          title={other ? `${t.name} (in the other pane)` : t.name}
+          className={`h-full max-w-52 truncate pr-1 pl-4 ${here ? 'type-current-s' : other ? 'type-label-s' : 'type-label-s text-fg-2'}`}
+        >
+          {t.name}
+        </button>
+        <button
+          aria-label={`Close ${t.name}`}
+          title="Close tab"
+          onClick={() => onClose(t.id)}
+          className={`mr-1.5 flex size-6 items-center justify-center text-fg-2 transition-opacity duration-150 group-hover:opacity-100 hover:bg-muted hover:text-fg focus-visible:opacity-100 ${here ? 'opacity-100' : 'opacity-0'}`}
+        >
+          <Icon name="close-line" size={14} />
+        </button>
+      </div>
+    )
+  }
+
+  // While split, the two shown tabs sit together (left pane first) where the first of them was.
+  const split = live && panes.length === 2
+  const pair = split
+    ? panes.map((id) => open.find((t) => t.id === id)).filter((t): t is Tab => !!t)
+    : []
+  const solo = open.filter((t) => !pair.includes(t))
+  const before = split ? solo.filter((t) => open.indexOf(t) < open.indexOf(pair[0])).length : 0
+  const single = (t: Tab): React.JSX.Element => (
+    <div key={t.id} className="flex border-r border-line">
+      {tab(t)}
+    </div>
+  )
+
   return (
     <div className="flex h-10 shrink-0 items-stretch border-b border-line bg-subtle">
       <div
@@ -82,54 +203,17 @@ export function TabStrip({
         aria-label="Open projects"
         className="flex min-w-0 flex-1 overflow-x-auto"
       >
-        {open.map((t) => {
-          const here = live && panes[focus] === t.id
-          const other = live && !here && panes.includes(t.id)
-          return (
-            <div
-              key={t.id}
-              draggable
-              onDragStart={(e) => {
-                // a private type, so dropping on a text field doesn't paste anything
-                e.dataTransfer.setData('application/x-orchestra-tab', t.id)
-                e.dataTransfer.effectAllowed = 'move'
-              }}
-              onDragEnd={(e) => {
-                const { screenX: x, screenY: y } = e
-                const outside =
-                  x < window.screenX ||
-                  x > window.screenX + window.outerWidth ||
-                  y < window.screenY ||
-                  y > window.screenY + window.outerHeight
-                if (outside && (x || y)) onPopOut(t.id, { x, y })
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                void menu(t, here, other)
-              }}
-              className={`group flex shrink-0 items-center border-r border-line transition-colors duration-150 ${here || other ? 'bg-canvas' : 'hover:bg-muted'}`}
-            >
-              <button
-                role="tab"
-                aria-selected={here}
-                onClick={() => onSelect(t.id)}
-                onAuxClick={(e) => e.button === 1 && onClose(t.id)}
-                title={other ? `${t.name} (in the other pane)` : t.name}
-                className={`h-full max-w-52 truncate pr-1 pl-4 ${here ? 'type-current-s' : other ? 'type-label-s' : 'type-label-s text-fg-2'}`}
-              >
-                {t.name}
-              </button>
-              <button
-                aria-label={`Close ${t.name}`}
-                title="Close tab"
-                onClick={() => onClose(t.id)}
-                className={`mr-1.5 flex size-6 items-center justify-center text-fg-2 transition-opacity duration-150 group-hover:opacity-100 hover:bg-muted hover:text-fg focus-visible:opacity-100 ${here ? 'opacity-100' : 'opacity-0'}`}
-              >
-                <Icon name="close-line" size={14} />
-              </button>
-            </div>
-          )
-        })}
+        {solo.slice(0, before).map(single)}
+        {pair.length === 2 && (
+          <div
+            aria-label="Split view"
+            title="These two are side by side"
+            className="flex shrink-0 divide-x divide-line border-2 border-fg-2"
+          >
+            {pair.map(tab)}
+          </div>
+        )}
+        {solo.slice(before).map(single)}
       </div>
     </div>
   )

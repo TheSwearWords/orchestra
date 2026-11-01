@@ -35,6 +35,7 @@ interface TabStripProps {
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onSplitWith: (id: string) => void // show this tab beside the current one
+  onUnsplit: (keep: string) => void // end the split, keeping this tab on screen
   onReorder: (id: string, onto: string) => void // dragged along the strip onto another tab
   receiving: 'ready' | 'over' | null // a tab is being dragged in another window
 }
@@ -53,6 +54,7 @@ export function TabStrip({
   onSelect,
   onClose,
   onSplitWith,
+  onUnsplit,
   onReorder,
   receiving
 }: TabStripProps): React.JSX.Element {
@@ -71,17 +73,21 @@ export function TabStrip({
   const [held, setHeld] = useState<string | null>(null) // pressed or being dragged: drawn smaller
 
   async function menu(t: Tab, here: boolean, other: boolean): Promise<void> {
+    const paired = live && panes.length === 2 && (here || other)
     const choice = await window.api.menu([
-      {
-        id: 'split',
-        label: other ? 'Already side by side' : `Split with ${currentName ?? 'the current tab'}`,
-        enabled: live && !here && !other && !!currentName
-      },
+      paired
+        ? { id: 'unsplit', label: 'Unsplit' }
+        : {
+            id: 'split',
+            label: `Split with ${currentName ?? 'the current tab'}`,
+            enabled: live && !here && !!currentName
+          },
       { id: 'window', label: 'Open in new window' },
       { id: '-', label: '', separator: true },
       { id: 'close', label: 'Close tab' }
     ])
     if (choice === 'split') onSplitWith(t.id)
+    if (choice === 'unsplit') onUnsplit(t.id)
     if (choice === 'close') onClose(t.id)
     if (choice === 'window') {
       await window.api.openWindow(t.id)

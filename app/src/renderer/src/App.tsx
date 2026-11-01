@@ -187,7 +187,7 @@ function App(): React.JSX.Element {
           <div className="relative isolate flex min-h-0 flex-1 flex-col overflow-y-auto">
             {/* a barely-there figure in the open space; content always reads over it */}
             <Ascii
-              key={view}
+              key={`art-${view}`}
               name={view === 'new' ? 'hand' : 'concert'}
               fit="width"
               className="absolute top-28 right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0"

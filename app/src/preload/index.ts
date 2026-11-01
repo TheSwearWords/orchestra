@@ -1,12 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Project } from '../main/projects'
-import type { ChatEvent, ChatMessage, LogEntry } from '../main/conductor'
+import type { AgentState, ChatEvent, ChatMessage, LogEntry } from '../main/conductor'
 import type { Instrument, Musician } from '../main/library'
 import type { Output } from '../main/outputs'
 import type { Reference, Site, Tag } from '../main/research'
 
 export type {
+  AgentState,
   ChatEvent,
   ChatMessage,
   Instrument,
@@ -121,6 +122,9 @@ const api = {
     ipcRenderer.invoke('chat:send', project, chat, text),
   stopChat: (project: string, chat: string): Promise<void> =>
     ipcRenderer.invoke('chat:stop', project, chat),
+  // every Musician's and Instrument's status in a project, keyed "musician" or "musician--instrument"
+  agentStates: (project: string): Promise<Record<string, AgentState>> =>
+    ipcRenderer.invoke('agents:states', project),
   // every project's Orchestrator events; callers filter by project
   onChatEvent: (cb: (e: ChatEvent) => void): (() => void) => {
     const listener = (_: unknown, e: ChatEvent): void => cb(e)

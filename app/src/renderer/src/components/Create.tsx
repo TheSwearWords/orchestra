@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import type {
+  AgentState,
   ChatInfo,
   ChatMessage,
   CreateState,
@@ -317,6 +318,7 @@ function ChatView({
   const [error, setError] = useState('')
   const [outputs, setOutputs] = useState<Output[]>([])
   const [channel, setChannel] = useState(false) // the agent channel instead of the conversation
+  const [agents, setAgents] = useState<Record<string, AgentState>>({})
 
   useEffect(() => {
     window.api.loadChat(project, chat).then((c) => {
@@ -326,7 +328,13 @@ function ChatView({
     })
     const loadOutputs = (): void => void window.api.listOutputs(project).then(setOutputs)
     loadOutputs()
+    const loadAgents = (): void => void window.api.agentStates(project).then(setAgents)
+    loadAgents()
     return window.api.onChatEvent((e) => {
+      if (e.project === project && e.kind === 'agents') {
+        loadAgents()
+        loadOutputs() // an agent may have written files
+      }
       if (e.project !== project || e.chat !== chat) return
       if (e.kind === 'live') setLive(e.text)
       if (e.kind === 'log') setLog((l) => [...l, e.entry])
@@ -368,6 +376,10 @@ function ChatView({
 
   const focus = plan.musicians.find((m) => m.id === chat)
   const title = focus?.name ?? 'General'
+  // Musicians and Instruments busy on this chat's behalf
+  const working = Object.values(agents).filter(
+    (a) => a.chat === chat && a.status === 'working'
+  ).length
 
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-6 px-6 pt-6 @5xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -415,7 +427,7 @@ function ChatView({
         </div>
 
         {channel ? (
-          <AgentChannel log={log} busy={busy} onStop={stop} />
+          <AgentChannel log={log} busy={busy || working > 0} onStop={stop} plan={plan} />
         ) : (
           <>
             <Conversation
@@ -434,14 +446,14 @@ function ChatView({
                 {error}
               </p>
             )}
-            <Composer busy={busy} onSend={send} onStop={stop} />
+            <Composer busy={busy} working={working} onSend={send} onStop={stop} />
           </>
         )}
       </section>
 
       {/* left out in half a split pane, where the conversation needs the room */}
       <aside className="hidden min-h-0 min-w-0 flex-col gap-6 overflow-y-auto pb-6 @5xl:flex">
-        <Score plan={plan} focus={focus?.id} busy={busy} outputs={outputs} />
+        <Score plan={plan} focus={focus?.id} busy={busy} outputs={outputs} agents={agents} />
         <Files project={project} outputs={outputs} />
       </aside>
     </div>
@@ -605,10 +617,12 @@ function Suggestion({
 
 function Composer({
   busy,
+  working,
   onSend,
   onStop
 }: {
   busy: boolean
+  working: number // Musicians and Instruments busy for this chat; you can still type meanwhile
   onSend: (text: string) => Promise<boolean>
   onStop: () => void
 }): React.JSX.Element {
@@ -641,8 +655,17 @@ function Composer({
           className="block w-full resize-none bg-transparent px-4 pt-3 type-body-m outline-none placeholder:text-fg-2"
         />
         <div className="flex items-center justify-between gap-4 px-4 pb-3">
-          <span className="type-caption text-fg-2">
-            {busy ? 'Working… stop it at any time' : 'Enter to send · Shift+Enter for a new line'}
+          <span className="flex items-center gap-2 type-caption text-fg-2">
+            {busy
+              ? 'Working… stop it at any time'
+              : working
+                ? `${working} agent${working === 1 ? '' : 's'} working for this chat`
+                : 'Enter to send · Shift+Enter for a new line'}
+            {!busy && working > 0 && (
+              <button onClick={onStop} className="type-label-s text-link hover:underline">
+                Stop all
+              </button>
+            )}
           </span>
           {busy ? (
             <button
@@ -673,12 +696,40 @@ function Composer({
 function AgentChannel({
   log,
   busy,
-  onStop
+  onStop,
+  plan
 }: {
   log: LogEntry[]
   busy: boolean
   onStop: () => void
+  plan: CreateState // to name and mark each speaker
 }): React.JSX.Element {
+  const speaker = (agent: string): { name: string; mark: ReactNode } => {
+    if (agent === 'orchestrator')
+      return {
+        name: 'Orchestrator',
+        mark: (
+          <span className="flex size-4 items-center justify-center rounded-full bg-on-brand text-brand">
+            <Icon name="logo-mark" size={10} />
+          </span>
+        )
+      }
+    const [m, i] = agent.split('--')
+    const musician = plan.musicians.find((x) => x.id === m)
+    if (!i)
+      return {
+        name: musician?.name ?? m,
+        mark: (
+          <span className="flex size-4 items-center justify-center rounded-full border border-on-brand">
+            <Icon name={musician?.icon ?? 'shapes-line'} size={9} />
+          </span>
+        )
+      }
+    return {
+      name: plan.instruments.find((x) => x.id === i)?.name ?? i,
+      mark: <span className="mx-1 size-2 rounded-full border border-on-brand" />
+    }
+  }
   const end = useRef<HTMLDivElement>(null)
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'nearest' })
@@ -703,8 +754,8 @@ function AgentChannel({
       <div className="flex-1 overflow-y-auto px-4 py-3" role="log" aria-label="Agent channel">
         {log.length === 0 && (
           <p className="type-log-s text-on-brand/60">
-            Nothing yet. Every agent action in this chat shows up here: what the Orchestrator reads
-            and writes now, and the Musicians&rsquo; messages to each other once they run.
+            Nothing yet. Every agent action in this chat shows up here: what the Orchestrator, its
+            Musicians and their Instruments read, write and say to each other.
           </p>
         )}
         {log.map((e, i) =>
@@ -715,16 +766,14 @@ function AgentChannel({
           ) : (
             <p key={i} className="flex gap-2.5 type-log-s">
               <span className="w-16 shrink-0 whitespace-nowrap text-on-brand/45">{time(e.t)}</span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="flex size-4 items-center justify-center rounded-full bg-on-brand text-brand">
-                  <Icon name="logo-mark" size={10} />
-                </span>
-                <span className="text-on-brand/80">
-                  {e.agent === 'orchestrator' ? 'orchestrator' : e.agent}
+              <span className="flex w-44 shrink-0 items-center gap-1.5">
+                {speaker(e.agent).mark}
+                <span className="truncate text-on-brand/80" title={e.agent.replace('--', ' › ')}>
+                  {speaker(e.agent).name}
                 </span>
               </span>
               <span
-                className={`min-w-0 ${e.kind === 'say' ? 'line-clamp-3 text-on-brand/70' : 'text-on-brand'}`}
+                className={`min-w-0 ${e.kind === 'say' ? 'line-clamp-3 text-on-brand/70' : e.kind === 'message' ? 'line-clamp-4 text-on-brand' : 'text-on-brand'}`}
               >
                 {e.kind === 'say' ? `“${e.text}”` : e.text}
               </span>
@@ -800,10 +849,12 @@ function AgentNode({
 function WorkNode({
   name,
   ready,
+  making = false,
   hint
 }: {
   name: string
   ready: boolean
+  making?: boolean // its Instrument is working on it now
   hint: string
 }): React.JSX.Element {
   return (
@@ -816,8 +867,10 @@ function WorkNode({
       <span className={`min-w-0 flex-1 truncate type-body-s ${ready ? '' : 'text-fg-2'}`}>
         {name}
       </span>
-      <span className={`shrink-0 type-caption ${ready ? 'text-success-fg' : 'text-fg-2'}`}>
-        {ready ? 'Ready' : 'To make'}
+      <span
+        className={`shrink-0 type-caption ${ready ? 'text-success-fg' : making ? 'text-link' : 'text-fg-2'}`}
+      >
+        {ready ? 'Ready' : making ? 'Making…' : 'To make'}
       </span>
     </div>
   )
@@ -831,17 +884,31 @@ function workName(output: string, fallback: string): string {
   return words[0].toUpperCase() + words.slice(1)
 }
 
+/** A Musician's or Instrument's status as a badge (Musicians) or a short word (Instruments). */
+const STATUS: Record<AgentState['status'], { label: string; tone: Tone }> = {
+  working: { label: 'Working', tone: 'working' },
+  waiting: { label: 'Waiting', tone: 'idle' },
+  done: { label: 'Done', tone: 'ready' },
+  stopped: { label: 'Stopped', tone: 'idle' },
+  error: { label: 'Error', tone: 'idle' }
+}
+
 function Score({
   plan,
   focus,
   busy,
-  outputs
+  outputs,
+  agents
 }: {
   plan: CreateState
   focus?: string // a deliverable's chat shows only that deliverable's part of the tree
   busy: boolean
   outputs: Output[]
+  agents: Record<string, AgentState> // keyed "musician" or "musician--instrument"
 }): React.JSX.Element {
+  // a foundation is being made while any Musician's run of its Instrument is working
+  const making = (instrument: string): boolean =>
+    Object.entries(agents).some(([k, a]) => k.endsWith(`--${instrument}`) && a.status === 'working')
   const ids = focus ? [focus] : plan.selected
   const chosen = plan.musicians.filter((m) => ids.includes(m.id))
   const foundations = foundationOrder(plan.musicians, plan.instruments, ids) // a few dozen items
@@ -884,6 +951,7 @@ function Score({
                     <WorkNode
                       name={workName(f.output, f.name)}
                       ready={ready(f.output)}
+                      making={making(f.id)}
                       hint={`Made by the ${f.name} Instrument → ${f.output}`}
                     />
                   </li>
@@ -897,11 +965,31 @@ function Score({
                 name={m.name}
                 role="Musician"
                 icon={m.icon}
-                status={<Badge tone="idle">Not started</Badge>}
+                status={
+                  agents[m.id] ? (
+                    <Badge tone={STATUS[agents[m.id].status].tone}>
+                      {STATUS[agents[m.id].status].label}
+                    </Badge>
+                  ) : (
+                    <Badge tone="idle">Not started</Badge>
+                  )
+                }
               >
                 {m.instruments.map((i) => (
                   <li key={i} className={branch}>
-                    <AgentNode name={names.get(i) ?? i} role="Instrument" />
+                    <AgentNode
+                      name={names.get(i) ?? i}
+                      role="Instrument"
+                      status={
+                        agents[`${m.id}--${i}`] && (
+                          <span
+                            className={`shrink-0 type-caption ${agents[`${m.id}--${i}`].status === 'working' ? 'text-link' : 'text-fg-2'}`}
+                          >
+                            {STATUS[agents[`${m.id}--${i}`].status].label}
+                          </span>
+                        )
+                      }
+                    />
                   </li>
                 ))}
                 {m.instruments.length === 0 && (
@@ -912,7 +1000,12 @@ function Score({
                   </li>
                 )}
                 <li className={branch}>
-                  <WorkNode name={m.name} ready={false} hint={m.deliverable} />
+                  <WorkNode
+                    name={m.name}
+                    ready={agents[m.id]?.status === 'done'}
+                    making={agents[m.id]?.status === 'working'}
+                    hint={m.deliverable}
+                  />
                 </li>
               </AgentNode>
             </li>
@@ -926,10 +1019,6 @@ function Score({
           )}
         </AgentNode>
       </div>
-
-      <p className="mt-5 border-t border-line pt-3 type-caption text-fg-2">
-        Musicians start once briefing is connected, the next build step.
-      </p>
     </section>
   )
 }

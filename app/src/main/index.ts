@@ -1,15 +1,14 @@
 import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { existsSync } from 'fs'
-import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { Conductor, GENERAL, handoffFile, readChat, readLog } from './conductor'
+import { Conductor, GENERAL, readChat, readLog } from './conductor'
+import { agentPrompt, orchestratorPrompt } from './prompts'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { loadLibrary } from './library'
-import { foundationOrder } from './plan'
 import { listOutputs, outputPath } from './outputs'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
 import { createProject, editProject, listProjects, renameProject, type Project } from './projects'
@@ -27,64 +26,19 @@ import {
   type Tag
 } from './research'
 
-// The Orchestrator: one Claude session per project, its replies broadcast to every window.
+// Create's agents: each chat's Orchestrator, and the Musicians and Instruments it sets to work.
+// Their events go to every window; each window filters by project and chat.
 const conductor = new Conductor({
   emit: (e) => {
     for (const w of BrowserWindow.getAllWindows())
       if (!w.isDestroyed()) w.webContents.send('chat:event', e)
   },
-  systemPrompt: async (id, chat) => {
-    const dir = join(PROJECTS_DIR, id)
-    const [lib, rules, projects, selected, handoff] = await Promise.all([
-      loadLibrary(ORCHESTRA_HOME),
-      readFile(join(ORCHESTRA_HOME, 'library', 'house-rules.md'), 'utf8').catch(() => ''),
-      listProjects(PROJECTS_DIR),
-      readSelection(dir),
-      readFile(join(dir, handoffFile(chat)), 'utf8').catch(() => '')
-    ])
-    const name = projects.find((p) => p.id === id)?.name ?? id
-    const catalogue = lib.musicians.map((m) => `- ${m.id}: ${m.name}. ${m.deliverable}`).join('\n')
-    const focus = lib.musicians.find((m) => m.id === chat)
-    const needs = focus
-      ? foundationOrder(lib.musicians, lib.instruments, [focus.id]).map((f) => f.name)
-      : []
-    const thisChat =
-      chat === GENERAL
-        ? `## This chat: General
-This is the project's General chat: the whole project, its overall plan, and adding deliverables. Each chosen deliverable also has its own chat in Orchestra, where its detailed work happens; when the user goes deep on one deliverable, suggest continuing in that deliverable's chat.`
-        : focus
-          ? `## This chat: ${focus.name}
-This chat is only about the ${focus.name} deliverable (id ${focus.id}): ${focus.deliverable} Its Musician is defined in ${join(ORCHESTRA_HOME, 'library', 'musicians', `${focus.id}.md`)}. Shared foundations it needs first: ${needs.join(', ') || 'none'}. Keep to this deliverable. If the user brings up another deliverable, say it belongs in that deliverable's chat (or in the General chat if it isn't chosen yet).`
-          : ''
-    return [
-      lib.orchestrator?.prompt ?? '',
-      rules,
-      thisChat,
-      `## This project
-You are working in the project "${name}"; your current directory is its folder. Read concept.md, research.md and deliverables.md before planning, and read deliverables.md again whenever the plan matters: the user can change it at any time. The agent library (Musicians and Instruments, as markdown) is at ${join(ORCHESTRA_HOME, 'library')}.
-
-Deliverables chosen so far: ${selected.length ? selected.join(', ') : 'none yet'}.
-
-## The conversation is open-ended
-The user may start with no deliverables, add more at any point, or just think out loud with you. When they want something that one of the library's deliverables covers and it isn't chosen yet, say so, and end your reply with exactly one line of this form (ids from the list below, comma-separated):
-Suggest deliverables: website, slide-deck
-Orchestra turns that line into an "Add to deliverables" button; nothing is added until the user clicks it. If nothing in the library fits, say so and describe the Musician you would propose instead.
-
-Library deliverables (id: name):
-${catalogue}
-
-## What you can do in this version of Orchestra
-You can talk with the user, read files, and write files inside the project folder. Briefing Musicians is not connected yet: plan the work with the user, and say plainly that the Musicians start once that is connected. Never say a Musician or Instrument is working. Write foundation files into prereqs/ only when the user asks you to.`,
-      handoff &&
-        `## Your handoff note from the previous session (${handoffFile(chat)})
-You wrote this before your last session ended. Continue from it.
-
-${handoff}`
-    ]
-      .filter(Boolean)
-      .join('\n\n')
-  },
-  model: async () => (await loadLibrary(ORCHESTRA_HOME)).orchestrator?.model ?? 'opus',
+  projectDir: (id) => projectDir(id),
+  library: () => loadLibrary(ORCHESTRA_HOME),
+  selected: (dir) => readSelection(dir),
+  orchestratorModel: async () => (await loadLibrary(ORCHESTRA_HOME)).orchestrator?.model ?? 'opus',
+  orchestratorPrompt: (id, chat) => orchestratorPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, chat),
+  agentPrompt: (id, key) => agentPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, key),
   extraDirs: [join(ORCHESTRA_HOME, 'library')]
 })
 
@@ -186,7 +140,8 @@ function dropState(state: 'ready' | null, except?: BrowserWindow): void {
     if (w !== except && !w.isDestroyed()) w.webContents.send('drop:state', state)
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await conductor.init() // Orchestra's tool server for agents
   electronApp.setAppUserModelId('com.orchestra.app')
 
   // F12 opens DevTools in development; Ctrl+R is ignored in production.
@@ -418,12 +373,18 @@ app.whenReady().then(() => {
     log: await readLog(projectDir(project), chat),
     busy: conductor.isBusy(project, chat)
   }))
-  ipcMain.handle('chat:send', (_, project: string, chat: string, text: string) =>
-    conductor.send(project, chat, projectDir(project), String(text))
-  )
-  ipcMain.handle('chat:stop', (_, project: string, chat: string) =>
-    conductor.stop(project, chat, projectDir(project))
-  )
+  ipcMain.handle('chat:send', (_, project: string, chat: string, text: string) => {
+    projectDir(project)
+    return conductor.send(project, chat, String(text))
+  })
+  ipcMain.handle('chat:stop', (_, project: string, chat: string) => {
+    projectDir(project)
+    return conductor.stop(project, chat)
+  })
+  ipcMain.handle('agents:states', (_, project: string) => {
+    projectDir(project)
+    return conductor.agentStates(project)
+  })
   ipcMain.handle('create:outputs', (_, project: string) => listOutputs(projectDir(project)))
   ipcMain.handle('create:openOutput', async (_, project: string, rel: string) => {
     const error = await shell.openPath(outputPath(projectDir(project), String(rel)))

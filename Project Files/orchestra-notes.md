@@ -334,3 +334,20 @@ The Agents screen (build step 5) later becomes the full editor for these same fi
 - **Chat look:** your messages are right-aligned bubbles; the Orchestrator is on the left with its avatar (the logo mark). The composer has more room below it and a dark-gray border. While working, Send becomes **Stop**: it kills the turn and keeps the conversation.
 - **Agent channel:** a read-only terminal-style toggle per chat, logging what each agent reads, writes and says, with its own "Stop all agents". It carries only the Orchestrator's activity until Musicians run.
 - **Model tiers (the user's design):** Orchestrator on Opus, Musicians on Sonnet, Instruments on Haiku for structured or menial jobs and Sonnet where craft matters. Set by `model:` in each library file; tier defaults apply when it's missing. The Orchestrator's session already runs with `--model`.
+
+## Create, part 2: agents at work (Nov 1)
+- **`main/session.ts`:** one stream-json Claude session, used by every agent. It keeps its session id in a file (so it resumes after a restart), queues turns and tracks context size.
+- **`main/orchestra-mcp.ts`:** Orchestra's localhost tool server (Pitcrew's pattern). The chain of command is enforced by which tools each level gets, and tested in `agents.test.mjs`:
+  - **Orchestrator:** `brief_musician`, for chosen deliverables only.
+  - **Musician:** `run_instrument` (its own Instruments and foundations) and `report` (with `done`).
+  - **Instrument:** no tools. Its closing message is its report to its Musician.
+- **`main/conductor.ts`:**
+  - Runs each chat's Orchestrator, plus Musicians (key = deliverable id) and Instruments (key = `<musician>--<instrument>`), each on its library `model:`.
+  - Statuses (working / waiting / done / stopped / error) live in `.orchestra/agents.json`. Every brief, report, action and remark goes to the chat's agent channel log.
+  - When a Musician reports, a chat note appears and the Orchestrator relays the news to the user.
+  - **Guard rails:** at most 4 agents working per project, and 40 messages between agents per hour.
+  - **Stop** ends the chat's Orchestrator and every agent briefed from that chat.
+- **`main/prompts.ts`:** the Orchestrator, Musician and Instrument instructions (library prompt + house rules + Orchestra's part). Figma, Blender and Fusion are not connected to agents yet; agents work in files.
+- **UI:** the tree shows live statuses ("Making…" on a foundation being made, Ready when its file exists, the deliverable Ready when its Musician reports done). The agent channel marks each speaker. Stop appears whenever anything in the chat is working.
+- **Tested end to end with real sessions:** Orchestrator → Brand Copy Musician → Copywriter → `prereqs/copy.md` → reports back, in 44s. Stop mid-run ended every session.
+- **Next:** decision cards (the user answers agents' questions with buttons, and approves new agents), then the preview card, then the Agents screen with MCP connections (Figma first).

@@ -117,7 +117,9 @@ export function Sidebar({
                   {...projectProps(p)}
                   className={`flex w-14 flex-col items-center py-2 transition-colors duration-150 hover:bg-muted ${selected === p.id ? 'bg-muted' : ''}`}
                 >
-                  <span className={selected === p.id ? 'type-current-m' : 'type-label-l'}>
+                  <span
+                    className={selected === p.id ? 'type-current-m text-brand' : 'type-label-l'}
+                  >
                     {initials(p.name)}
                   </span>
                   <span className="w-full truncate px-1 text-center type-caption text-fg-2">
@@ -213,7 +215,7 @@ export function Sidebar({
                   ) : (
                     <button
                       {...projectProps(p)}
-                      className={`flex h-10 w-full items-center gap-2 px-6 text-left transition-colors duration-150 hover:bg-muted ${selected === p.id ? 'bg-muted type-current-m' : 'type-label-m'}`}
+                      className={`flex h-10 w-full items-center gap-2 px-6 text-left transition-colors duration-150 hover:bg-muted ${selected === p.id ? `bg-muted type-current-m ${typeof activeChat === 'string' ? '' : 'text-brand'}` : 'type-label-m'}`}
                     >
                       <Icon name="folder-line" />
                       <span className="truncate">{p.name}</span>
@@ -224,15 +226,13 @@ export function Sidebar({
                       aria-label={`${p.name} chats`}
                       className="mt-1 mb-1 ml-8 flex flex-col border-l border-line"
                     >
-                      {[
-                        { id: null, title: 'All chats', icon: 'layout-grid-line', busy: false },
-                        ...chats
-                      ].map((c) => (
-                        <li key={c.id ?? 'all'}>
+                      {/* the project's own row opens its overview, so no "All chats" row */}
+                      {chats.map((c) => (
+                        <li key={c.id}>
                           <button
                             onClick={() => onOpenChat(c.id)}
                             aria-current={activeChat === c.id ? 'page' : undefined}
-                            className={`flex h-8 w-full items-center gap-2 pr-4 pl-3 text-left transition-colors duration-150 hover:bg-muted ${activeChat === c.id ? 'bg-muted type-current-s' : 'type-body-s text-fg-2 hover:text-fg'}`}
+                            className={`flex h-8 w-full items-center gap-2 pr-4 pl-3 text-left transition-colors duration-150 hover:bg-muted ${activeChat === c.id ? 'bg-muted type-current-s text-brand' : 'type-body-s text-fg-2 hover:text-fg'}`}
                           >
                             <Icon name={c.icon} size={14} />
                             <span className="truncate">{c.title}</span>

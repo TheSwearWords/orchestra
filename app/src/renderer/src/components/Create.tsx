@@ -387,7 +387,7 @@ function ChatView({
               className={`mt-1.5 ${focus ? 'text-link' : ''}`}
             />
             <div>
-              <h2 className="type-heading-m">{title}</h2>
+              <h2 className="type-heading-m italic">{title}</h2>
               <p className="mt-1 type-caption text-fg-2">
                 {focus ? focus.deliverable : 'The whole project, with the Orchestrator'}
               </p>

@@ -143,16 +143,16 @@ export function Sidebar({
         </div>
       ) : (
         <div key="expanded" className={`relative isolate flex w-52 shrink-0 flex-col ${fadeIn}`}>
-          {/* The figure sits behind the whole rail at a fixed size and shows only where the rail
-          is open, between the two solid sections; more projects cover more of it rather than
-          shrinking it. Kept very faint. */}
+          {/* The figure sits behind the whole rail at a fixed size, showing through the buttons
+          too (the sections are see-through); the project count never rescales it. Kept very
+          faint so text always reads over it. */}
           <Ascii
             key={art}
             name={art}
             fit="height"
             className="absolute inset-x-0 top-[12%] bottom-0 -z-10 text-line-strong/20 transition-opacity duration-700 ease-out-strong starting:opacity-0"
           />
-          <div className="flex min-h-0 shrink flex-col border-b border-line bg-subtle px-4 pt-7 pb-4 [&>*:not(ul)]:shrink-0">
+          <div className="flex min-h-0 shrink flex-col border-b border-line px-4 pt-7 pb-4 [&>*:not(ul)]:shrink-0">
             <div className="flex items-center gap-2">
               <Icon name="logo-mark" size={30} className="text-logo" />
               {/* outlined type mark from Figma (Brand page); 715 x 138 */}
@@ -259,7 +259,7 @@ export function Sidebar({
 
           <div className="min-h-0 flex-1" />
 
-          <div className="flex shrink-0 flex-col gap-1.5 border-t border-line bg-subtle pt-2 pb-4">
+          <div className="flex shrink-0 flex-col gap-1.5 border-t border-line pt-2 pb-4">
             {UTILITY.map((u) => (
               <button
                 key={u.page}

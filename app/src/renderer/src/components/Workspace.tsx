@@ -242,7 +242,8 @@ export function TabStrip({
               key={it.tabs.map((m) => m.id).join('+')}
               aria-label="Split group"
               title="A split group: these two open side by side"
-              className="flex shrink-0 divide-x divide-line border-2 border-brand"
+              // blue while the group is on screen, gray once another tab is showing
+              className={`flex shrink-0 divide-x divide-line border-2 transition-colors duration-150 ${live && it.tabs.every((m) => panes.includes(m.id)) ? 'border-brand' : 'border-line-strong'}`}
             >
               {it.tabs.map(tab)}
             </div>

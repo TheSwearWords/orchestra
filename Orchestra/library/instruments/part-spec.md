@@ -3,6 +3,7 @@ name: Part Spec
 job: Write the production spec for a part: dimensions, material, tolerances and how it will be made.
 output: prereqs/part-spec.md
 needs: []
+model: haiku
 tools: [files]
 source: cad-model
 ---

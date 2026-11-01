@@ -3,6 +3,7 @@ name: Product Brief
 job: Write down what the product is, who it's for, what it does and why it's better, from the concept, research and the user's answers.
 output: prereqs/product-brief.md
 needs: []
+model: sonnet
 tools: [files]
 source: starter
 ---

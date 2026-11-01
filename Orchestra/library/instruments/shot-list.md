@@ -3,6 +3,7 @@ name: Shot List
 job: Read the storyboard and brand tokens, export the stills and vectors needed in one pass, and write the shot list.
 output: prereqs/shot-list.md
 needs: [brand-spec]
+model: haiku
 tools: [files, figma-read]
 source: render-3d
 ---

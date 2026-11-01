@@ -3,6 +3,7 @@ name: Logo Builder
 job: Draw the chosen logo direction as vector marks in Figma, refine it from notes, and export the final files.
 output: Logo frames in Figma, final files in prereqs/logo/
 needs: [logo-concepts]
+model: sonnet
 tools: [figma-read, figma-write]
 source: logo
 ---

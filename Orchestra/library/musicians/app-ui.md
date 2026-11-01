@@ -6,6 +6,7 @@ category: Product
 keywords: [ui, app, web app, saas, dashboard, screens, mockups, product design, figma]
 prerequisites: [product-brief, brand-spec, screen-inventory]
 instruments: [mockup-builder]
+model: sonnet
 tools: [files, figma-read, figma-write]
 source: mine
 ---

@@ -3,6 +3,7 @@ name: Page Designer
 job: Design one website page at a time in Figma, desktop and mobile, from the kit and the written copy.
 output: Page frames in Figma (links in the handoff note)
 needs: [sitemap, copywriter]
+model: sonnet
 tools: [figma-read, figma-write]
 source: website
 ---

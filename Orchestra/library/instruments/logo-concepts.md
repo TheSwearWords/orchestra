@@ -3,6 +3,7 @@ name: Logo Concepts
 job: Write 3 to 5 distinct logo directions, each with the idea, a rough sketch and why it fits.
 output: prereqs/logo-concepts.md
 needs: [product-brief]
+model: sonnet
 tools: [files, figma-read, figma-write]
 source: logo
 ---

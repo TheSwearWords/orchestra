@@ -6,7 +6,10 @@ const known = new Set(['website', 'slide-deck', 'brand-kit'])
 
 test('the closing suggestion line becomes ids and leaves the reply', () => {
   assert.deepEqual(
-    splitSuggestion('A site and a deck both fit.\n\nSuggest deliverables: website, slide-deck', known),
+    splitSuggestion(
+      'A site and a deck both fit.\n\nSuggest deliverables: website, slide-deck',
+      known
+    ),
     { body: 'A site and a deck both fit.', ids: ['website', 'slide-deck'] }
   )
   // formatting, a full stop, unknown ids and repeats are tolerated

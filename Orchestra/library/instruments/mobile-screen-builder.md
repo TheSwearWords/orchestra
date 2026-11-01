@@ -3,6 +3,7 @@ name: Mobile Screen Builder
 job: Build mobile app screens in Figma, one flow at a time, from the kit.
 output: Screen frames in Figma, per flow (links in the handoff note)
 needs: [screen-inventory]
+model: sonnet
 tools: [figma-read, figma-write]
 source: mobile-app
 ---

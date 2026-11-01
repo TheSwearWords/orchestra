@@ -6,6 +6,7 @@ category: 3D
 keywords: [3d, blender, render, product shots, trailer, video, model, gltf, web 3d, campaign]
 prerequisites: [brand-spec, model-reference]
 instruments: [model-builder, blender-builder]
+model: sonnet
 tools: [files, shell, figma-read, blender]
 source: mine
 ---

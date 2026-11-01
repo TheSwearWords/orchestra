@@ -3,6 +3,7 @@ name: CAD Modeler
 job: Build a parametric model in Autodesk Fusion from the part spec, then export production files.
 output: The Fusion file, STEP/STL/3MF exports and a dimensioned drawing in exports/
 needs: [part-spec]
+model: sonnet
 tools: [files, shell, fusion]
 source: cad-model
 ---

@@ -3,6 +3,7 @@ name: Sitemap
 job: Plan the website's pages and the sections on each, in order, with what each section must say.
 output: prereqs/sitemap.md
 needs: [product-brief]
+model: haiku
 tools: [files]
 source: website
 ---

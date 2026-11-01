@@ -6,6 +6,7 @@ category: Brand
 keywords: [copy, copywriting, slogan, tagline, headline, marketing, messaging, voice, text]
 prerequisites: [product-brief, voice-guide]
 instruments: [copywriter]
+model: sonnet
 tools: [files]
 source: starter
 ---

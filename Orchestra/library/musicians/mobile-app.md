@@ -6,6 +6,7 @@ category: Product
 keywords: [mobile, app, ios, android, phone, screens, flows, product design, figma]
 prerequisites: [product-brief, brand-spec, screen-inventory]
 instruments: [mobile-screen-builder]
+model: sonnet
 tools: [files, figma-read, figma-write]
 source: starter
 ---

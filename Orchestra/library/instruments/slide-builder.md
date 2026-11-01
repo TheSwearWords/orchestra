@@ -3,6 +3,7 @@ name: Slide Builder
 job: Build slides in Figma on the kit's slide masters from the outline and written copy.
 output: Slides in Figma, plus a PDF export (links in the handoff note)
 needs: [deck-outline, copywriter]
+model: sonnet
 tools: [figma-read, figma-write]
 source: slide-deck
 ---

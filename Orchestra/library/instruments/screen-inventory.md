@@ -3,6 +3,7 @@ name: Screen Inventory
 job: List the screens to design and map each one to design system components, with the gaps.
 output: prereqs/screen-inventory.md
 needs: []
+model: haiku
 tools: [files, figma-read]
 source: app-ui
 ---

@@ -3,6 +3,7 @@ name: Model Builder
 job: Build the 3D model in Blender from the reference sheet, in rounds the user reviews.
 output: The Blender model in the project's exports/ folder, with review renders
 needs: [model-reference]
+model: sonnet
 tools: [files, shell, blender]
 source: render-3d
 ---

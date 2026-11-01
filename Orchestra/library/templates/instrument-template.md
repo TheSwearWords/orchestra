@@ -3,6 +3,7 @@ name: <Job>
 job: <one sentence>
 output: <file in the project, e.g. prereqs/brand-spec.md>
 needs: []
+model: <opus | sonnet | haiku: the cheapest that does the job well>
 tools: []
 source: <musician id>
 ---

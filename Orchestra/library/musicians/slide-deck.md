@@ -6,6 +6,7 @@ category: Brand
 keywords: [slides, deck, presentation, pitch, keynote, figma slides]
 prerequisites: [product-brief, brand-spec, voice-guide, deck-outline]
 instruments: [copywriter, slide-builder]
+model: sonnet
 tools: [files, figma-read, figma-write]
 source: starter
 ---

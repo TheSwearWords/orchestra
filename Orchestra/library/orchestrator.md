@@ -1,5 +1,6 @@
 ---
 name: Orchestrator
+model: opus
 tools: [all]
 source: mine
 ---

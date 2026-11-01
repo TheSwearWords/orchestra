@@ -3,6 +3,7 @@ name: Voice Guide
 job: Define how the brand sounds: tone, vocabulary, messaging pillars and examples.
 output: prereqs/voice-guide.md
 needs: [product-brief]
+model: sonnet
 tools: [files]
 source: brand-copy
 ---

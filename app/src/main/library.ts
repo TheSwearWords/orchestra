@@ -10,6 +10,7 @@ export interface AgentDoc {
   name: string
   prompt: string
   tools: string[]
+  model: string // opus | sonnet | haiku; defaults by tier: Orchestrator opus, Musician sonnet, Instrument haiku
   source: string // mine | starter | orchestrator | <musician id>
 }
 
@@ -58,12 +59,13 @@ export function parseDoc(md: string): { fields: Fields; body: string } | null {
 const str = (f: Fields, k: string): string => (typeof f[k] === 'string' ? (f[k] as string) : '')
 const list = (f: Fields, k: string): string[] => (Array.isArray(f[k]) ? (f[k] as string[]) : [])
 
-function agent(id: string, f: Fields, body: string): AgentDoc {
+function agent(id: string, f: Fields, body: string, tierModel: string): AgentDoc {
   return {
     id,
     name: str(f, 'name') || id,
     prompt: body,
     tools: list(f, 'tools'),
+    model: str(f, 'model') || tierModel,
     source: str(f, 'source')
   }
 }
@@ -83,7 +85,7 @@ export async function loadLibrary(home: string): Promise<Library> {
   const dir = join(home, 'library')
   const orch = await readFile(join(dir, 'orchestrator.md'), 'utf8').then(parseDoc, () => null)
   const musicians = (await readFolder(join(dir, 'musicians'))).map(({ id, fields, body }) => ({
-    ...agent(id, fields, body),
+    ...agent(id, fields, body, 'sonnet'),
     deliverable: str(fields, 'deliverable'),
     icon: str(fields, 'icon'),
     category: str(fields, 'category') || 'Other',
@@ -92,13 +94,13 @@ export async function loadLibrary(home: string): Promise<Library> {
     instruments: list(fields, 'instruments')
   }))
   const instruments = (await readFolder(join(dir, 'instruments'))).map(({ id, fields, body }) => ({
-    ...agent(id, fields, body),
+    ...agent(id, fields, body, 'haiku'),
     job: str(fields, 'job'),
     output: str(fields, 'output'),
     needs: list(fields, 'needs')
   }))
   return {
-    orchestrator: orch ? agent('orchestrator', orch.fields, orch.body) : null,
+    orchestrator: orch ? agent('orchestrator', orch.fields, orch.body, 'opus') : null,
     musicians,
     instruments
   }

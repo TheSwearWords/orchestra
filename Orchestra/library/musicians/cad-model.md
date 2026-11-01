@@ -6,6 +6,7 @@ category: 3D
 keywords: [cad, fusion, autodesk, 3d print, manufacturing, production, step, stl, part]
 prerequisites: [part-spec, model-reference]
 instruments: [cad-modeler]
+model: sonnet
 tools: [files, shell, fusion]
 source: starter
 ---

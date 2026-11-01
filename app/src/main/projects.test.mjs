@@ -11,7 +11,12 @@ test('renameProject changes the name, keeps the folder and the rest of the file'
   try {
     const p = await createProject(dir, { name: 'Forma', client: 'Atelier', concept: 'Quiet.' })
     const r = await renameProject(dir, p.id, 'Forma Editorial\n')
-    assert.deepEqual(r, { id: 'forma', name: 'Forma Editorial', client: 'Atelier', concept: 'Quiet.' })
+    assert.deepEqual(r, {
+      id: 'forma',
+      name: 'Forma Editorial',
+      client: 'Atelier',
+      concept: 'Quiet.'
+    })
     const md = await readFile(join(dir, 'forma', 'concept.md'), 'utf8')
     assert.match(md, /^---\nname: Forma Editorial\nclient: Atelier\n---\n\n# Forma Editorial\n/)
     await assert.rejects(renameProject(dir, p.id, '  '))

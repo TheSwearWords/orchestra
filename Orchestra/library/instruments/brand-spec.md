@@ -3,6 +3,7 @@ name: Brand Spec
 job: Turn the concept, research and references into a written brand spec and its tokens.
 output: prereqs/brand-spec.md and prereqs/tokens.json
 needs: [product-brief]
+model: sonnet
 tools: [files]
 source: brand-kit
 ---

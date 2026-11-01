@@ -24,10 +24,12 @@ const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 /** The start of Create: pick what this project needs; foundations are worked out live. */
 export function Deliverables({
   project,
-  onSaved
+  onSaved,
+  continueLabel
 }: {
   project: string
-  onSaved?: (ids: string[]) => void // e.g. move on to the conversation
+  onSaved?: (ids: string[]) => void // e.g. move on to the chats
+  continueLabel?: string // "Continue": always moves on, saving any change first
 }): React.JSX.Element {
   const [data, setData] = useState<CreateState | null>(null)
   const [chosen, setChosen] = useState<string[]>([])
@@ -203,9 +205,15 @@ export function Deliverables({
             </p>
           )}
         </div>
-        {!dirty && saved.length > 0 && <span className="type-caption text-fg-2">Saved</span>}
-        <button onClick={save} disabled={!dirty || saving} className={solidButton}>
-          {saving ? 'Saving…' : 'Save deliverables'}
+        {!continueLabel && !dirty && saved.length > 0 && (
+          <span className="type-caption text-fg-2">Saved</span>
+        )}
+        <button
+          onClick={save}
+          disabled={saving || (continueLabel ? chosen.length === 0 : !dirty)}
+          className={solidButton}
+        >
+          {saving ? 'Saving…' : (continueLabel ?? 'Save deliverables')}
         </button>
       </div>
     </div>

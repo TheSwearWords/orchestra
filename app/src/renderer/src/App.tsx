@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Project } from '../../preload'
+import type { ChatInfo, Project } from '../../preload'
 import { Ascii, type AsciiName } from './components/Ascii'
 import { Create } from './components/Create'
 import { Icon } from './components/Icon'
@@ -77,6 +77,12 @@ function App(): React.JSX.Element {
   const [tabs, setTabs] = useState<Tabs>(start.tabs)
   const [mode, setMode] = useState<Mode>(start.mode)
   const [phases, setPhases] = useState<Record<string, Phase>>(() => rememberedJson('phases', {}))
+  // the chat each project has open in Create (null: the overview of its chats)
+  const [openChats, setOpenChats] = useState<Record<string, string | null>>(() =>
+    rememberedJson('chats', {})
+  )
+  const [chatList, setChatList] = useState<ChatInfo[]>([])
+  const [chatsVersion, setChatsVersion] = useState(0) // bumped when deliverables (so chats) change
   const [collapsed, setCollapsed] = useState(() => remembered('collapsed') === '1')
   // a tab is being dragged in another window: 'over' when it's above this window's tab strip
   const [receiving, setReceiving] = useState<'ready' | 'over' | null>(null)
@@ -118,11 +124,24 @@ function App(): React.JSX.Element {
     remember('tabs', JSON.stringify(tabs))
     remember('mode', mode)
     remember('phases', JSON.stringify(phases))
-  }, [tabs, mode, phases])
+    remember('chats', JSON.stringify(openChats))
+  }, [tabs, mode, phases, openChats])
 
   const view: Mode = mode === 'projects' && tabs.panes.length === 0 ? 'new' : mode
   const current = view === 'projects' ? focused(tabs) : undefined
   const currentName = projects?.find((p) => p.id === current)?.name
+
+  // the sidebar lists the current project's chats, with a mark on the ones working
+  useEffect(() => {
+    if (!current) return
+    // a remembered tab can name a project that is gone; it closes on the next refresh
+    const load = (): void =>
+      void window.api.listChats(current).then(setChatList, () => setChatList([]))
+    load()
+    return window.api.onChatEvent((e) => {
+      if (e.project === current && e.kind === 'busy') load()
+    })
+  }, [current, chatsVersion])
   useEffect(() => {
     document.title = currentName ? `${currentName} · Orchestra` : 'Orchestra' // names each window
   }, [currentName])
@@ -157,6 +176,15 @@ function App(): React.JSX.Element {
         }}
         onToggle={toggle}
         onChanged={refresh}
+        chats={current ? chatList : []}
+        activeChat={
+          current && phaseOf(current) === 'create' ? (openChats[current] ?? null) : undefined
+        }
+        onOpenChat={(chat) => {
+          if (!current) return
+          setPhases((all) => ({ ...all, [current]: 'create' }))
+          setOpenChats((all) => ({ ...all, [current]: chat }))
+        }}
       />
       <main className="flex min-w-0 flex-1 flex-col bg-canvas">
         {(tabs.open.length > 0 || receiving) && (
@@ -184,6 +212,9 @@ function App(): React.JSX.Element {
                     project={project}
                     phase={phaseOf(id)}
                     onPhase={(ph) => setPhases((all) => ({ ...all, [id]: ph }))}
+                    chat={openChats[id] ?? null}
+                    onChat={(c) => setOpenChats((all) => ({ ...all, [id]: c }))}
+                    onChatsChanged={() => setChatsVersion((v) => v + 1)}
                     split={tabs.panes.length === 2}
                     side={i}
                     focused={tabs.focus === i}
@@ -240,7 +271,10 @@ function ProjectPane({
   side,
   focused,
   onFocus,
-  onClose
+  onClose,
+  chat,
+  onChat,
+  onChatsChanged
 }: {
   project: Project
   phase: Phase
@@ -250,6 +284,9 @@ function ProjectPane({
   focused: boolean
   onFocus: () => void
   onClose: () => void
+  chat: string | null
+  onChat: (chat: string | null) => void
+  onChatsChanged: () => void
 }): React.JSX.Element {
   return (
     <section
@@ -294,7 +331,13 @@ function ProjectPane({
         {phase === 'research' ? (
           <Research key={project.id} project={project.id} />
         ) : phase === 'create' ? (
-          <Create key={project.id} project={project.id} />
+          <Create
+            key={project.id}
+            project={project.id}
+            chat={chat}
+            onChat={onChat}
+            onChatsChanged={onChatsChanged}
+          />
         ) : (
           <section key={phase} className="stagger px-6 py-8">
             <p className="type-body-m text-fg-2">The {phase} phase is next on the build plan.</p>

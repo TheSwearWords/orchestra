@@ -1,12 +1,34 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Project } from '../main/projects'
-import type { ChatEvent, ChatMessage } from '../main/conductor'
+import type { ChatEvent, ChatMessage, LogEntry } from '../main/conductor'
 import type { Instrument, Musician } from '../main/library'
 import type { Output } from '../main/outputs'
 import type { Reference, Site, Tag } from '../main/research'
 
-export type { ChatEvent, ChatMessage, Instrument, Musician, Output, Project, Reference, Site, Tag }
+export type {
+  ChatEvent,
+  ChatMessage,
+  Instrument,
+  LogEntry,
+  Musician,
+  Output,
+  Project,
+  Reference,
+  Site,
+  Tag
+}
+
+/** One chat in a project: General, or a chosen deliverable's. */
+export interface ChatInfo {
+  id: string
+  title: string
+  icon: string
+  deliverable: boolean
+  busy: boolean
+  count: number // messages, not counting notes
+  last: ChatMessage | null
+}
 
 export interface ResearchState {
   references: Reference[]
@@ -85,10 +107,16 @@ const api = {
   loadCreate: (project: string): Promise<CreateState> => ipcRenderer.invoke('create:load', project),
   saveDeliverables: (project: string, ids: string[]): Promise<string[]> =>
     ipcRenderer.invoke('create:save', project, ids),
-  loadChat: (project: string): Promise<{ messages: ChatMessage[]; busy: boolean }> =>
-    ipcRenderer.invoke('chat:load', project),
-  sendChat: (project: string, text: string): Promise<void> =>
-    ipcRenderer.invoke('chat:send', project, text),
+  listChats: (project: string): Promise<ChatInfo[]> => ipcRenderer.invoke('chats:list', project),
+  loadChat: (
+    project: string,
+    chat: string
+  ): Promise<{ messages: ChatMessage[]; log: LogEntry[]; busy: boolean }> =>
+    ipcRenderer.invoke('chat:load', project, chat),
+  sendChat: (project: string, chat: string, text: string): Promise<void> =>
+    ipcRenderer.invoke('chat:send', project, chat, text),
+  stopChat: (project: string, chat: string): Promise<void> =>
+    ipcRenderer.invoke('chat:stop', project, chat),
   // every project's Orchestrator events; callers filter by project
   onChatEvent: (cb: (e: ChatEvent) => void): (() => void) => {
     const listener = (_: unknown, e: ChatEvent): void => cb(e)

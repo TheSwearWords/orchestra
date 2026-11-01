@@ -6,6 +6,7 @@ category: Brand
 keywords: [brand, identity, design system, tokens, kit, components, figma]
 prerequisites: [brand-spec, logo-builder]
 instruments: [kit-builder]
+model: sonnet
 tools: [files, figma-read, figma-write]
 source: mine
 ---

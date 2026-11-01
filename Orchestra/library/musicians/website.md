@@ -6,6 +6,7 @@ category: Web
 keywords: [website, web, landing page, product site, saas, app site, marketing site, figma]
 prerequisites: [product-brief, brand-spec, voice-guide, sitemap]
 instruments: [copywriter, page-designer]
+model: sonnet
 tools: [files, figma-read, figma-write]
 source: starter
 ---

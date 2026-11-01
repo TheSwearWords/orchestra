@@ -3,6 +3,7 @@ name: Model Reference
 job: Turn the user's schematic sketches or reference images into one reference sheet a 3D modeler can build from.
 output: prereqs/model-reference.md (images in prereqs/model-reference/)
 needs: []
+model: haiku
 tools: [files]
 source: render-3d
 ---

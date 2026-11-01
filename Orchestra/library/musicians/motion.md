@@ -6,6 +6,7 @@ category: Motion
 keywords: [motion, animation, logo animation, video, figma]
 prerequisites: [brand-spec, logo-builder]
 instruments: []
+model: sonnet
 tools: [files, figma-read, figma-write]
 source: mine
 ---

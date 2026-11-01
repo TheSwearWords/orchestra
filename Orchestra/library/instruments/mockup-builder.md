@@ -3,6 +3,7 @@ name: Mockup Builder
 job: Build one screen at a time in Figma from the design system's components.
 output: Screen frames in Figma, light and dark (links in the handoff note)
 needs: [screen-inventory]
+model: sonnet
 tools: [figma-read, figma-write]
 source: app-ui
 ---

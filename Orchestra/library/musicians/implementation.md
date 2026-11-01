@@ -6,6 +6,7 @@ category: Code
 keywords: [code, website, build, frontend, implementation, develop]
 prerequisites: [brand-spec]
 instruments: []
+model: sonnet
 tools: [files, shell, figma-read]
 source: mine
 ---

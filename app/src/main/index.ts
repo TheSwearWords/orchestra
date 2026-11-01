@@ -5,10 +5,11 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { Conductor, HANDOFF_FILE, readChat } from './conductor'
+import { Conductor, GENERAL, handoffFile, readChat, readLog } from './conductor'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { loadLibrary } from './library'
+import { foundationOrder } from './plan'
 import { listOutputs, outputPath } from './outputs'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
 import { createProject, listProjects, renameProject, type Project } from './projects'
@@ -32,20 +33,33 @@ const conductor = new Conductor({
     for (const w of BrowserWindow.getAllWindows())
       if (!w.isDestroyed()) w.webContents.send('chat:event', e)
   },
-  systemPrompt: async (id) => {
+  systemPrompt: async (id, chat) => {
     const dir = join(PROJECTS_DIR, id)
     const [lib, rules, projects, selected, handoff] = await Promise.all([
       loadLibrary(ORCHESTRA_HOME),
       readFile(join(ORCHESTRA_HOME, 'library', 'house-rules.md'), 'utf8').catch(() => ''),
       listProjects(PROJECTS_DIR),
       readSelection(dir),
-      readFile(join(dir, HANDOFF_FILE), 'utf8').catch(() => '')
+      readFile(join(dir, handoffFile(chat)), 'utf8').catch(() => '')
     ])
     const name = projects.find((p) => p.id === id)?.name ?? id
     const catalogue = lib.musicians.map((m) => `- ${m.id}: ${m.name}. ${m.deliverable}`).join('\n')
+    const focus = lib.musicians.find((m) => m.id === chat)
+    const needs = focus
+      ? foundationOrder(lib.musicians, lib.instruments, [focus.id]).map((f) => f.name)
+      : []
+    const thisChat =
+      chat === GENERAL
+        ? `## This chat: General
+This is the project's General chat: the whole project, its overall plan, and adding deliverables. Each chosen deliverable also has its own chat in Orchestra, where its detailed work happens; when the user goes deep on one deliverable, suggest continuing in that deliverable's chat.`
+        : focus
+          ? `## This chat: ${focus.name}
+This chat is only about the ${focus.name} deliverable (id ${focus.id}): ${focus.deliverable} Its Musician is defined in ${join(ORCHESTRA_HOME, 'library', 'musicians', `${focus.id}.md`)}. Shared foundations it needs first: ${needs.join(', ') || 'none'}. Keep to this deliverable. If the user brings up another deliverable, say it belongs in that deliverable's chat (or in the General chat if it isn't chosen yet).`
+          : ''
     return [
       lib.orchestrator?.prompt ?? '',
       rules,
+      thisChat,
       `## This project
 You are working in the project "${name}"; your current directory is its folder. Read concept.md, research.md and deliverables.md before planning, and read deliverables.md again whenever the plan matters: the user can change it at any time. The agent library (Musicians and Instruments, as markdown) is at ${join(ORCHESTRA_HOME, 'library')}.
 
@@ -62,7 +76,7 @@ ${catalogue}
 ## What you can do in this version of Orchestra
 You can talk with the user, read files, and write files inside the project folder. Briefing Musicians is not connected yet: plan the work with the user, and say plainly that the Musicians start once that is connected. Never say a Musician or Instrument is working. Write foundation files into prereqs/ only when the user asks you to.`,
       handoff &&
-        `## Your handoff note from the previous session (${HANDOFF_FILE})
+        `## Your handoff note from the previous session (${handoffFile(chat)})
 You wrote this before your last session ended. Continue from it.
 
 ${handoff}`
@@ -70,6 +84,7 @@ ${handoff}`
       .filter(Boolean)
       .join('\n\n')
   },
+  model: async () => (await loadLibrary(ORCHESTRA_HOME)).orchestrator?.model ?? 'opus',
   extraDirs: [join(ORCHESTRA_HOME, 'library')]
 })
 
@@ -362,12 +377,39 @@ app.whenReady().then(() => {
     saveSelection(projectDir(project), await loadLibrary(ORCHESTRA_HOME), ids)
   )
 
-  ipcMain.handle('chat:load', async (_, project: string) => ({
-    messages: await readChat(projectDir(project)),
-    busy: conductor.isBusy(project)
+  // A project's chats: General, then one per chosen deliverable, in library order. A deliverable
+  // taken out of the plan keeps its history on disk and comes back if it's chosen again.
+  ipcMain.handle('chats:list', async (_, project: string) => {
+    const dir = projectDir(project)
+    const [lib, selected] = await Promise.all([loadLibrary(ORCHESTRA_HOME), readSelection(dir)])
+    const chats = [
+      { id: GENERAL, title: 'General', icon: 'chat-3-line', deliverable: false },
+      ...lib.musicians
+        .filter((m) => selected.includes(m.id))
+        .map((m) => ({ id: m.id, title: m.name, icon: m.icon, deliverable: true }))
+    ]
+    return Promise.all(
+      chats.map(async (c) => {
+        const messages = await readChat(dir, c.id)
+        return {
+          ...c,
+          busy: conductor.isBusy(project, c.id),
+          count: messages.filter((m) => m.role !== 'note').length,
+          last: messages.filter((m) => m.role !== 'note').at(-1) ?? null
+        }
+      })
+    )
+  })
+  ipcMain.handle('chat:load', async (_, project: string, chat: string) => ({
+    messages: await readChat(projectDir(project), chat),
+    log: await readLog(projectDir(project), chat),
+    busy: conductor.isBusy(project, chat)
   }))
-  ipcMain.handle('chat:send', (_, project: string, text: string) =>
-    conductor.send(project, projectDir(project), String(text))
+  ipcMain.handle('chat:send', (_, project: string, chat: string, text: string) =>
+    conductor.send(project, chat, projectDir(project), String(text))
+  )
+  ipcMain.handle('chat:stop', (_, project: string, chat: string) =>
+    conductor.stop(project, chat, projectDir(project))
   )
   ipcMain.handle('create:outputs', (_, project: string) => listOutputs(projectDir(project)))
   ipcMain.handle('create:openOutput', async (_, project: string, rel: string) => {

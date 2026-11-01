@@ -6,6 +6,7 @@ category: <Brand | Product | Motion | 3D | Code | ...>
 keywords: []
 prerequisites: []
 instruments: []
+model: <opus | sonnet | haiku: the cheapest that does the job well>
 tools: []
 source: orchestrator
 ---

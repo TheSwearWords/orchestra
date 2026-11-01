@@ -3,6 +3,7 @@ name: Blender Builder
 job: Do materials, lighting and output in Blender: product stills, animation renders, or browser-ready glTF.
 output: Renders or GLB files in the project's exports/ folder
 needs: [model-builder]
+model: sonnet
 tools: [files, shell, blender]
 source: render-3d
 ---

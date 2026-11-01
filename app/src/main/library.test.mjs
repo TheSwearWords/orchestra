@@ -31,6 +31,10 @@ test('loads a library and reports missing and circular Instruments', async () =>
 
     const loaded = await loadLibrary(home)
     assert.equal(loaded.orchestrator?.prompt, 'Hi')
+    // no model line: each tier gets its default
+    assert.equal(loaded.orchestrator?.model, 'opus')
+    assert.equal(loaded.musicians[0].model, 'sonnet')
+    assert.equal(loaded.instruments[0].model, 'haiku')
     assert.deepEqual(loaded.musicians[0].prerequisites, ['spec'])
     assert.equal(loaded.musicians[0].category, 'Other')
     const problems = checkLibrary(loaded)

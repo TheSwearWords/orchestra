@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Project } from '../../../preload'
+import type { ChatInfo, Project } from '../../../preload'
 import { Ascii, type AsciiName } from './Ascii'
 import { Icon, type IconName } from './Icon'
 
@@ -21,6 +21,9 @@ interface Props {
   onSide: (project: string) => void // open beside the current one, in a split
   onToggle: () => void
   onChanged: () => void // a project was renamed or deleted; reload the list
+  chats: ChatInfo[] // the selected project's chats, listed under it
+  activeChat: string | null | undefined // null: its overview; undefined: not in Create
+  onOpenChat: (chat: string | null) => void
 }
 
 export function Sidebar({
@@ -31,7 +34,10 @@ export function Sidebar({
   onSelect,
   onSide,
   onToggle,
-  onChanged
+  onChanged,
+  chats,
+  activeChat,
+  onOpenChat
 }: Props): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -203,6 +209,34 @@ export function Sidebar({
                       <Icon name="folder-line" />
                       <span className="truncate">{p.name}</span>
                     </button>
+                  )}
+                  {selected === p.id && chats.length > 0 && (
+                    <ul
+                      aria-label={`${p.name} chats`}
+                      className="mt-1 mb-1 ml-8 flex flex-col border-l border-line"
+                    >
+                      {[
+                        { id: null, title: 'All chats', icon: 'layout-grid-line', busy: false },
+                        ...chats
+                      ].map((c) => (
+                        <li key={c.id ?? 'all'}>
+                          <button
+                            onClick={() => onOpenChat(c.id)}
+                            aria-current={activeChat === c.id ? 'page' : undefined}
+                            className={`flex h-8 w-full items-center gap-2 pr-4 pl-3 text-left transition-colors duration-150 hover:bg-muted ${activeChat === c.id ? 'bg-muted type-current-s' : 'type-body-s text-fg-2 hover:text-fg'}`}
+                          >
+                            <Icon name={c.icon} size={14} />
+                            <span className="truncate">{c.title}</span>
+                            {c.busy && (
+                              <span
+                                title="Working"
+                                className="ml-auto size-1.5 shrink-0 rounded-full bg-brand"
+                              />
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </li>
               ))}

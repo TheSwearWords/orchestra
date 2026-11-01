@@ -327,3 +327,10 @@ The Agents screen (build step 5) later becomes the full editor for these same fi
     - Agents are round markers: the Orchestrator filled, Musicians ringed with their icon, Instruments small.
     - Work (foundation files and deliverables) is a dashed square, or a green check when ready.
     - Work is named after the file it makes.
+
+## Create, part 1c: chats per deliverable (Nov 1)
+- **Chats:** a project has a General chat plus one chat per chosen deliverable. Each chat is its own Orchestrator session, focused on that deliverable, with its own history, agent log and handoff note (`notes/orchestrator-<deliverable>.md`). Everything lives in `.orchestra/chats/<id>/`; the old single chat migrates into General.
+- **Flow:** a new project picks deliverables first, or skips. Continue leads to "What do you want to work on first?", the chats under the Orchestrator. The open project lists its chats underneath it in the sidebar (Claude-style); tabs stay per project.
+- **Chat look:** your messages are right-aligned bubbles; the Orchestrator is on the left with its avatar (the logo mark). The composer has more room below it and a dark-gray border. While working, Send becomes **Stop**: it kills the turn and keeps the conversation.
+- **Agent channel:** a read-only terminal-style toggle per chat, logging what each agent reads, writes and says, with its own "Stop all agents". It carries only the Orchestrator's activity until Musicians run.
+- **Model tiers (the user's design):** Orchestrator on Opus, Musicians on Sonnet, Instruments on Haiku for structured or menial jobs and Sonnet where craft matters. Set by `model:` in each library file; tier defaults apply when it's missing. The Orchestrator's session already runs with `--model`.

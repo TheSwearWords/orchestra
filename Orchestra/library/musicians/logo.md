@@ -6,6 +6,7 @@ category: Brand
 keywords: [logo, mark, wordmark, logotype, identity, brand]
 prerequisites: [product-brief]
 instruments: [logo-concepts, logo-builder]
+model: sonnet
 tools: [files, figma-read, figma-write]
 source: starter
 ---

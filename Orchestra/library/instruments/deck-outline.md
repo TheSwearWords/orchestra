@@ -3,6 +3,7 @@ name: Deck Outline
 job: Plan the deck's story: the audience, the one takeaway, and each slide's point in order.
 output: prereqs/deck-outline.md
 needs: [product-brief]
+model: haiku
 tools: [files]
 source: slide-deck
 ---

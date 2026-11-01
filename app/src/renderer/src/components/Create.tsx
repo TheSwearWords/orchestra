@@ -1,10 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import type { ChatMessage, CreateState, Musician, Output } from '../../../preload'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import type {
+  ChatInfo,
+  ChatMessage,
+  CreateState,
+  LogEntry,
+  Musician,
+  Output
+} from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
+import { splitSuggestion } from '../suggest'
 import { Deliverables } from './Deliverables'
 import { Icon } from './Icon'
 import { Markdown } from './Research'
-import { splitSuggestion } from '../suggest'
 
 // Electron prefixes IPC errors with the channel name; show only the reason
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
@@ -13,10 +20,22 @@ const time = (iso: string): string =>
 
 const solidButton =
   'h-9 shrink-0 bg-brand px-4 type-label-m text-on-brand transition-[background-color,scale] duration-150 hover:bg-brand-hover active:scale-[0.97] active:bg-brand-pressed disabled:bg-muted disabled:text-fg-disabled'
+const outlineButton =
+  'flex h-9 shrink-0 items-center gap-2 border border-line-strong bg-canvas px-4 type-label-m transition-[background-color,scale] duration-150 hover:bg-muted active:scale-[0.97]'
 
-/** The Create phase: an open-ended conversation with the Orchestrator, with the deliverable
- * picker a click away. Deliverables can be picked first, later, or added from the chat. */
-export function Create({ project }: { project: string }): React.JSX.Element {
+/** The Create phase. A project has several chats with the Orchestrator: General, plus one per
+ * chosen deliverable. With no chat open, it shows them all to choose from. */
+export function Create({
+  project,
+  chat,
+  onChat,
+  onChatsChanged
+}: {
+  project: string
+  chat: string | null // null: the overview of all chats
+  onChat: (chat: string | null) => void
+  onChatsChanged: () => void // deliverables changed, so the sidebar's chat list did too
+}): React.JSX.Element {
   const [plan, setPlan] = useState<CreateState | null>(null)
   const [picking, setPicking] = useState(false)
 
@@ -25,62 +44,163 @@ export function Create({ project }: { project: string }): React.JSX.Element {
   }, [project])
 
   if (!plan) return <div className="flex-1" />
-  if (picking)
+  const pickerFirst = picking || (chat === null && plan.selected.length === 0 && !seenOverview)
+  if (pickerFirst)
     return (
       <div className="flex flex-1 flex-col">
         <button
-          onClick={() => setPicking(false)}
+          onClick={() => {
+            setPicking(false)
+            seenOverview = true
+          }}
           className="flex items-center gap-2 self-start px-6 pt-5 type-label-m text-link hover:underline"
         >
           <Icon name="arrow-left-line" />
-          Back to the conversation
+          {plan.selected.length ? 'Back to the chats' : 'Skip: just talk to the Orchestrator'}
         </button>
         <Deliverables
           project={project}
+          continueLabel="Continue"
           onSaved={(ids) => {
             setPlan({ ...plan, selected: ids })
             setPicking(false)
+            seenOverview = true
+            onChat(null)
+            onChatsChanged()
           }}
         />
       </div>
     )
+  if (chat === null)
+    return (
+      <Overview project={project} plan={plan} onOpen={onChat} onPick={() => setPicking(true)} />
+    )
   return (
-    <Workspace
+    <ChatView
+      key={chat}
       project={project}
+      chat={chat}
       plan={plan}
-      onPick={() => setPicking(true)}
-      onSelected={(ids) => setPlan({ ...plan, selected: ids })}
+      onBack={() => onChat(null)}
+      onSelected={(ids) => {
+        setPlan({ ...plan, selected: ids })
+        onChatsChanged()
+      }}
     />
   )
 }
+// Picking deliverables comes first for a new project, once; "skip" goes straight to the chats.
+let seenOverview = false
 
-function Workspace({
+/** "What do you want to work on first?": the project's chats under the Orchestrator. */
+function Overview({
   project,
   plan,
-  onPick,
-  onSelected
+  onOpen,
+  onPick
 }: {
   project: string
   plan: CreateState
+  onOpen: (chat: string) => void
   onPick: () => void
+}): React.JSX.Element {
+  const [chats, setChats] = useState<ChatInfo[] | null>(null)
+  useEffect(() => {
+    const load = (): void => void window.api.listChats(project).then(setChats)
+    load()
+    return window.api.onChatEvent((e) => {
+      if (e.project === project && (e.kind === 'busy' || e.kind === 'message')) load()
+    })
+  }, [project, plan.selected])
+
+  return (
+    <div className="stagger flex-1 px-6 pt-8 pb-12">
+      <div className="flex items-end justify-between gap-6">
+        <div>
+          <h2 className="type-heading-s">What do you want to work on first?</h2>
+          <p className="mt-1 type-caption text-fg-2">
+            Each deliverable has its own chat with the Orchestrator. General is for the whole
+            project.
+          </p>
+        </div>
+        <button onClick={onPick} className={outlineButton}>
+          <Icon name="add-line" />
+          {plan.selected.length ? 'Change deliverables' : 'Pick deliverables'}
+        </button>
+      </div>
+
+      <div className="mt-8 flex items-center gap-2.5">
+        <Avatar />
+        <span className="type-label-m">Orchestrator</span>
+      </div>
+      <ul className="mt-2 ml-3 grid gap-3 border-l border-line-strong py-2 pl-6 @3xl:grid-cols-2">
+        {(chats ?? []).map((c) => (
+          <li key={c.id}>
+            <button
+              onClick={() => onOpen(c.id)}
+              className="flex h-full w-full flex-col border border-line bg-canvas p-4 text-left transition-[background-color,scale] duration-150 hover:bg-subtle active:scale-[0.99]"
+            >
+              <span className="flex w-full items-center justify-between gap-3">
+                <span className="flex items-center gap-2 type-label-l">
+                  <Icon name={c.icon} size={18} className={c.deliverable ? 'text-link' : ''} />
+                  {c.title}
+                </span>
+                {c.busy ? (
+                  <Badge tone="working">Working</Badge>
+                ) : (
+                  <span className="type-caption text-fg-2">
+                    {c.count ? `${c.count} message${c.count === 1 ? '' : 's'}` : 'Not started'}
+                  </span>
+                )}
+              </span>
+              <span className="mt-2 line-clamp-2 type-body-s text-fg-2">
+                {c.last
+                  ? `${c.last.role === 'user' ? 'You: ' : ''}${c.last.text.replace(/\s+/g, ' ')}`
+                  : c.deliverable
+                    ? (plan.musicians.find((m) => m.id === c.id)?.deliverable ?? '')
+                    : 'The whole project: the plan, and adding deliverables.'}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ChatView({
+  project,
+  chat,
+  plan,
+  onBack,
+  onSelected
+}: {
+  project: string
+  chat: string
+  plan: CreateState
+  onBack: () => void
   onSelected: (ids: string[]) => void
 }): React.JSX.Element {
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [log, setLog] = useState<LogEntry[]>([])
   const [busy, setBusy] = useState(false)
   const [live, setLive] = useState('')
   const [error, setError] = useState('')
   const [outputs, setOutputs] = useState<Output[]>([])
+  const [channel, setChannel] = useState(false) // the agent channel instead of the conversation
 
   useEffect(() => {
-    window.api.loadChat(project).then((c) => {
+    window.api.loadChat(project, chat).then((c) => {
       setMessages(c.messages)
+      setLog(c.log)
       setBusy(c.busy)
     })
     const loadOutputs = (): void => void window.api.listOutputs(project).then(setOutputs)
     loadOutputs()
     return window.api.onChatEvent((e) => {
-      if (e.project !== project) return
+      if (e.project !== project || e.chat !== chat) return
       if (e.kind === 'live') setLive(e.text)
+      if (e.kind === 'log') setLog((l) => [...l, e.entry])
       if (e.kind === 'message') {
         setMessages((m) => [...m, e.message])
         if (e.message.role === 'orchestrator') setLive('')
@@ -94,18 +214,19 @@ function Workspace({
       }
       if (e.kind === 'error') setError(e.text)
     })
-  }, [project])
+  }, [project, chat])
 
   async function send(text: string): Promise<boolean> {
     setError('')
     try {
-      await window.api.sendChat(project, text)
+      await window.api.sendChat(project, chat, text)
       return true
     } catch (e) {
       setError(reason(e))
       return false
     }
   }
+  const stop = (): void => void window.api.stopChat(project, chat).catch((e) => setError(reason(e)))
 
   async function add(ids: string[]): Promise<void> {
     setError('')
@@ -116,53 +237,96 @@ function Workspace({
     }
   }
 
-  const chosen = plan.musicians.filter((m) => plan.selected.includes(m.id))
+  const focus = plan.musicians.find((m) => m.id === chat)
+  const title = focus?.name ?? 'General'
 
   return (
-    <div className="grid flex-1 gap-6 px-6 pt-8 pb-8 @5xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid flex-1 gap-6 px-6 pt-6 @5xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="flex min-w-0 flex-col">
-        <div className="flex items-start justify-between gap-6 border-b border-line pb-5">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 self-start type-label-s text-link hover:underline"
+        >
+          <Icon name="arrow-left-line" size={14} />
+          All chats
+        </button>
+        <div className="mt-3 flex items-start justify-between gap-6 border-b border-line pb-5">
           <div className="flex gap-3">
-            <Icon name="chat-3-line" size={20} className="mt-1.5" />
+            <Icon
+              name={focus?.icon ?? 'chat-3-line'}
+              size={20}
+              className={`mt-1.5 ${focus ? 'text-link' : ''}`}
+            />
             <div>
-              <h2 className="type-heading-s">A direction, together</h2>
+              <h2 className="type-heading-s">{title}</h2>
               <p className="mt-1 type-caption text-fg-2">
-                Orchestrator ·{' '}
-                {chosen.length ? chosen.map((m) => m.name).join(', ') : 'no deliverables yet'}
+                {focus ? focus.deliverable : 'The whole project, with the Orchestrator'}
               </p>
             </div>
           </div>
-          <button onClick={onPick} className="type-label-s text-link hover:underline">
-            {chosen.length ? 'Change deliverables' : 'Pick deliverables'}
-          </button>
+          <div role="radiogroup" aria-label="View" className="flex shrink-0 border border-line">
+            {(
+              [
+                [false, 'Conversation', 'chat-3-line'],
+                [true, 'Agent channel', 'terminal-box-line']
+              ] as const
+            ).map(([on, label, icon]) => (
+              <button
+                key={label}
+                role="radio"
+                aria-checked={channel === on}
+                onClick={() => setChannel(on)}
+                className={`flex h-8 items-center gap-1.5 px-3 transition-colors duration-150 ${channel === on ? 'bg-muted type-current-s' : 'type-label-s text-fg-2 hover:text-fg'}`}
+              >
+                <Icon name={icon} size={14} />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <Conversation
-          messages={messages}
-          busy={busy}
-          live={live}
-          musicians={plan.musicians}
-          selected={plan.selected}
-          onAdd={add}
-        />
-
-        {error && (
-          <p
-            role="alert"
-            className="mt-4 border-l-2 border-signal bg-signal-subtle px-3 py-2 type-body-s text-signal-fg"
-          >
-            {error}
-          </p>
+        {channel ? (
+          <AgentChannel log={log} busy={busy} onStop={stop} />
+        ) : (
+          <>
+            <Conversation
+              messages={messages}
+              busy={busy}
+              live={live}
+              musicians={plan.musicians}
+              selected={plan.selected}
+              onAdd={add}
+            />
+            {error && (
+              <p
+                role="alert"
+                className="mt-4 border-l-2 border-signal bg-signal-subtle px-3 py-2 type-body-s text-signal-fg"
+              >
+                {error}
+              </p>
+            )}
+            <Composer busy={busy} onSend={send} onStop={stop} />
+          </>
         )}
-
-        <Composer busy={busy} onSend={send} />
       </section>
 
-      <aside className="flex min-w-0 flex-col gap-6">
-        <Score plan={plan} busy={busy} outputs={outputs} onPick={onPick} />
+      <aside className="flex min-w-0 flex-col gap-6 pb-8">
+        <Score plan={plan} focus={focus?.id} busy={busy} outputs={outputs} />
         <Files project={project} outputs={outputs} />
       </aside>
     </div>
+  )
+}
+
+/** The Orchestrator's mark, so its messages read as a person in the chat. */
+function Avatar({ size = 'md' }: { size?: 'sm' | 'md' }): React.JSX.Element {
+  return (
+    <span
+      aria-hidden
+      className={`flex shrink-0 items-center justify-center rounded-full bg-brand text-on-brand ${size === 'sm' ? 'size-5' : 'size-7'}`}
+    >
+      <Icon name="logo-mark" size={size === 'sm' ? 12 : 16} />
+    </span>
   )
 }
 
@@ -188,7 +352,7 @@ function Conversation({
   const known = new Set(musicians.map((m) => m.id))
 
   return (
-    <div className="flex flex-col gap-4 py-5" aria-live="polite">
+    <div className="flex flex-col gap-5 py-6" aria-live="polite">
       {messages.length === 0 && !busy && (
         <p className="py-4 type-body-m text-fg-2">
           Tell the Orchestrator what you want made, or just think out loud. It reads your concept
@@ -207,16 +371,17 @@ function Conversation({
           )
         if (m.role === 'user')
           return (
-            <div key={i} className="bg-subtle px-4 py-3">
-              <Byline who="You" t={m.t} />
-              <p className="mt-2 type-body-m whitespace-pre-wrap">{m.text}</p>
+            <div key={i} className="flex flex-col items-end">
+              <p className="max-w-[80%] bg-subtle px-4 py-3 type-body-m whitespace-pre-wrap">
+                {m.text}
+              </p>
+              <span className="mt-1 type-caption text-fg-2">{time(m.t)}</span>
             </div>
           )
         const { body, ids } = splitSuggestion(m.text, known)
         return (
-          <div key={i} className="px-1">
-            <Byline who="Orchestrator" t={m.t} accent />
-            <Markdown text={body} className="mt-1 [&>*:first-child]:mt-1" />
+          <OrchestratorSays key={i} t={m.t}>
+            <Markdown text={body} className="[&>*:first-child]:mt-1" />
             {ids.length > 0 && (
               <Suggestion
                 items={musicians.filter((x) => ids.includes(x.id))}
@@ -224,23 +389,35 @@ function Conversation({
                 onAdd={() => onAdd(ids)}
               />
             )}
-          </div>
+          </OrchestratorSays>
         )
       })}
       {busy && (
-        <div className="px-1">
-          <Byline who="Orchestrator" accent />
+        <OrchestratorSays>
           {live ? (
-            <Markdown
-              text={splitSuggestion(live, known).body}
-              className="mt-1 [&>*:first-child]:mt-1"
-            />
+            <Markdown text={splitSuggestion(live, known).body} className="[&>*:first-child]:mt-1" />
           ) : (
-            <p className="mt-2 type-body-s text-fg-2">Reading the project…</p>
+            <p className="mt-1 type-body-s text-fg-2">Reading the project…</p>
           )}
-        </div>
+        </OrchestratorSays>
       )}
-      <div ref={end} />
+      <div ref={end} className="scroll-mb-48" />
+    </div>
+  )
+}
+
+/** The Orchestrator's turn: its mark on the left, the text flowing beside it, no bubble. */
+function OrchestratorSays({ t, children }: { t?: string; children: ReactNode }): React.JSX.Element {
+  return (
+    <div className="flex gap-3 pr-[10%]">
+      <Avatar />
+      <div className="min-w-0 flex-1">
+        <div className="flex h-7 items-center gap-2">
+          <span className="type-label-m">Orchestrator</span>
+          {t && <span className="type-caption text-fg-2">{time(t)}</span>}
+        </div>
+        {children}
+      </div>
     </div>
   )
 }
@@ -274,7 +451,7 @@ function Suggestion({
       {added ? (
         <span className="flex items-center gap-1.5 type-label-s text-fg-2">
           <Icon name="check-line" />
-          Added
+          Added, each with its own chat
         </span>
       ) : (
         <button
@@ -293,29 +470,14 @@ function Suggestion({
   )
 }
 
-function Byline({
-  who,
-  t,
-  accent
-}: {
-  who: string
-  t?: string
-  accent?: boolean
-}): React.JSX.Element {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className={`type-label-m ${accent ? 'text-link' : ''}`}>{who}</span>
-      {t && <span className="type-caption text-fg-2">{time(t)}</span>}
-    </div>
-  )
-}
-
 function Composer({
   busy,
-  onSend
+  onSend,
+  onStop
 }: {
   busy: boolean
   onSend: (text: string) => Promise<boolean>
+  onStop: () => void
 }): React.JSX.Element {
   const [text, setText] = useState('')
 
@@ -334,8 +496,8 @@ function Composer({
   }
 
   return (
-    <div className="sticky bottom-0 mt-auto bg-canvas pt-3 pb-1">
-      <div className="border border-line-strong bg-canvas focus-within:border-focus">
+    <div className="sticky bottom-0 mt-auto bg-canvas pt-3 pb-6">
+      <div className="border border-fg-2/45 bg-canvas transition-colors duration-150 focus-within:border-fg-2">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -347,17 +509,96 @@ function Composer({
         />
         <div className="flex items-center justify-between gap-4 px-4 pb-3">
           <span className="type-caption text-fg-2">
-            {busy ? 'The Orchestrator is answering…' : 'Enter to send · Shift+Enter for a new line'}
+            {busy ? 'Working… stop it at any time' : 'Enter to send · Shift+Enter for a new line'}
           </span>
-          <button
-            onClick={() => void submit()}
-            disabled={busy || !text.trim()}
-            aria-label="Send"
-            className="flex size-9 items-center justify-center bg-brand text-on-brand transition-[background-color,scale] duration-150 hover:bg-brand-hover active:scale-[0.95] disabled:bg-muted disabled:text-fg-disabled"
-          >
-            <Icon name="send-plane-2-fill" />
-          </button>
+          {busy ? (
+            <button
+              onClick={onStop}
+              aria-label="Stop"
+              title="Stop what the agents are doing"
+              className="flex size-9 items-center justify-center bg-fg text-canvas transition-[background-color,scale] duration-150 hover:bg-fg-2 active:scale-[0.95]"
+            >
+              <Icon name="stop-fill" />
+            </button>
+          ) : (
+            <button
+              onClick={() => void submit()}
+              disabled={!text.trim()}
+              aria-label="Send"
+              className="flex size-9 items-center justify-center bg-brand text-on-brand transition-[background-color,scale] duration-150 hover:bg-brand-hover active:scale-[0.95] disabled:bg-muted disabled:text-fg-disabled"
+            >
+              <Icon name="send-plane-2-fill" />
+            </button>
+          )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Read-only oversight: every agent's actions and words in this chat, terminal-style. */
+function AgentChannel({
+  log,
+  busy,
+  onStop
+}: {
+  log: LogEntry[]
+  busy: boolean
+  onStop: () => void
+}): React.JSX.Element {
+  const end = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: 'nearest' })
+  }, [log.length])
+
+  return (
+    <div className="mt-6 mb-6 flex min-h-[420px] flex-col bg-inverse text-on-brand">
+      <div className="flex items-center justify-between gap-4 border-b border-on-brand/15 px-4 py-2.5">
+        <span className="type-log-s text-on-brand/60">agent channel · read-only</span>
+        {busy ? (
+          <button
+            onClick={onStop}
+            className="flex items-center gap-1.5 border border-danger px-2.5 py-1 type-log-s text-on-brand transition-colors duration-150 hover:bg-danger"
+          >
+            <Icon name="stop-fill" size={12} />
+            Stop all agents
+          </button>
+        ) : (
+          <span className="type-log-s text-on-brand/60">idle</span>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-3" role="log" aria-label="Agent channel">
+        {log.length === 0 && (
+          <p className="type-log-s text-on-brand/60">
+            Nothing yet. Every agent action in this chat shows up here: what the Orchestrator reads
+            and writes now, and the Musicians&rsquo; messages to each other once they run.
+          </p>
+        )}
+        {log.map((e, i) =>
+          e.kind === 'turn' ? (
+            <p key={i} className="my-1.5 type-log-s text-on-brand/45">
+              ── {e.text} · {time(e.t)}
+            </p>
+          ) : (
+            <p key={i} className="flex gap-2.5 type-log-s">
+              <span className="w-16 shrink-0 whitespace-nowrap text-on-brand/45">{time(e.t)}</span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                <span className="flex size-4 items-center justify-center rounded-full bg-brand">
+                  <Icon name="logo-mark" size={10} />
+                </span>
+                <span className="text-on-brand/80">
+                  {e.agent === 'orchestrator' ? 'orchestrator' : e.agent}
+                </span>
+              </span>
+              <span
+                className={`min-w-0 ${e.kind === 'say' ? 'line-clamp-3 text-on-brand/70' : 'text-on-brand'}`}
+              >
+                {e.kind === 'say' ? `“${e.text}”` : e.text}
+              </span>
+            </p>
+          )
+        )}
+        <div ref={end} />
       </div>
     </div>
   )
@@ -395,9 +636,7 @@ function AgentNode({
 }): React.JSX.Element {
   const marker =
     role === 'Orchestrator' ? (
-      <span className="flex size-6 items-center justify-center rounded-full bg-brand text-on-brand">
-        <Icon name="logo-mark" size={14} />
-      </span>
+      <Avatar size="sm" />
     ) : role === 'Musician' ? (
       <span className="flex size-6 items-center justify-center rounded-full border-2 border-brand bg-canvas text-link">
         <Icon name={icon ?? 'shapes-line'} size={12} />
@@ -461,20 +700,18 @@ function workName(output: string, fallback: string): string {
 
 function Score({
   plan,
+  focus,
   busy,
-  outputs,
-  onPick
+  outputs
 }: {
   plan: CreateState
+  focus?: string // a deliverable's chat shows only that deliverable's part of the tree
   busy: boolean
   outputs: Output[]
-  onPick: () => void
 }): React.JSX.Element {
-  const chosen = plan.musicians.filter((m) => plan.selected.includes(m.id))
-  const foundations = useMemo(
-    () => foundationOrder(plan.musicians, plan.instruments, plan.selected),
-    [plan]
-  )
+  const ids = focus ? [focus] : plan.selected
+  const chosen = plan.musicians.filter((m) => ids.includes(m.id))
+  const foundations = foundationOrder(plan.musicians, plan.instruments, ids) // a few dozen items
   const names = new Map(plan.instruments.map((i) => [i.id, i.name]))
   // a foundation is ready once the first file its output names exists in the project
   const exists = new Set(outputs.map((o) => o.path))
@@ -484,7 +721,7 @@ function Score({
   }
 
   return (
-    <section className="border border-line p-5">
+    <section className="border border-line bg-canvas p-5">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="type-heading-xs">Agents and work</h3>
         <span className="flex items-center gap-3 type-caption text-fg-2">
@@ -549,12 +786,9 @@ function Score({
           ))}
           {chosen.length === 0 && (
             <li className={branch}>
-              <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="type-body-s text-fg-2">No deliverables yet.</span>
-                <button onClick={onPick} className="type-label-s text-link hover:underline">
-                  Pick deliverables
-                </button>
-              </div>
+              <p className="flex min-h-7 items-center type-body-s text-fg-2">
+                No deliverables yet.
+              </p>
             </li>
           )}
         </AgentNode>
@@ -584,7 +818,7 @@ const kb = (n: number): string =>
 function Files({ project, outputs }: { project: string; outputs: Output[] }): React.JSX.Element {
   const [error, setError] = useState('')
   return (
-    <section className="border border-line p-5">
+    <section className="border border-line bg-canvas p-5">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="type-heading-xs">Created files</h3>
         <span className="type-caption text-fg-2">

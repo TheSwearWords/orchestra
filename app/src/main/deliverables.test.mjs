@@ -9,10 +9,27 @@ import { foundationOrder } from './plan.ts'
 const inst = (id, needs = []) => ({ id, name: id.toUpperCase(), needs, output: `prereqs/${id}.md` })
 const lib = {
   orchestrator: null,
-  instruments: [inst('brief'), inst('spec', ['brief']), inst('concepts', ['brief']), inst('logo', ['concepts'])],
+  instruments: [
+    inst('brief'),
+    inst('spec', ['brief']),
+    inst('concepts', ['brief']),
+    inst('logo', ['concepts'])
+  ],
   musicians: [
-    { id: 'kit', name: 'Kit', deliverable: 'The kit.', prerequisites: ['spec', 'logo'], instruments: [] },
-    { id: 'site', name: 'Site', deliverable: 'The site.', prerequisites: ['brief', 'spec'], instruments: [] }
+    {
+      id: 'kit',
+      name: 'Kit',
+      deliverable: 'The kit.',
+      prerequisites: ['spec', 'logo'],
+      instruments: []
+    },
+    {
+      id: 'site',
+      name: 'Site',
+      deliverable: 'The site.',
+      prerequisites: ['brief', 'spec'],
+      instruments: []
+    }
   ]
 }
 

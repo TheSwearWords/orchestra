@@ -3,6 +3,7 @@ name: Copywriter
 job: Write the text a deliverable needs (taglines, headlines, page or slide copy) in the brand's voice, with options.
 output: The copy file named in the brief (approved lines go to prereqs/copy.md)
 needs: [voice-guide]
+model: sonnet
 tools: [files]
 source: brand-copy
 ---

@@ -52,9 +52,16 @@ Already customizable today:
 - Install everything needed: Obsidian, and so on.
 - Idea: bundle it all as one install (a skill package or plugin that compiles everything).
 
+## 4. Usage meter in the logo
+
+- The Orchestra logo in the top-left fills up as you use your plan's usage.
+- Hover it for a quick readout: what percent you have left.
+- With mix-and-match models, the hover could list each connected provider separately (Claude 62% left, ChatGPT 80% left).
+
 ---
 
 ## Open questions
+- Usage data source: where the numbers come from per provider (CLI output, API rate-limit headers, the provider's own usage page), and whether "fill" means used or remaining.
 - Exact compute adapters: how ChatGPT and other providers hook into the Orchestrator/Musician/Instrument model.
 - Per-agent model assignment: where it's set (agent file? settings?), what happens if a provider isn't connected (fall back to the default?), and whether onboarding Step 2 lets you pick several providers.
 - Self-editing safety: does a shipped (packaged) build need to switch into a source/dev copy before Advanced mode can edit it? How does the user recover if an edit breaks the app?

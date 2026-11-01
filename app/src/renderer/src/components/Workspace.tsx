@@ -30,6 +30,7 @@ export function WorkspaceHeader({ title, context, status }: HeaderProps): React.
 interface TabStripProps {
   open: { id: string; name: string }[]
   panes: string[] // what each pane shows
+  pairs: [string, string][] // split groups, drawn together in a blue frame
   focus: number
   live: boolean // false while New project or a page is showing: no tab is "current"
   onSelect: (id: string) => void
@@ -49,6 +50,7 @@ type Tab = { id: string; name: string }
 export function TabStrip({
   open,
   panes,
+  pairs,
   focus,
   live,
   onSelect,
@@ -72,8 +74,8 @@ export function TabStrip({
   const [tearing, setTearing] = useState<string | null>(null)
   const [held, setHeld] = useState<string | null>(null) // pressed or being dragged: drawn smaller
 
-  async function menu(t: Tab, here: boolean, other: boolean): Promise<void> {
-    const paired = live && panes.length === 2 && (here || other)
+  async function menu(t: Tab, here: boolean): Promise<void> {
+    const paired = pairs.some((p) => p.includes(t.id))
     const choice = await window.api.menu([
       paired
         ? { id: 'unsplit', label: 'Unsplit' }
@@ -187,7 +189,7 @@ export function TabStrip({
         }}
         onContextMenu={(e) => {
           e.preventDefault()
-          void menu(t, here, other)
+          void menu(t, here)
         }}
         className={`group flex shrink-0 touch-none items-center transition-[background-color,opacity,scale] duration-150 ease-out-strong ${here || other ? 'bg-canvas' : 'hover:bg-muted'} ${held === t.id ? 'scale-[0.92] cursor-grabbing' : ''} ${tearing === t.id ? 'opacity-40' : ''}`}
       >
@@ -213,18 +215,19 @@ export function TabStrip({
     )
   }
 
-  // While split, the two shown tabs sit together (left pane first) where the first of them was.
-  const split = live && panes.length === 2
-  const pair = split
-    ? panes.map((id) => open.find((t) => t.id === id)).filter((t): t is Tab => !!t)
-    : []
-  const solo = open.filter((t) => !pair.includes(t))
-  const before = split ? solo.filter((t) => open.indexOf(t) < open.indexOf(pair[0])).length : 0
-  const single = (t: Tab): React.JSX.Element => (
-    <div key={t.id} className="flex border-r border-line">
-      {tab(t)}
-    </div>
-  )
+  // Each split group sits together (left tab first) where its first tab would be.
+  const byId = new Map(open.map((t) => [t.id, t]))
+  const items: ({ kind: 'tab'; tab: Tab } | { kind: 'group'; tabs: Tab[] })[] = []
+  const placed = new Set<string>()
+  for (const t of open) {
+    if (placed.has(t.id)) continue
+    const group = pairs.find((p) => p.includes(t.id))
+    const members = group?.map((id) => byId.get(id)).filter((m): m is Tab => !!m) ?? []
+    if (members.length === 2) {
+      members.forEach((m) => placed.add(m.id))
+      items.push({ kind: 'group', tabs: members })
+    } else items.push({ kind: 'tab', tab: t })
+  }
 
   return (
     <div className="flex h-10 shrink-0 items-stretch border-b border-line bg-subtle">
@@ -233,17 +236,22 @@ export function TabStrip({
         aria-label="Open projects"
         className="flex min-w-0 flex-1 overflow-x-auto"
       >
-        {solo.slice(0, before).map(single)}
-        {pair.length === 2 && (
-          <div
-            aria-label="Split view"
-            title="These two are side by side"
-            className="flex shrink-0 divide-x divide-line border-2 border-brand"
-          >
-            {pair.map(tab)}
-          </div>
+        {items.map((it) =>
+          it.kind === 'group' ? (
+            <div
+              key={it.tabs.map((m) => m.id).join('+')}
+              aria-label="Split group"
+              title="A split group: these two open side by side"
+              className="flex shrink-0 divide-x divide-line border-2 border-brand"
+            >
+              {it.tabs.map(tab)}
+            </div>
+          ) : (
+            <div key={it.tab.id} className="flex border-r border-line">
+              {tab(it.tab)}
+            </div>
+          )
         )}
-        {solo.slice(before).map(single)}
         {receiving && (
           <div
             aria-live="polite"

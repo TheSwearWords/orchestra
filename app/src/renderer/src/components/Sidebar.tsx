@@ -142,8 +142,17 @@ export function Sidebar({
           </div>
         </div>
       ) : (
-        <div key="expanded" className={`relative flex w-52 shrink-0 flex-col ${fadeIn}`}>
-          <div className="flex flex-col border-b border-line bg-subtle px-4 pt-7 pb-4">
+        <div key="expanded" className={`relative isolate flex w-52 shrink-0 flex-col ${fadeIn}`}>
+          {/* The figure sits behind the whole rail at a fixed size and shows only where the rail
+          is open, between the two solid sections; more projects cover more of it rather than
+          shrinking it. Kept very faint. */}
+          <Ascii
+            key={art}
+            name={art}
+            fit="height"
+            className="absolute inset-x-0 top-[12%] bottom-0 -z-10 text-line-strong/20 transition-opacity duration-700 ease-out-strong starting:opacity-0"
+          />
+          <div className="flex min-h-0 shrink flex-col border-b border-line bg-subtle px-4 pt-7 pb-4 [&>*:not(ul)]:shrink-0">
             <div className="flex items-center gap-2">
               <Icon name="logo-mark" size={30} className="text-logo" />
               {/* outlined type mark from Figma (Brand page); 715 x 138 */}
@@ -182,7 +191,7 @@ export function Sidebar({
               <span>Projects</span>
               <span>{projects.length}</span>
             </div>
-            <ul className="-mx-4 mt-2 flex flex-col gap-2">
+            <ul className="-mx-4 mt-2 flex min-h-0 flex-col gap-2 overflow-y-auto">
               {shown.map((p) => (
                 <li key={p.id}>
                   {renaming === p.id ? (
@@ -248,18 +257,9 @@ export function Sidebar({
             </ul>
           </div>
 
-          {/* the open space between the two solid sections: the figure stands on the line above
-          Files, fills the height, and wider figures crop at the sides */}
-          <div className="relative min-h-0 flex-1">
-            <Ascii
-              key={art}
-              name={art}
-              fit="stand"
-              className="absolute inset-x-0 top-4 bottom-0 text-line-strong/40 transition-opacity duration-700 ease-out-strong starting:opacity-0"
-            />
-          </div>
+          <div className="min-h-0 flex-1" />
 
-          <div className="flex flex-col gap-1.5 border-t border-line bg-subtle pt-2 pb-4">
+          <div className="flex shrink-0 flex-col gap-1.5 border-t border-line bg-subtle pt-2 pb-4">
             {UTILITY.map((u) => (
               <button
                 key={u.page}

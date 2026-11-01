@@ -96,9 +96,12 @@ function Sites({
 
   return (
     <div className="mt-6 border-y border-line">
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-2 @4xl:grid-cols-4">
         {sites.map((s) => (
-          <li key={s.url} className="border-r border-b border-line [&:nth-child(4n)]:border-r-0">
+          <li
+            key={s.url}
+            className="border-r border-b border-line [&:nth-child(2n)]:border-r-0 @4xl:[&:nth-child(2n)]:border-r @4xl:[&:nth-child(4n)]:border-r-0"
+          >
             <a
               href={s.url}
               target="_blank"

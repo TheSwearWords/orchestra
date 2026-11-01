@@ -13,8 +13,10 @@ const rank = (c: string): number => {
 const solidButton =
   'h-9 shrink-0 bg-brand px-4 type-label-m text-on-brand transition-[background-color,scale] duration-150 hover:bg-brand-hover active:scale-[0.97] active:bg-brand-pressed disabled:bg-muted disabled:text-fg-disabled'
 
-// Grid cells, like the Research site buttons: four across, hairlines between, none on the right edge
-const cell = 'border-r border-b border-line [&:nth-child(4n)]:border-r-0'
+// Grid cells, like the Research site buttons: four across (two in half a split), hairlines
+// between, none on the right edge
+const cell =
+  'border-r border-b border-line [&:nth-child(2n)]:border-r-0 @4xl:[&:nth-child(2n)]:border-r @4xl:[&:nth-child(4n)]:border-r-0'
 
 // Electron prefixes IPC errors with the channel name; show only the reason
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
@@ -117,7 +119,7 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
           />
         </label>
 
-        <ul className="grid grid-cols-4">
+        <ul className="grid grid-cols-2 @4xl:grid-cols-4">
           {shown.map((m) => {
             const on = chosen.includes(m.id)
             const needs = m.prerequisites.map((p) => names.get(p) ?? p).join(', ')

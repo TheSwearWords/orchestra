@@ -303,3 +303,9 @@ The Agents screen (build step 5) later becomes the full editor for these same fi
   - "Add your own" is a placeholder until the Create chat exists.
 - **Multiple windows (Nov 1):** Ctrl+Shift+N opens a new window. Ctrl+click or middle-click a project opens it in its own window, and the window is titled with the project name. **In-app tabs** come after the Create chat, when background agents make them pay off.
 - **Deliverable icons:** each Musician has `icon:` (a Remix icon name) in its front matter; unknown names fall back to `shapes-line`. A new icon must be copied into `app/src/renderer/src/assets/icons/`.
+- **Tabs and split view (Nov 1):**
+  - A tab strip of open projects sits above the workspace. Clicking a project in the sidebar opens or focuses its tab.
+  - The split button at the end of the strip shows two tabs side by side. A brand line marks the focused pane, which is where tab clicks go.
+  - Right-click a project → "Open to the side".
+  - The rules live in `renderer/src/tabs.ts`, with tests. Each project remembers its phase.
+  - In a half-width pane, the 4-up grids drop to 2 (container queries).

@@ -7,7 +7,7 @@
   "scripts": {
     "format": "prettier --write .",
     "tokens": "node scripts/tokens.mjs",
-    "test": "node --test src/main/*.test.mjs",
+    "test": "node --test src/main/*.test.mjs src/renderer/src/*.test.mjs",
     "lint": "eslint --cache .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",

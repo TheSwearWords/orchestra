@@ -95,9 +95,10 @@ app.whenReady().then(() => {
   ipcMain.handle('projects:menu', (e, id: string, name: string) => {
     const dir = projectDir(id)
     const win = BrowserWindow.fromWebContents(e.sender)!
-    return new Promise<'rename' | 'opened' | 'deleted' | null>((resolve) => {
+    return new Promise<'rename' | 'side' | 'opened' | 'deleted' | null>((resolve) => {
       Menu.buildFromTemplate([
         { label: 'Rename', click: () => resolve('rename') },
+        { label: 'Open to the side', click: () => resolve('side') },
         {
           label: 'Open in new window',
           click: () => {

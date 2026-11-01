@@ -18,6 +18,7 @@ interface Props {
   collapsed: boolean
   art: AsciiName
   onSelect: (target: string) => void
+  onSide: (project: string) => void // open beside the current one, in a split
   onToggle: () => void
   onChanged: () => void // a project was renamed or deleted; reload the list
 }
@@ -28,6 +29,7 @@ export function Sidebar({
   collapsed,
   art,
   onSelect,
+  onSide,
   onToggle,
   onChanged
 }: Props): React.JSX.Element {
@@ -39,8 +41,8 @@ export function Sidebar({
   // and fades in, so nothing reflows while the rail slides.
   const fadeIn = 'transition-opacity duration-200 ease-out-strong starting:opacity-0'
 
-  // Every project button: click selects, Ctrl/middle-click opens a window, right-click shows
-  // Rename / Open in new window / Delete.
+  // Every project button: click opens its tab, Ctrl/middle-click opens a window, right-click
+  // shows Rename / Open to the side / Open in new window / Delete.
   const projectProps = (p: Project): React.ButtonHTMLAttributes<HTMLButtonElement> => ({
     'aria-current': selected === p.id ? ('page' as const) : undefined,
     onClick: (e: React.MouseEvent) =>
@@ -50,6 +52,7 @@ export function Sidebar({
       e.preventDefault()
       const choice = await window.api.projectMenu(p.id, p.name)
       if (choice === 'deleted') onChanged()
+      if (choice === 'side') onSide(p.id)
       if (choice === 'rename') {
         if (collapsed) onToggle()
         setRenaming(p.id)

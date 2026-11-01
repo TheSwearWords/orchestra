@@ -23,7 +23,10 @@ const api = {
   listProjects: (): Promise<Project[]> => ipcRenderer.invoke('projects:list'),
   renameProject: (id: string, name: string): Promise<Project> =>
     ipcRenderer.invoke('projects:rename', id, name),
-  projectMenu: (id: string, name: string): Promise<'rename' | 'opened' | 'deleted' | null> =>
+  projectMenu: (
+    id: string,
+    name: string
+  ): Promise<'rename' | 'side' | 'opened' | 'deleted' | null> =>
     ipcRenderer.invoke('projects:menu', id, name),
   createProject: (input: Omit<Project, 'id'>): Promise<Project> =>
     ipcRenderer.invoke('projects:create', input),

@@ -202,6 +202,7 @@ function App(): React.JSX.Element {
             onSelect={show}
             onClose={(id) => setTabs((t) => closeTab(t, id))}
             onSplitWith={(id) => setTabs((t) => openToSide(t, id))}
+            onUnsplit={(keep) => setTabs((t) => unsplit(t, Math.max(0, t.panes.indexOf(keep))))}
             onReorder={(id, onto) => setTabs((t) => moveTab(t, id, onto))}
             receiving={receiving}
           />

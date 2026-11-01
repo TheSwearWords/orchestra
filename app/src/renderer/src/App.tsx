@@ -14,7 +14,9 @@ import {
   moveTab,
   openTab,
   openToSide,
+  pairsOf,
   prune,
+  ungroup,
   unsplit,
   type Tabs
 } from './tabs'
@@ -197,12 +199,13 @@ function App(): React.JSX.Element {
           <TabStrip
             open={tabs.open.map((id) => ({ id, name: byId.get(id)?.name ?? id }))}
             panes={tabs.panes}
+            pairs={pairsOf(tabs)}
             focus={tabs.focus}
             live={view === 'projects'}
             onSelect={show}
             onClose={(id) => setTabs((t) => closeTab(t, id))}
             onSplitWith={(id) => setTabs((t) => openToSide(t, id))}
-            onUnsplit={(keep) => setTabs((t) => unsplit(t, Math.max(0, t.panes.indexOf(keep))))}
+            onUnsplit={(keep) => setTabs((t) => ungroup(t, keep))}
             onReorder={(id, onto) => setTabs((t) => moveTab(t, id, onto))}
             receiving={receiving}
           />
@@ -305,18 +308,11 @@ function ProjectPane({
       onFocusCapture={onFocus}
       className={`@container relative isolate flex min-w-0 flex-1 flex-col overflow-hidden ${side === 1 ? 'border-l border-line' : ''}`}
     >
-      {/* when split, a brand line marks the pane that tab clicks go to */}
-      {split && (
-        <div
-          aria-hidden
-          className={`h-0.5 shrink-0 transition-colors duration-150 ${focused ? 'bg-brand' : 'bg-transparent'}`}
-        />
-      )}
       <Ascii
         key={phase}
         name={PHASE_ART[phase].workspace}
         fit="width"
-        className={`absolute ${split ? 'top-[102px]' : 'top-[66px]'} right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0`}
+        className={`absolute ${split ? 'top-[100px]' : 'top-[66px]'} right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0`}
       />
       {/* header and phase tabs stay put; each phase scrolls its own content below them */}
       <div key={project.id} className="stagger flex min-h-0 flex-1 flex-col">

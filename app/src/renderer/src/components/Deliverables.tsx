@@ -124,15 +124,17 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
                   aria-checked={on}
                   onClick={() => toggle(m.id)}
                   title={needs ? `Needs ${needs}` : undefined}
-                  className={`flex h-full min-h-36 w-full flex-col items-start px-5 py-4 text-left transition-[background-color,scale] duration-150 active:scale-[0.98] ${on ? 'bg-brand text-on-brand' : 'bg-subtle hover:bg-muted'}`}
+                  className={`flex h-full w-full flex-col items-start px-5 py-4 text-left transition-[background-color,scale] duration-150 active:scale-[0.98] ${on ? 'bg-brand text-on-brand' : 'bg-subtle hover:bg-muted'}`}
                 >
                   <span
                     className={`flex items-center gap-2 ${on ? 'type-current-m' : 'type-label-m'}`}
                   >
-                    {on && <Icon name="check-line" />}
+                    <Icon name={on ? 'check-line' : m.icon} size={18} />
                     {m.name}
                   </span>
-                  <span className={`mt-2 type-body-s ${on ? 'text-on-brand/85' : 'text-fg-2'}`}>
+                  <span
+                    className={`mt-1.5 line-clamp-3 type-body-s leading-5 ${on ? 'text-on-brand/85' : 'text-fg-2'}`}
+                  >
                     {m.deliverable}
                   </span>
                 </button>
@@ -143,7 +145,7 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
             <button
               onClick={() => setExplaining(!explaining)}
               aria-expanded={explaining}
-              className={`flex h-full min-h-36 w-full items-center justify-center gap-2 transition-colors duration-150 hover:bg-muted ${explaining ? 'bg-muted type-current-m' : 'bg-canvas type-label-m text-link'}`}
+              className={`flex h-full min-h-24 w-full items-center justify-center gap-2 transition-colors duration-150 hover:bg-muted ${explaining ? 'bg-muted type-current-m' : 'bg-canvas type-label-m text-link'}`}
             >
               <Icon name="add-line" />
               Add your own

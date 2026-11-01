@@ -15,6 +15,7 @@ export interface AgentDoc {
 
 export interface Musician extends AgentDoc {
   deliverable: string
+  icon: string // a Remix icon name bundled in the app; unknown names fall back to a generic one
   category: string
   keywords: string[]
   prerequisites: string[] // foundation Instruments, built once per project and shared
@@ -75,6 +76,7 @@ export async function loadLibrary(home: string): Promise<Library> {
   const musicians = (await readFolder(join(dir, 'musicians'))).map(({ id, fields, body }) => ({
     ...agent(id, fields, body),
     deliverable: str(fields, 'deliverable'),
+    icon: str(fields, 'icon'),
     category: str(fields, 'category') || 'Other',
     keywords: list(fields, 'keywords'),
     prerequisites: list(fields, 'prerequisites'),

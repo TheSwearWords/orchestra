@@ -1,6 +1,7 @@
 ---
 name: <Deliverable>
 deliverable: <what this Musician owns end to end, one line>
+icon: <a Remix icon name, e.g. palette-line>
 category: <Brand | Product | Motion | 3D | Code | ...>
 keywords: []
 prerequisites: []

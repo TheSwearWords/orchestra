@@ -1,6 +1,7 @@
 ---
 name: Motion
 deliverable: Motion made in Figma, starting with logo animations (reveal, loops, transitions).
+icon: film-line
 category: Motion
 keywords: [motion, animation, logo animation, video, figma]
 prerequisites: [brand-spec, logo-builder]

@@ -1,6 +1,7 @@
 ---
 name: Slide Deck
 deliverable: A presentation in Figma built on the brand kit's slide masters: pitch, product, or client deck.
+icon: slideshow-line
 category: Brand
 keywords: [slides, deck, presentation, pitch, keynote, figma slides]
 prerequisites: [product-brief, brand-spec, voice-guide, deck-outline]

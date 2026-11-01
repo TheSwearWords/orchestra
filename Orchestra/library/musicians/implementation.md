@@ -1,6 +1,7 @@
 ---
 name: Implementation
-deliverable: Working code that implements approved designs (design system, mockups, specs). The code is the deliverable.
+deliverable: Working code built from approved designs: the design system, mockups and specs.
+icon: code-s-slash-line
 category: Code
 keywords: [code, website, build, frontend, implementation, develop]
 prerequisites: [brand-spec]

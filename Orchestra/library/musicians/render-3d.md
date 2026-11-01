@@ -1,6 +1,7 @@
 ---
 name: 3D Render
-deliverable: 3D models built in Blender from sketches or reference images, then rendered as product stills, trailers, or exported for the browser.
+deliverable: Blender models from sketches or references, rendered as stills or trailers, or exported for the web.
+icon: box-3-line
 category: 3D
 keywords: [3d, blender, render, product shots, trailer, video, model, gltf, web 3d, campaign]
 prerequisites: [brand-spec, model-reference]

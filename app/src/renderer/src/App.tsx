@@ -14,9 +14,9 @@ const PAGE_TITLES: Record<Page, string> = {
   agents: 'Agents'
 }
 
-// Sidebar and workspace always show different figures.
+// Sidebar and workspace always show different figures; the narrow rail gets upright ones.
 const PHASE_ART: Record<Phase, { rail: AsciiName; workspace: AsciiName }> = {
-  research: { rail: 'concert', workspace: 'apollo' },
+  research: { rail: 'hand', workspace: 'apollo' },
   create: { rail: 'violin', workspace: 'concert' },
   refine: { rail: 'apollo', workspace: 'hand' }
 }
@@ -39,13 +39,35 @@ function remember(key: string, value: string): void {
 
 function App(): React.JSX.Element {
   const [projects, setProjects] = useState<Project[] | null>(null)
-  const [selected, setSelected] = useState<string | null>(() => remembered('selected'))
+  // a window opened on a project gets it in the URL hash; otherwise reopen the last one
+  const [selected, setSelected] = useState<string | null>(
+    () => new URLSearchParams(location.hash.slice(1)).get('project') ?? remembered('selected')
+  )
   const [phase, setPhase] = useState<Phase>('research')
   const [collapsed, setCollapsed] = useState(() => remembered('collapsed') === '1')
 
   useEffect(() => {
-    window.api.listProjects().then(setProjects)
+    const load = (): void => void window.api.listProjects().then(setProjects)
+    load()
+    // another window may have created a project; catch up when this one comes forward
+    window.addEventListener('focus', load)
+    const keys = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        void window.api.openWindow()
+      }
+    }
+    window.addEventListener('keydown', keys)
+    return () => {
+      window.removeEventListener('focus', load)
+      window.removeEventListener('keydown', keys)
+    }
   }, [])
+
+  const projectName = projects?.find((p) => p.id === selected)?.name
+  useEffect(() => {
+    document.title = projectName ? `${projectName} · Orchestra` : 'Orchestra' // names each window
+  }, [projectName])
 
   function select(target: string): void {
     setSelected(target)

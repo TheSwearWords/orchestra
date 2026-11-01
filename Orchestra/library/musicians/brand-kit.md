@@ -1,6 +1,7 @@
 ---
 name: Brand Kit
-deliverable: The brand kit in Figma, the source of truth for visual language: colors, logo, type styles, spacing, radius, elevation, buttons, boxes, backgrounds, icons, inputs, tags, grid, slide masters and guidelines. It keeps growing as the product does.
+deliverable: The brand's visual source of truth in Figma: color, type, logo, components and slide masters.
+icon: palette-line
 category: Brand
 keywords: [brand, identity, design system, tokens, kit, components, figma]
 prerequisites: [brand-spec, logo-builder]

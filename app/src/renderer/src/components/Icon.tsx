@@ -30,7 +30,9 @@ export type IconName =
   | 'wordmark'
 
 interface Props {
-  name: IconName
+  // any bundled icon; names from data files (like a deliverable's icon) may be unknown and fall
+  // back to a generic shape
+  name: IconName | (string & {})
   size?: number
   width?: number // for non-square marks such as the phase columns; defaults to size
   className?: string
@@ -38,7 +40,7 @@ interface Props {
 
 export function Icon({ name, size = 16, width = size, className = '' }: Props): React.JSX.Element {
   // quoted: small SVGs are inlined as data: URIs, which contain characters that break bare url()
-  const url = `url("${byName[name]}")`
+  const url = `url("${byName[name] ?? byName['shapes-line']}")`
   return (
     <span
       aria-hidden

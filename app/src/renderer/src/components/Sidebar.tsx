@@ -75,9 +75,12 @@ export function Sidebar({
             {projects.map((p) => (
               <li key={p.id}>
                 <button
-                  title={p.name}
+                  title={`${p.name} (Ctrl+click opens a new window)`}
                   aria-current={selected === p.id ? 'page' : undefined}
-                  onClick={() => onSelect(p.id)}
+                  onClick={(e) =>
+                    e.ctrlKey || e.metaKey ? void window.api.openWindow(p.id) : onSelect(p.id)
+                  }
+                  onAuxClick={(e) => e.button === 1 && void window.api.openWindow(p.id)}
                   className={`flex w-14 flex-col items-center py-2 transition-colors duration-150 hover:bg-muted ${selected === p.id ? 'bg-muted' : ''}`}
                 >
                   <span className={selected === p.id ? 'type-current-m' : 'type-label-l'}>
@@ -105,16 +108,7 @@ export function Sidebar({
           </div>
         </div>
       ) : (
-        <div key="expanded" className={`relative isolate flex w-52 shrink-0 flex-col ${fadeIn}`}>
-          {/* the figure sits behind the rail and only shows in the open space between the two
-          solid sections; cropped on the left */}
-          <Ascii
-            key={art}
-            name={art}
-            fit="height"
-            className="absolute inset-x-0 top-[12%] bottom-0 -z-10 text-line-strong/30 transition-opacity duration-700 ease-out-strong starting:opacity-0"
-          />
-
+        <div key="expanded" className={`relative flex w-52 shrink-0 flex-col ${fadeIn}`}>
           <div className="flex flex-col border-b border-line bg-subtle px-4 pt-7 pb-4">
             <div className="flex items-center gap-2">
               <Icon name="logo-mark" size={30} className="text-logo" />
@@ -159,7 +153,11 @@ export function Sidebar({
                 <li key={p.id}>
                   <button
                     aria-current={selected === p.id ? 'page' : undefined}
-                    onClick={() => onSelect(p.id)}
+                    onClick={(e) =>
+                      e.ctrlKey || e.metaKey ? void window.api.openWindow(p.id) : onSelect(p.id)
+                    }
+                    onAuxClick={(e) => e.button === 1 && void window.api.openWindow(p.id)}
+                    title="Ctrl+click opens it in a new window"
                     className={`flex h-10 w-full items-center gap-2 px-6 text-left transition-colors duration-150 hover:bg-muted ${selected === p.id ? 'bg-muted type-current-m' : 'type-label-m'}`}
                   >
                     <Icon name="folder-line" />
@@ -175,7 +173,15 @@ export function Sidebar({
             </ul>
           </div>
 
-          <div className="flex-1" />
+          {/* the open space between the two solid sections holds the whole figure, scaled to fit */}
+          <div className="relative min-h-0 flex-1">
+            <Ascii
+              key={art}
+              name={art}
+              fit="contain"
+              className="absolute inset-4 text-line-strong/40 transition-opacity duration-700 ease-out-strong starting:opacity-0"
+            />
+          </div>
 
           <div className="flex flex-col gap-1.5 border-t border-line bg-subtle pt-2 pb-4">
             {UTILITY.map((u) => (

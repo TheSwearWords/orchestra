@@ -1,6 +1,7 @@
 ---
 name: Brand Copy
 deliverable: Slogans, taglines, headlines, product descriptions and other marketing text in the brand's voice.
+icon: quill-pen-line
 category: Brand
 keywords: [copy, copywriting, slogan, tagline, headline, marketing, messaging, voice, text]
 prerequisites: [product-brief, voice-guide]

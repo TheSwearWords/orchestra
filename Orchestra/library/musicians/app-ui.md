@@ -1,6 +1,7 @@
 ---
 name: App UI
 deliverable: Desktop or web app screens in Figma, built from the project's brand kit.
+icon: dashboard-line
 category: Product
 keywords: [ui, app, web app, saas, dashboard, screens, mockups, product design, figma]
 prerequisites: [product-brief, brand-spec, screen-inventory]

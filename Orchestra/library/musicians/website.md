@@ -1,6 +1,7 @@
 ---
 name: Website
-deliverable: A marketing website designed in Figma: a product site, or a site for a SaaS or app the user is launching.
+deliverable: A marketing site in Figma, for a product, a SaaS or an app launch.
+icon: global-line
 category: Web
 keywords: [website, web, landing page, product site, saas, app site, marketing site, figma]
 prerequisites: [product-brief, brand-spec, voice-guide, sitemap]

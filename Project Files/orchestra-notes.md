@@ -301,3 +301,5 @@ The Agents screen (build step 5) later becomes the full editor for these same fi
   - A sticky footer shows the foundations in build order, worked out live by `plan.ts` (`foundationOrder`).
   - The selection saves to the project's `deliverables.md`: ids in the front matter, plus a readable build order.
   - "Add your own" is a placeholder until the Create chat exists.
+- **Multiple windows (Nov 1):** Ctrl+Shift+N opens a new window. Ctrl+click or middle-click a project opens it in its own window, and the window is titled with the project name. **In-app tabs** come after the Create chat, when background agents make them pay off.
+- **Deliverable icons:** each Musician has `icon:` (a Remix icon name) in its front matter; unknown names fall back to `shapes-line`. A new icon must be copied into `app/src/renderer/src/assets/icons/`.

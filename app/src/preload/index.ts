@@ -19,6 +19,7 @@ export interface CreateState {
 }
 
 const api = {
+  openWindow: (project?: string): Promise<void> => ipcRenderer.invoke('window:open', project),
   listProjects: (): Promise<Project[]> => ipcRenderer.invoke('projects:list'),
   createProject: (input: Omit<Project, 'id'>): Promise<Project> =>
     ipcRenderer.invoke('projects:create', input),

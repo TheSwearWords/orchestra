@@ -36,7 +36,8 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'orchestra', privileges: { standard: true, secure: true } }
 ])
 
-function createWindow(): void {
+/** Opens an Orchestra window; with a project id it opens on that project (passed in the URL hash). */
+function createWindow(project?: string): void {
   const mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -63,10 +64,11 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  const hash = project ? `project=${encodeURIComponent(project)}` : ''
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + (hash && `#${hash}`))
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash })
   }
 }
 
@@ -78,6 +80,10 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  ipcMain.handle('window:open', (_, project?: string) => {
+    if (project !== undefined) projectDir(project) // only real projects
+    createWindow(project)
+  })
   ipcMain.handle('projects:list', () => listProjects(PROJECTS_DIR))
   ipcMain.handle('projects:create', (_, input: Omit<Project, 'id'>) =>
     createProject(PROJECTS_DIR, input)

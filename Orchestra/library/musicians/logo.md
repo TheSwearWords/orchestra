@@ -1,6 +1,7 @@
 ---
 name: Logo
 deliverable: The logo, from written directions to final vector files in every format the brand needs.
+icon: pen-nib-line
 category: Brand
 keywords: [logo, mark, wordmark, logotype, identity, brand]
 prerequisites: [product-brief]

@@ -1,6 +1,7 @@
 ---
 name: Mobile App
 deliverable: Mobile app screens and flows in Figma for iOS and Android, built from the brand kit.
+icon: smartphone-line
 category: Product
 keywords: [mobile, app, ios, android, phone, screens, flows, product design, figma]
 prerequisites: [product-brief, brand-spec, screen-inventory]

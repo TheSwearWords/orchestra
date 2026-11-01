@@ -13,6 +13,7 @@ import {
   unsplit
 } from './tabs.ts'
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 const three = () => ['a', 'b', 'c'].reduce(openTab, EMPTY)
 
 test('opening tabs shows each alone, once each', () => {

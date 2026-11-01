@@ -36,11 +36,14 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'orchestra', privileges: { standard: true, secure: true } }
 ])
 
-/** Opens an Orchestra window; with a project id it opens on that project (passed in the URL hash). */
-function createWindow(project?: string): void {
+/** Opens an Orchestra window; with a project id it opens on that project (passed in the URL hash),
+ * and with a screen point (a tab dropped outside a window) it opens there. */
+function createWindow(project?: string, at?: { x: number; y: number }): void {
   const mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
+    // the cursor lands on the new window's tab strip, as if still holding the tab
+    ...(at ? { x: Math.round(at.x) - 300, y: Math.round(at.y) - 20 } : {}),
     minWidth: 1024,
     minHeight: 640,
     backgroundColor: '#FFFFFF',
@@ -80,10 +83,32 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.handle('window:open', (_, project?: string) => {
+  ipcMain.handle('window:open', (_, project?: string, at?: { x: number; y: number }) => {
     if (project !== undefined) projectDir(project) // only real projects
-    createWindow(project)
+    const point = at && Number.isFinite(at.x) && Number.isFinite(at.y) ? at : undefined
+    createWindow(project, point)
   })
+
+  // A native context menu built from the renderer's items; resolves to the chosen id, or null.
+  ipcMain.handle(
+    'menu:popup',
+    (e, items: { id: string; label: string; enabled?: boolean; separator?: boolean }[]) => {
+      const win = BrowserWindow.fromWebContents(e.sender)!
+      return new Promise<string | null>((resolve) => {
+        Menu.buildFromTemplate(
+          items.map((it) =>
+            it.separator
+              ? { type: 'separator' as const }
+              : {
+                  label: String(it.label),
+                  enabled: it.enabled !== false,
+                  click: () => resolve(String(it.id))
+                }
+          )
+        ).popup({ window: win, callback: () => setTimeout(() => resolve(null), 200) })
+      })
+    }
+  )
   ipcMain.handle('projects:list', () => listProjects(PROJECTS_DIR))
   ipcMain.handle('projects:rename', (_, id: string, name: string) => {
     projectDir(id)

@@ -18,7 +18,6 @@ export type IconName =
   | 'check-line'
   | 'close-line'
   | 'folder-line'
-  | 'layout-column-line'
   | 'logo-mark'
   | 'phase-create'
   | 'phase-refine'

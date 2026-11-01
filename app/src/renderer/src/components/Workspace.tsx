@@ -34,11 +34,12 @@ interface TabStripProps {
   live: boolean // false while New project or a page is showing: no tab is "current"
   onSelect: (id: string) => void
   onClose: (id: string) => void
-  onSplit: () => void
-  onUnsplit: () => void
+  onSplitWith: (id: string) => void // show this tab beside the current one
+  onPopOut: (id: string, at: { x: number; y: number }) => void // dragged out of the window
 }
 
-/** Open projects. The focused pane's tab reads as current; the other pane's tab is lit but plain. */
+/** Open projects. The focused pane's tab reads as current; the other pane's tab is lit but plain.
+ * Right-click a tab to split it beside the current one; drag it out to give it its own window. */
 export function TabStrip({
   open,
   panes,
@@ -46,10 +47,34 @@ export function TabStrip({
   live,
   onSelect,
   onClose,
-  onSplit,
-  onUnsplit
+  onSplitWith,
+  onPopOut
 }: TabStripProps): React.JSX.Element {
-  const split = panes.length === 2
+  const currentName = open.find((t) => t.id === panes[focus])?.name
+
+  async function menu(
+    t: { id: string; name: string },
+    here: boolean,
+    other: boolean
+  ): Promise<void> {
+    const choice = await window.api.menu([
+      {
+        id: 'split',
+        label: other ? 'Already side by side' : `Split with ${currentName ?? 'the current tab'}`,
+        enabled: live && !here && !other && !!currentName
+      },
+      { id: 'window', label: 'Open in new window' },
+      { id: '-', label: '', separator: true },
+      { id: 'close', label: 'Close tab' }
+    ])
+    if (choice === 'split') onSplitWith(t.id)
+    if (choice === 'close') onClose(t.id)
+    if (choice === 'window') {
+      await window.api.openWindow(t.id)
+      onClose(t.id)
+    }
+  }
+
   return (
     <div className="flex h-10 shrink-0 items-stretch border-b border-line bg-subtle">
       <div
@@ -63,6 +88,25 @@ export function TabStrip({
           return (
             <div
               key={t.id}
+              draggable
+              onDragStart={(e) => {
+                // a private type, so dropping on a text field doesn't paste anything
+                e.dataTransfer.setData('application/x-orchestra-tab', t.id)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragEnd={(e) => {
+                const { screenX: x, screenY: y } = e
+                const outside =
+                  x < window.screenX ||
+                  x > window.screenX + window.outerWidth ||
+                  y < window.screenY ||
+                  y > window.screenY + window.outerHeight
+                if (outside && (x || y)) onPopOut(t.id, { x, y })
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                void menu(t, here, other)
+              }}
               className={`group flex shrink-0 items-center border-r border-line transition-colors duration-150 ${here || other ? 'bg-canvas' : 'hover:bg-muted'}`}
             >
               <button
@@ -87,21 +131,6 @@ export function TabStrip({
           )
         })}
       </div>
-      <button
-        onClick={split ? onUnsplit : onSplit}
-        disabled={!live || (!split && open.length < 2)}
-        aria-pressed={split}
-        title={
-          split
-            ? 'Close the split'
-            : open.length < 2
-              ? 'Open another project to split'
-              : 'Split: show two projects side by side'
-        }
-        className={`flex w-11 items-center justify-center border-l border-line transition-colors duration-150 disabled:opacity-40 ${split ? 'bg-canvas text-brand' : 'text-fg-2 hover:bg-muted hover:text-fg disabled:hover:bg-transparent'}`}
-      >
-        <Icon name="layout-column-line" />
-      </button>
     </div>
   )
 }

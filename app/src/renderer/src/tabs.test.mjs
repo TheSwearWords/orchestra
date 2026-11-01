@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { EMPTY, closeTab, focused, openTab, openToSide, prune, split, unsplit } from './tabs.ts'
+import { EMPTY, closeTab, focused, openTab, openToSide, prune, unsplit } from './tabs.ts'
 
 test('opening tabs shows them in the focused pane, once each', () => {
   let t = openTab(EMPTY, 'a')
@@ -10,11 +10,8 @@ test('opening tabs shows them in the focused pane, once each', () => {
   assert.equal(focused(t), 'a')
 })
 
-test('split shows another tab on the right; one tab cannot split', () => {
-  assert.deepEqual(split(openTab(EMPTY, 'a')), openTab(EMPTY, 'a'))
-  const t = split(openTab(openTab(EMPTY, 'a'), 'b')) // b is shown, a goes right
-  assert.deepEqual(t, { open: ['a', 'b'], panes: ['b', 'a'], focus: 1 })
-  // clicking a tab changes the focused pane; showing the other pane's project collapses the split
+test('in a split, a tab click changes the focused pane; the same project twice collapses it', () => {
+  const t = { open: ['a', 'b'], panes: ['b', 'a'], focus: 1 }
   assert.deepEqual(openTab(t, 'c').panes, ['b', 'c'])
   assert.deepEqual(openTab(t, 'b'), { open: ['a', 'b'], panes: ['b'], focus: 0 })
   assert.deepEqual(unsplit(t, 0), { open: ['a', 'b'], panes: ['b'], focus: 0 })

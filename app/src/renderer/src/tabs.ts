@@ -31,13 +31,6 @@ export function openToSide(t: Tabs, id: string): Tabs {
   return openTab({ ...t, open, focus: 1 - t.focus }, id)
 }
 
-/** Splits the workspace, showing the next other open tab on the right. Needs two tabs. */
-export function split(t: Tabs): Tabs {
-  if (t.panes.length !== 1) return t
-  const other = t.open.find((id) => id !== t.panes[0])
-  return other ? { ...t, panes: [t.panes[0], other], focus: 1 } : t
-}
-
 /** Ends the split, keeping the given pane. */
 export function unsplit(t: Tabs, keep: number): Tabs {
   if (t.panes.length !== 2) return t

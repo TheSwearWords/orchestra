@@ -7,17 +7,7 @@ import { NewProject } from './components/NewProject'
 import { Research } from './components/Research'
 import { Sidebar, type Page } from './components/Sidebar'
 import { PhaseTabs, TabStrip, WorkspaceHeader, type Phase } from './components/Workspace'
-import {
-  EMPTY,
-  closeTab,
-  focused,
-  openTab,
-  openToSide,
-  prune,
-  split,
-  unsplit,
-  type Tabs
-} from './tabs'
+import { EMPTY, closeTab, focused, openTab, openToSide, prune, unsplit, type Tabs } from './tabs'
 
 const PAGE_TITLES: Record<Page, string> = {
   files: 'Files',
@@ -157,8 +147,10 @@ function App(): React.JSX.Element {
             live={view === 'projects'}
             onSelect={show}
             onClose={(id) => setTabs((t) => closeTab(t, id))}
-            onSplit={() => setTabs(split)}
-            onUnsplit={() => setTabs((t) => unsplit(t, t.focus))}
+            onSplitWith={(id) => setTabs((t) => openToSide(t, id))}
+            onPopOut={(id, at) =>
+              void window.api.openWindow(id, at).then(() => setTabs((t) => closeTab(t, id)))
+            }
           />
         )}
 

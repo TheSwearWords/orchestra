@@ -19,7 +19,11 @@ export interface CreateState {
 }
 
 const api = {
-  openWindow: (project?: string): Promise<void> => ipcRenderer.invoke('window:open', project),
+  openWindow: (project?: string, at?: { x: number; y: number }): Promise<void> =>
+    ipcRenderer.invoke('window:open', project, at),
+  menu: (
+    items: { id: string; label: string; enabled?: boolean; separator?: boolean }[]
+  ): Promise<string | null> => ipcRenderer.invoke('menu:popup', items),
   listProjects: (): Promise<Project[]> => ipcRenderer.invoke('projects:list'),
   renameProject: (id: string, name: string): Promise<Project> =>
     ipcRenderer.invoke('projects:rename', id, name),

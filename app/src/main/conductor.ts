@@ -49,8 +49,18 @@ const chatDir = (project: string, chat: string): string => {
 const file = (project: string, chat: string, name: string): string =>
   join(chatDir(project, chat), name)
 
-/** Before chats, a project had one conversation in .orchestra/; it becomes the general chat. */
-async function migrate(project: string): Promise<void> {
+/** Before chats, a project had one conversation in .orchestra/; it becomes the general chat.
+ * Chats load in parallel, so the move runs once per project and the others wait for it. */
+const migrating = new Map<string, Promise<void>>()
+function migrate(project: string): Promise<void> {
+  let p = migrating.get(project)
+  if (!p) {
+    p = moveOldChat(project)
+    migrating.set(project, p)
+  }
+  return p
+}
+async function moveOldChat(project: string): Promise<void> {
   const old = join(project, '.orchestra', 'chat.jsonl')
   if (!(await stat(old).catch(() => null))) return
   const dir = chatDir(project, GENERAL)

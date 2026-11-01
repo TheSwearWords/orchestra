@@ -37,7 +37,14 @@ test('the old single conversation becomes the general chat', async () => {
     await mkdir(join(dir, '.orchestra'))
     await writeFile(join(dir, '.orchestra', 'chat.jsonl'), JSON.stringify(m) + '\n')
     await writeFile(join(dir, '.orchestra', 'session.json'), '{"id":"abc"}')
-    assert.deepEqual(await readChat(dir, 'general'), [m])
+    // all of a project's chats load at once; the move happens once and nobody fails
+    const [general, website] = await Promise.all([
+      readChat(dir, 'general'),
+      readChat(dir, 'website'),
+      readChat(dir, 'general')
+    ])
+    assert.deepEqual(general, [m])
+    assert.deepEqual(website, [])
     assert.equal(
       await readFile(join(dir, '.orchestra', 'chats', 'general', 'session.json'), 'utf8'),
       '{"id":"abc"}'

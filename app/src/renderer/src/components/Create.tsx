@@ -47,7 +47,7 @@ export function Create({
   const pickerFirst = picking || (chat === null && plan.selected.length === 0 && !seenOverview)
   if (pickerFirst)
     return (
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <button
           onClick={() => {
             setPicking(false)
@@ -114,7 +114,7 @@ function Overview({
   }, [project, plan.selected])
 
   return (
-    <div className="stagger flex-1 px-6 pt-8 pb-12">
+    <div className="stagger min-h-0 flex-1 overflow-y-auto px-6 pt-8 pb-12">
       <div className="flex items-end justify-between gap-6">
         <div>
           <h2 className="type-heading-s">What do you want to work on first?</h2>
@@ -241,8 +241,8 @@ function ChatView({
   const title = focus?.name ?? 'General'
 
   return (
-    <div className="grid flex-1 gap-6 px-6 pt-6 @5xl:grid-cols-[minmax(0,1fr)_340px]">
-      <section className="flex min-w-0 flex-col">
+    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-6 px-6 pt-6 @5xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section className="flex min-h-0 min-w-0 flex-col">
         <button
           onClick={onBack}
           className="flex items-center gap-1.5 self-start type-label-s text-link hover:underline"
@@ -310,7 +310,8 @@ function ChatView({
         )}
       </section>
 
-      <aside className="flex min-w-0 flex-col gap-6 pb-8">
+      {/* left out in half a split pane, where the conversation needs the room */}
+      <aside className="hidden min-h-0 min-w-0 flex-col gap-6 overflow-y-auto pb-6 @5xl:flex">
         <Score plan={plan} focus={focus?.id} busy={busy} outputs={outputs} />
         <Files project={project} outputs={outputs} />
       </aside>
@@ -352,7 +353,10 @@ function Conversation({
   const known = new Set(musicians.map((m) => m.id))
 
   return (
-    <div className="flex flex-col gap-5 py-6" aria-live="polite">
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-6 pr-2"
+      aria-live="polite"
+    >
       {messages.length === 0 && !busy && (
         <p className="py-4 type-body-m text-fg-2">
           Tell the Orchestrator what you want made, or just think out loud. It reads your concept
@@ -401,7 +405,7 @@ function Conversation({
           )}
         </OrchestratorSays>
       )}
-      <div ref={end} className="scroll-mb-48" />
+      <div ref={end} />
     </div>
   )
 }
@@ -496,7 +500,7 @@ function Composer({
   }
 
   return (
-    <div className="sticky bottom-0 mt-auto bg-canvas pt-3 pb-6">
+    <div className="shrink-0 bg-canvas pt-3 pb-6">
       <div className="border border-fg-2/45 bg-canvas transition-colors duration-150 focus-within:border-fg-2">
         <textarea
           value={text}
@@ -552,7 +556,7 @@ function AgentChannel({
   }, [log.length])
 
   return (
-    <div className="mt-6 mb-6 flex min-h-[420px] flex-col bg-brand text-on-brand">
+    <div className="mt-6 mb-6 flex min-h-0 flex-1 flex-col bg-brand text-on-brand">
       <div className="flex items-center justify-between gap-4 border-b border-on-brand/15 px-4 py-2.5">
         <span className="type-log-s text-on-brand/60">agent channel · read-only</span>
         {busy ? (

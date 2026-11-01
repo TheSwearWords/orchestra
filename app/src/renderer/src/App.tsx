@@ -293,13 +293,13 @@ function ProjectPane({
       aria-label={project.name}
       onMouseDownCapture={onFocus}
       onFocusCapture={onFocus}
-      className={`@container relative isolate flex min-w-0 flex-1 flex-col overflow-y-auto ${side === 1 ? 'border-l border-line' : ''}`}
+      className={`@container relative isolate flex min-w-0 flex-1 flex-col overflow-hidden ${side === 1 ? 'border-l border-line' : ''}`}
     >
       {/* when split, a brand line marks the pane that tab clicks go to */}
       {split && (
         <div
           aria-hidden
-          className={`sticky top-0 z-10 h-0.5 shrink-0 transition-colors duration-150 ${focused ? 'bg-brand' : 'bg-transparent'}`}
+          className={`h-0.5 shrink-0 transition-colors duration-150 ${focused ? 'bg-brand' : 'bg-transparent'}`}
         />
       )}
       <Ascii
@@ -308,7 +308,8 @@ function ProjectPane({
         fit="width"
         className="absolute top-[174px] right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0"
       />
-      <div key={project.id} className="stagger flex flex-1 flex-col">
+      {/* header and phase tabs stay put; each phase scrolls its own content below them */}
+      <div key={project.id} className="stagger flex min-h-0 flex-1 flex-col">
         <WorkspaceHeader
           title={project.name}
           context={[project.client, project.concept.split('\n')[0]].filter(Boolean).join(' · ')}
@@ -329,7 +330,9 @@ function ProjectPane({
         />
         <PhaseTabs active={phase} onChange={onPhase} />
         {phase === 'research' ? (
-          <Research key={project.id} project={project.id} />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <Research key={project.id} project={project.id} />
+          </div>
         ) : phase === 'create' ? (
           <Create
             key={project.id}
@@ -339,7 +342,7 @@ function ProjectPane({
             onChatsChanged={onChatsChanged}
           />
         ) : (
-          <section key={phase} className="stagger px-6 py-8">
+          <section key={phase} className="stagger min-h-0 flex-1 overflow-y-auto px-6 py-8">
             <p className="type-body-m text-fg-2">The {phase} phase is next on the build plan.</p>
           </section>
         )}

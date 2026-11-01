@@ -552,13 +552,13 @@ function AgentChannel({
   }, [log.length])
 
   return (
-    <div className="mt-6 mb-6 flex min-h-[420px] flex-col bg-inverse text-on-brand">
+    <div className="mt-6 mb-6 flex min-h-[420px] flex-col bg-brand text-on-brand">
       <div className="flex items-center justify-between gap-4 border-b border-on-brand/15 px-4 py-2.5">
         <span className="type-log-s text-on-brand/60">agent channel · read-only</span>
         {busy ? (
           <button
             onClick={onStop}
-            className="flex items-center gap-1.5 border border-danger px-2.5 py-1 type-log-s text-on-brand transition-colors duration-150 hover:bg-danger"
+            className="flex items-center gap-1.5 border border-on-brand px-2.5 py-1 type-log-s text-on-brand transition-colors duration-150 hover:bg-on-brand hover:text-brand"
           >
             <Icon name="stop-fill" size={12} />
             Stop all agents
@@ -583,7 +583,7 @@ function AgentChannel({
             <p key={i} className="flex gap-2.5 type-log-s">
               <span className="w-16 shrink-0 whitespace-nowrap text-on-brand/45">{time(e.t)}</span>
               <span className="flex shrink-0 items-center gap-1.5">
-                <span className="flex size-4 items-center justify-center rounded-full bg-brand">
+                <span className="flex size-4 items-center justify-center rounded-full bg-on-brand text-brand">
                   <Icon name="logo-mark" size={10} />
                 </span>
                 <span className="text-on-brand/80">

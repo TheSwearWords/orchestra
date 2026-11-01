@@ -22,7 +22,13 @@ const cell =
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 
 /** The start of Create: pick what this project needs; foundations are worked out live. */
-export function Deliverables({ project }: { project: string }): React.JSX.Element {
+export function Deliverables({
+  project,
+  onSaved
+}: {
+  project: string
+  onSaved?: (ids: string[]) => void // e.g. move on to the conversation
+}): React.JSX.Element {
   const [data, setData] = useState<CreateState | null>(null)
   const [chosen, setChosen] = useState<string[]>([])
   const [saved, setSaved] = useState<string[]>([])
@@ -81,6 +87,7 @@ export function Deliverables({ project }: { project: string }): React.JSX.Elemen
       const ids = await window.api.saveDeliverables(project, chosen)
       setChosen(ids)
       setSaved(ids)
+      onSaved?.(ids)
     } catch (e) {
       setError(reason(e))
     }

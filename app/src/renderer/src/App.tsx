@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Project } from '../../preload'
 import { Ascii, type AsciiName } from './components/Ascii'
-import { Deliverables } from './components/Deliverables'
+import { Create } from './components/Create'
 import { Icon } from './components/Icon'
 import { NewProject } from './components/NewProject'
 import { Research } from './components/Research'
@@ -294,7 +294,7 @@ function ProjectPane({
         {phase === 'research' ? (
           <Research key={project.id} project={project.id} />
         ) : phase === 'create' ? (
-          <Deliverables key={project.id} project={project.id} />
+          <Create key={project.id} project={project.id} />
         ) : (
           <section key={phase} className="stagger px-6 py-8">
             <p className="type-body-m text-fg-2">The {phase} phase is next on the build plan.</p>

@@ -1,12 +1,15 @@
 import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { existsSync } from 'fs'
+import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { Conductor, readChat } from './conductor'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { loadLibrary } from './library'
+import { listOutputs, outputPath } from './outputs'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
 import { createProject, listProjects, renameProject, type Project } from './projects'
 import {
@@ -22,6 +25,34 @@ import {
   type Site,
   type Tag
 } from './research'
+
+// The Orchestrator: one Claude session per project, its replies broadcast to every window.
+const conductor = new Conductor({
+  emit: (e) => {
+    for (const w of BrowserWindow.getAllWindows())
+      if (!w.isDestroyed()) w.webContents.send('chat:event', e)
+  },
+  systemPrompt: async (id) => {
+    const [lib, rules, projects] = await Promise.all([
+      loadLibrary(ORCHESTRA_HOME),
+      readFile(join(ORCHESTRA_HOME, 'library', 'house-rules.md'), 'utf8').catch(() => ''),
+      listProjects(PROJECTS_DIR)
+    ])
+    const name = projects.find((p) => p.id === id)?.name ?? id
+    return [
+      lib.orchestrator?.prompt ?? '',
+      rules,
+      `## This project
+You are working in the project "${name}"; your current directory is its folder. Read concept.md, research.md and deliverables.md before planning. The agent library (Musicians and Instruments, as markdown) is at ${join(ORCHESTRA_HOME, 'library')}.
+
+## What you can do in this version of Orchestra
+You can talk with the user, read files, and write files inside the project folder. Briefing Musicians is not connected yet: plan the work with the user, and say plainly that the Musicians start once that is connected. Never say a Musician or Instrument is working. Write foundation files into prereqs/ only when the user asks you to.`
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+  },
+  extraDirs: [join(ORCHESTRA_HOME, 'library')]
+})
 
 /** A project's folder, refusing ids that could point outside the vault. */
 function projectDir(id: string): string {
@@ -312,6 +343,19 @@ app.whenReady().then(() => {
     saveSelection(projectDir(project), await loadLibrary(ORCHESTRA_HOME), ids)
   )
 
+  ipcMain.handle('chat:load', async (_, project: string) => ({
+    messages: await readChat(projectDir(project)),
+    busy: conductor.isBusy(project)
+  }))
+  ipcMain.handle('chat:send', (_, project: string, text: string) =>
+    conductor.send(project, projectDir(project), String(text))
+  )
+  ipcMain.handle('create:outputs', (_, project: string) => listOutputs(projectDir(project)))
+  ipcMain.handle('create:openOutput', async (_, project: string, rel: string) => {
+    const error = await shell.openPath(outputPath(projectDir(project), String(rel)))
+    if (error) throw new Error(error)
+  })
+
   // orchestra://ref/<project>/<file> serves uploaded reference files for thumbnails, and
   // nothing else: both parts are validated by projectDir and referenceFilePath.
   protocol.handle('orchestra', (req) => {
@@ -331,6 +375,8 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+app.on('before-quit', () => conductor.stopAll())
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

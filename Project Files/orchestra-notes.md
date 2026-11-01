@@ -309,3 +309,13 @@ The Agents screen (build step 5) later becomes the full editor for these same fi
   - Right-click a project → "Open to the side".
   - The rules live in `renderer/src/tabs.ts`, with tests. Each project remembers its phase.
   - In a half-width pane, the 4-up grids drop to 2 (container queries).
+
+## Create, part 1 (Nov 1)
+- After deliverables are saved, Create shows the conversation with the Orchestrator ("A direction, together") beside the Agents card and Created files. "Change deliverables" goes back to the picker.
+- `main/conductor.ts`: one long-lived headless Claude Code session per project (stream-json, like Pitcrew's runner). Replies stream live. The chat is saved in `<project>/.orchestra/chat.jsonl`, the session id in `.orchestra/session.json`. A resume that fails starts a fresh session.
+- **The Orchestrator's instructions:** the library's `orchestrator.md`, the house rules, and the project context. Its tools: read the project and library, write inside the project, web. No Bash, and no Claude subagents.
+- **Agents card:** foundations show "Ready" when their file exists in `prereqs/`. Musicians show "Not started" until briefing exists.
+- **Next:**
+  - Part 2: an Orchestra MCP with `brief_musician`; Musicians run as their own sessions with their Instruments, and the tree shows live status.
+  - Part 3: "Before we move forward" decision cards and agent-creation approvals.
+  - Part 4: the preview card.

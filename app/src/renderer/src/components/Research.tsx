@@ -555,7 +555,13 @@ interface Item {
 
 /** Just enough markdown for research.md: headings, (nested) lists, rules, paragraphs.
  * Built as React elements, never raw HTML, because the text can quote fetched web pages. */
-function Markdown({ text }: { text: string }): React.JSX.Element {
+export function Markdown({
+  text,
+  className = 'stagger mt-4 max-w-[760px] border border-line bg-canvas px-6 py-5'
+}: {
+  text: string
+  className?: string // the box around it; research.md gets a framed sheet
+}): React.JSX.Element {
   const out: React.JSX.Element[] = []
   let para: string[] = []
   let list: { ordered: boolean; items: Item[] } | null = null
@@ -647,15 +653,18 @@ function Markdown({ text }: { text: string }): React.JSX.Element {
   flushPara()
   flushList()
 
-  return (
-    <div className="stagger mt-4 max-w-[760px] border border-line bg-canvas px-6 py-5">{out}</div>
-  )
+  return <div className={className}>{out}</div>
 }
 
 // **bold** and _italic_ / *italic*; everything else stays literal text
 function inline(s: string): ReactNode[] {
-  return s.split(/(\*\*[^*]+\*\*|_[^_]+_|\*[^*]+\*)/).map((part, i) =>
-    part.startsWith('**') ? (
+  // `code` first, so underscores and asterisks inside a file name stay literal
+  return s.split(/(`[^`]+`|\*\*[^*]+\*\*|_[^_]+_|\*[^*]+\*)/).map((part, i) =>
+    /^`.+`$/.test(part) ? (
+      <code key={i} className="bg-subtle px-1 font-mono text-[0.9em]">
+        {part.slice(1, -1)}
+      </code>
+    ) : part.startsWith('**') ? (
       <strong key={i} className="font-semibold">
         {part.slice(2, -2)}
       </strong>

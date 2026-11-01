@@ -1,10 +1,12 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Project } from '../main/projects'
+import type { ChatEvent, ChatMessage } from '../main/conductor'
 import type { Instrument, Musician } from '../main/library'
+import type { Output } from '../main/outputs'
 import type { Reference, Site, Tag } from '../main/research'
 
-export type { Instrument, Musician, Project, Reference, Site, Tag }
+export type { ChatEvent, ChatMessage, Instrument, Musician, Output, Project, Reference, Site, Tag }
 
 export interface ResearchState {
   references: Reference[]
@@ -82,7 +84,21 @@ const api = {
 
   loadCreate: (project: string): Promise<CreateState> => ipcRenderer.invoke('create:load', project),
   saveDeliverables: (project: string, ids: string[]): Promise<string[]> =>
-    ipcRenderer.invoke('create:save', project, ids)
+    ipcRenderer.invoke('create:save', project, ids),
+  loadChat: (project: string): Promise<{ messages: ChatMessage[]; busy: boolean }> =>
+    ipcRenderer.invoke('chat:load', project),
+  sendChat: (project: string, text: string): Promise<void> =>
+    ipcRenderer.invoke('chat:send', project, text),
+  // every project's Orchestrator events; callers filter by project
+  onChatEvent: (cb: (e: ChatEvent) => void): (() => void) => {
+    const listener = (_: unknown, e: ChatEvent): void => cb(e)
+    ipcRenderer.on('chat:event', listener)
+    return () => ipcRenderer.removeListener('chat:event', listener)
+  },
+  listOutputs: (project: string): Promise<Output[]> =>
+    ipcRenderer.invoke('create:outputs', project),
+  openOutput: (project: string, path: string): Promise<void> =>
+    ipcRenderer.invoke('create:openOutput', project, path)
 }
 
 export type OrchestraApi = typeof api

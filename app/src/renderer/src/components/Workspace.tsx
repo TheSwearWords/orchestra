@@ -232,7 +232,7 @@ export function TabStrip({
           <div
             aria-label="Split view"
             title="These two are side by side"
-            className="flex shrink-0 divide-x divide-line border-2 border-fg-2"
+            className="flex shrink-0 divide-x divide-line border-2 border-brand"
           >
             {pair.map(tab)}
           </div>

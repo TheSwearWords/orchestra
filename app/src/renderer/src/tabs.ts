@@ -31,6 +31,18 @@ export function openToSide(t: Tabs, id: string): Tabs {
   return openTab({ ...t, open, focus: 1 - t.focus }, id)
 }
 
+/** Moves a tab to where another tab is: after it when moving right, before it when moving left. */
+export function moveTab(t: Tabs, id: string, onto: string): Tabs {
+  const from = t.open.indexOf(id)
+  const to = t.open.indexOf(onto)
+  if (from === -1 || to === -1 || from === to) return t
+  const open = t.open.filter((o) => o !== id)
+  // after removing the moved tab, index `to` is just past the other tab when moving right,
+  // and right on it when moving left
+  open.splice(to, 0, id)
+  return { ...t, open }
+}
+
 /** Ends the split, keeping the given pane. */
 export function unsplit(t: Tabs, keep: number): Tabs {
   if (t.panes.length !== 2) return t

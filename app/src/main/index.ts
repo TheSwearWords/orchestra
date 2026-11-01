@@ -114,6 +114,13 @@ function endDrag(): void {
   drag = null
 }
 
+/** Tells every Orchestra window except `except` whether a tab could be dropped on it now:
+ * 'ready' while any tab is being dragged, 'over' for the one under the cursor, null after. */
+function dropState(state: 'ready' | null, except?: BrowserWindow): void {
+  for (const w of BrowserWindow.getAllWindows())
+    if (w !== except && !w.isDestroyed()) w.webContents.send('drop:state', state)
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.orchestra.app')
 
@@ -145,15 +152,27 @@ app.whenReady().then(() => {
         drag.follower.setPosition(Math.round(p.x - drag.grip.x), Math.round(p.y - drag.grip.y))
         // over another window's tab strip: dropping here merges, so show the window as see-through
         const target = stripUnder(p, drag.follower)
-        if (target !== drag.target) drag.follower.setOpacity(target ? 0.55 : 1)
+        if (target !== drag.target) {
+          drag.follower.setOpacity(target ? 0.55 : 1)
+          if (drag.target && !drag.target.isDestroyed())
+            drag.target.webContents.send('drop:state', 'ready')
+          target?.webContents.send('drop:state', 'over')
+        }
         drag.target = target
       }, 16)
       drag = { project, follower, created: !alone, grip, target: null, timer }
     }
   )
-  // Back inside the window it came from before release: the torn-off window goes away.
+  // A tab started moving in some window: the others show they can take it. Disarm when the
+  // drag ends without leaving its window.
+  ipcMain.handle('drag:arm', (e) => dropState('ready', BrowserWindow.fromWebContents(e.sender)!))
+  ipcMain.handle('drag:disarm', () => dropState(null))
+  // Back inside the window it came from before release: the torn-off window goes away, and the
+  // tab is still being dragged inside that window, so the others stay ready.
   ipcMain.handle('drag:cancel', () => {
     if (drag?.created && !drag.follower.isDestroyed()) drag.follower.close()
+    if (drag?.target && !drag.target.isDestroyed())
+      drag.target.webContents.send('drop:state', 'ready')
     endDrag()
   })
   // Released. Over another window's tab strip, the tab joins that window and the dragged window
@@ -162,6 +181,7 @@ app.whenReady().then(() => {
     if (!drag) return 'placed'
     const { project, follower, target } = drag
     endDrag()
+    dropState(null)
     if (target && !target.isDestroyed()) {
       target.webContents.send('tabs:adopt', project)
       target.focus()

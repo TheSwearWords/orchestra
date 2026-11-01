@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { EMPTY, closeTab, focused, openTab, openToSide, prune, unsplit } from './tabs.ts'
+import { EMPTY, closeTab, focused, moveTab, openTab, openToSide, prune, unsplit } from './tabs.ts'
 
 test('opening tabs shows them in the focused pane, once each', () => {
   let t = openTab(EMPTY, 'a')
@@ -32,6 +32,15 @@ test('closing a tab moves its pane to a free neighbour, or closes the pane', () 
   assert.deepEqual(closeTab(two, 'b'), { open: ['a'], panes: ['a'], focus: 0 })
   assert.deepEqual(closeTab(closeTab(two, 'b'), 'a'), EMPTY)
   assert.deepEqual(closeTab(two, 'zzz'), two)
+})
+
+test('moveTab puts a tab in another tab’s place, either direction', () => {
+  const t = { open: ['a', 'b', 'c', 'd'], panes: ['a'], focus: 0 }
+  assert.deepEqual(moveTab(t, 'a', 'c').open, ['b', 'c', 'a', 'd'])
+  assert.deepEqual(moveTab(t, 'd', 'b').open, ['a', 'd', 'b', 'c'])
+  assert.deepEqual(moveTab(t, 'b', 'c').open, ['a', 'c', 'b', 'd'])
+  assert.equal(moveTab(t, 'b', 'b'), t)
+  assert.equal(moveTab(t, 'zzz', 'b'), t)
 })
 
 test('prune drops deleted projects', () => {

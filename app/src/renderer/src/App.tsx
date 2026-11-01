@@ -7,7 +7,17 @@ import { NewProject } from './components/NewProject'
 import { Research } from './components/Research'
 import { Sidebar, type Page } from './components/Sidebar'
 import { PhaseTabs, TabStrip, WorkspaceHeader, type Phase } from './components/Workspace'
-import { EMPTY, closeTab, focused, openTab, openToSide, prune, unsplit, type Tabs } from './tabs'
+import {
+  EMPTY,
+  closeTab,
+  focused,
+  moveTab,
+  openTab,
+  openToSide,
+  prune,
+  unsplit,
+  type Tabs
+} from './tabs'
 
 const PAGE_TITLES: Record<Page, string> = {
   files: 'Files',
@@ -68,6 +78,8 @@ function App(): React.JSX.Element {
   const [mode, setMode] = useState<Mode>(start.mode)
   const [phases, setPhases] = useState<Record<string, Phase>>(() => rememberedJson('phases', {}))
   const [collapsed, setCollapsed] = useState(() => remembered('collapsed') === '1')
+  // a tab is being dragged in another window: 'over' when it's above this window's tab strip
+  const [receiving, setReceiving] = useState<'ready' | 'over' | null>(null)
 
   // Reloads the project list; tabs of projects that are gone (deleted, maybe in another window) close.
   const refresh = (): void =>
@@ -93,10 +105,12 @@ function App(): React.JSX.Element {
       setTabs((t) => openTab(t, id))
       setMode('projects')
     })
+    const stopReceiving = window.api.onDropState(setReceiving)
     return () => {
       window.removeEventListener('focus', load)
       window.removeEventListener('keydown', keys)
       stopAdopting()
+      stopReceiving()
     }
   }, [])
 
@@ -145,7 +159,7 @@ function App(): React.JSX.Element {
         onChanged={refresh}
       />
       <main className="flex min-w-0 flex-1 flex-col bg-canvas">
-        {tabs.open.length > 0 && (
+        {(tabs.open.length > 0 || receiving) && (
           <TabStrip
             open={tabs.open.map((id) => ({ id, name: byId.get(id)?.name ?? id }))}
             panes={tabs.panes}
@@ -154,6 +168,8 @@ function App(): React.JSX.Element {
             onSelect={show}
             onClose={(id) => setTabs((t) => closeTab(t, id))}
             onSplitWith={(id) => setTabs((t) => openToSide(t, id))}
+            onReorder={(id, onto) => setTabs((t) => moveTab(t, id, onto))}
+            receiving={receiving}
           />
         )}
 

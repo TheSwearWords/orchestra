@@ -35,6 +35,8 @@ interface TabStripProps {
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onSplitWith: (id: string) => void // show this tab beside the current one
+  onReorder: (id: string, onto: string) => void // dragged along the strip onto another tab
+  receiving: 'ready' | 'over' | null // a tab is being dragged in another window
 }
 
 type Tab = { id: string; name: string }
@@ -50,7 +52,9 @@ export function TabStrip({
   live,
   onSelect,
   onClose,
-  onSplitWith
+  onSplitWith,
+  onReorder,
+  receiving
 }: TabStripProps): React.JSX.Element {
   const currentName = open.find((t) => t.id === panes[focus])?.name
   // a press on a tab that may turn into a drag, and then into a tear-off past the window's edge
@@ -64,6 +68,7 @@ export function TabStrip({
   } | null>(null)
   const swallowClick = useRef(false)
   const [tearing, setTearing] = useState<string | null>(null)
+  const [held, setHeld] = useState<string | null>(null) // pressed or being dragged: drawn smaller
 
   async function menu(t: Tab, here: boolean, other: boolean): Promise<void> {
     const choice = await window.api.menu([
@@ -93,7 +98,9 @@ export function TabStrip({
   function finish(cancelled: boolean): void {
     const p = press.current
     press.current = null
+    setHeld(null)
     if (!p?.moved) return
+    if (!p.out) void window.api.dragDisarm() // never left the window: the others stand down
     swallowClick.current = true // the release after a drag isn't a click
     setTimeout(() => (swallowClick.current = false))
     if (!p.out) return
@@ -115,16 +122,18 @@ export function TabStrip({
     return (
       <div
         key={t.id}
+        data-tab={t.id}
         onPointerDown={(e) => {
-          if (e.button === 0)
-            press.current = {
-              id: t.id,
-              x: e.screenX,
-              y: e.screenY,
-              moved: false,
-              out: false,
-              alone: open.length === 1
-            }
+          if (e.button !== 0) return
+          setHeld(t.id)
+          press.current = {
+            id: t.id,
+            x: e.screenX,
+            y: e.screenY,
+            moved: false,
+            out: false,
+            alone: open.length === 1
+          }
         }}
         onPointerMove={(e) => {
           const p = press.current
@@ -133,9 +142,24 @@ export function TabStrip({
             if (Math.hypot(e.screenX - p.x, e.screenY - p.y) < 6) return
             p.moved = true
             e.currentTarget.setPointerCapture(e.pointerId) // keep the moves coming outside the window
+            void window.api.dragArm() // other windows show they can take it
           }
           if (p.alone && p.out) return // this window now moves with the cursor
           const out = outsideWindow(e)
+          if (!out) {
+            // along the strip: swap with a neighbour once past its middle (so it can't flicker back)
+            const over = document
+              .elementFromPoint(e.clientX, e.clientY)
+              ?.closest<HTMLElement>('[data-tab]')
+            const onto = over?.dataset.tab
+            if (over && onto && onto !== t.id) {
+              const r = over.getBoundingClientRect()
+              const right =
+                open.findIndex((o) => o.id === onto) > open.findIndex((o) => o.id === t.id)
+              if (right ? e.clientX > r.left + r.width / 2 : e.clientX < r.left + r.width / 2)
+                onReorder(t.id, onto)
+            }
+          }
           if (out === p.out) return
           p.out = out
           setTearing(out ? t.id : null)
@@ -159,7 +183,7 @@ export function TabStrip({
           e.preventDefault()
           void menu(t, here, other)
         }}
-        className={`group flex shrink-0 touch-none items-center transition-[background-color,opacity] duration-150 ${here || other ? 'bg-canvas' : 'hover:bg-muted'} ${tearing === t.id ? 'opacity-40' : ''}`}
+        className={`group flex shrink-0 touch-none items-center transition-[background-color,opacity,scale] duration-150 ease-out-strong ${here || other ? 'bg-canvas' : 'hover:bg-muted'} ${held === t.id ? 'scale-[0.92] cursor-grabbing' : ''} ${tearing === t.id ? 'opacity-40' : ''}`}
       >
         <button
           role="tab"
@@ -214,6 +238,15 @@ export function TabStrip({
           </div>
         )}
         {solo.slice(before).map(single)}
+        {receiving && (
+          <div
+            aria-live="polite"
+            className={`m-1 flex shrink-0 items-center gap-1.5 border border-dashed border-brand px-3 transition-[background-color,color,opacity] duration-150 ease-out-strong starting:opacity-0 ${receiving === 'over' ? 'bg-brand type-current-s text-on-brand' : 'bg-brand-subtle type-label-s text-brand'}`}
+          >
+            <Icon name="add-line" size={14} />
+            {receiving === 'over' ? 'Drop to move here' : 'Drop a tab here'}
+          </div>
+        )}
       </div>
     </div>
   )

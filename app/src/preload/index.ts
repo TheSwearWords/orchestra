@@ -26,6 +26,14 @@ const api = {
     alone: boolean
   ): Promise<void> => ipcRenderer.invoke('drag:start', project, at, alone),
   dragCancel: (): Promise<void> => ipcRenderer.invoke('drag:cancel'),
+  dragArm: (): Promise<void> => ipcRenderer.invoke('drag:arm'),
+  dragDisarm: (): Promise<void> => ipcRenderer.invoke('drag:disarm'),
+  // whether this window could take a tab being dragged in another window, and if it's under it
+  onDropState: (cb: (state: 'ready' | 'over' | null) => void): (() => void) => {
+    const listener = (_: unknown, state: 'ready' | 'over' | null): void => cb(state)
+    ipcRenderer.on('drop:state', listener)
+    return () => ipcRenderer.removeListener('drop:state', listener)
+  },
   dragEnd: (): Promise<'merged' | 'placed'> => ipcRenderer.invoke('drag:end'),
   // another window's tab was dropped on this one's tab strip
   onAdoptTab: (cb: (project: string) => void): (() => void) => {

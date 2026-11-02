@@ -547,7 +547,7 @@ footer a{color:#fff}
       + 'musician.brand-kit.working..instrument.typography.done..references.scanned..');
     const DOTS = ' .·:', MID = '-=-+-', box = document.getElementById('score'), wrap = box.parentElement;
     const ctx = box.getContext('2d');
-    let cell = 8, start = performance.now(), last = 0, raf = 0, visible = true;
+    let vx = 1, vw = 0, cell = 8, start = performance.now(), last = 0, raf = 0, visible = true;
     const speed = Array.from({ length: R }, (_, r) => ((r * 7919) % 5 + 1) * (r % 2 ? 1 : -1));
     function size() {
       const d = devicePixelRatio || 1, wide = innerWidth > 900;
@@ -557,7 +557,8 @@ footer a{color:#fff}
       box.style.width = w + 'px'; box.style.height = h + 'px'; box.width = w * d; box.height = h * d;
       ctx.setTransform(d, 0, 0, d, 0, 0);
       ctx.font = `${cell}px "IBM Plex Mono", ui-monospace, monospace`;
-      ctx.textBaseline = 'top';
+      ctx.textBaseline = 'top'; ctx.textAlign = 'right';
+      vx = (cell * 0.6) / (ctx.measureText('0').width || cell * 0.6); vw = w;
     }
     function frame(now) {
       const t = (now - start) / 1000;
@@ -579,13 +580,13 @@ footer a{color:#fff}
           else line += v === 2 && ((c * 31 + r * 17 + tick) % 4) === 0 ? DOTS[1 + ((c + r) % 3)] : (v === 1 && ((c * 31 + r * 17 + tick) % 9) === 0 ? '.' : ' ');
         }
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(line, 0, r * cell);
+        ctx.save(); ctx.translate(vw, 0); ctx.scale(vx, 1); ctx.fillText(line, 0, r * cell); ctx.restore();
       }
     }
     /* the integral behind the headline, filled with the same words, in a quieter tone */
     const ib = document.getElementById('intc'), ic = ib.getContext('2d');
     const INT = new Path2D(document.querySelector('#int path').getAttribute('d'));
-    let IM = [], IR = 0, ICOL = 0, icell = 10;
+    let IM = [], IR = 0, ICOL = 0, icell = 10, ix = 1;
     function isize() {
       const box = ib.parentElement, W = box.clientWidth, H = box.clientHeight, d = devicePixelRatio || 1;
       if (!W || !H) return;
@@ -593,6 +594,7 @@ footer a{color:#fff}
       IR = Math.ceil(H / icell); ICOL = Math.ceil(W / (icell * 0.6));
       ib.width = W * d; ib.height = H * d; ic.setTransform(d, 0, 0, d, 0, 0);
       ic.font = `${icell}px "IBM Plex Mono", ui-monospace, monospace`; ic.textBaseline = 'top';
+      ix = (icell * 0.6) / (ic.measureText('0').width || icell * 0.6);
       const off = document.createElement('canvas'); off.width = ICOL; off.height = IR;
       const o = off.getContext('2d'); o.scale(ICOL / 117, IR / 184); o.fill(INT);
       const px = o.getImageData(0, 0, ICOL, IR).data, inside = (c, r) => c >= 0 && r >= 0 && c < ICOL && r < IR && px[(r * ICOL + c) * 4 + 3] > 110;
@@ -611,8 +613,10 @@ footer a{color:#fff}
           body += v === 1 ? ch : ' ';
           edge += v === 2 ? (ch === '.' ? ':' : ch) : ' ';
         }
+        ic.save(); ic.scale(ix, 1);
         ic.fillStyle = 'rgba(255,255,255,.2)'; ic.fillText(body, 0, r * icell);
         ic.fillStyle = 'rgba(255,255,255,.42)'; ic.fillText(edge, 0, r * icell);
+        ic.restore();
       }
     }
     function loop(now) {

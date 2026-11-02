@@ -66,8 +66,8 @@ a{color:var(--link)}
 .mark-swap .m-reg,.mark-swap .m-bold{width:40px;height:40px;flex:none}
 .mark-swap.sm .m-reg,.mark-swap.sm .m-bold{width:28px;height:28px}
 .mark-swap .m-bold{display:none}
-.mark-swap:is(:hover,:focus-visible,:active) .m-reg{display:none}
-.mark-swap:is(:hover,:focus-visible,:active) .m-bold{display:block}
+.mark-swap:is(:hover,:focus-visible,:active,[aria-current="page"]) .m-reg{display:none}
+.mark-swap:is(:hover,:focus-visible,:active,[aria-current="page"]) .m-bold{display:block}
 .brand span{font:italic 800 28px/36px var(--f-display);letter-spacing:-.03em}
 .nav{display:flex;gap:var(--s6);align-items:center}
 .nav a{color:inherit;text-decoration:none;font:500 16px/20px var(--f-body);opacity:.92}
@@ -133,23 +133,48 @@ a{color:var(--link)}
 .fact h3{font:italic 800 30px/36px var(--f-display);letter-spacing:-.03em}
 .fact p{color:var(--ink-2);margin-top:var(--s3);max-width:24em}
 @media (max-width:860px){.facts{grid-template-columns:1fr}.fact,.fact+.fact{padding-left:0;border-right:0;border-bottom:1px solid var(--line)}}
-.hier{margin-block:var(--s9);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);align-items:start}
+.hier{margin-top:var(--s9);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);align-items:end}
 .hier h3{font:italic 800 clamp(32px,3.4vw,44px)/1.1 var(--f-display);letter-spacing:-.03em}
-.hier > div > p{color:var(--ink-2);margin-top:var(--s4);max-width:30em}
-.chain{list-style:none;margin:0;padding:0;display:grid;gap:0}
-.chain li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:var(--s4);padding:var(--s4) 0;border-top:1px solid var(--line)}
-.chain li:last-child{border-bottom:1px solid var(--line)}
-.dot{width:36px;height:36px;border-radius:50%;display:grid;place-items:center}
-.dot.o{background:var(--blue);color:#fff}
-.dot.o svg{width:22px;height:22px}
-.dot.m{border:1.5px solid var(--link);color:var(--link)}
-.dot.m svg{width:14px;height:14px}
-.dot.i{width:14px;height:14px;margin:11px;border:1.5px solid var(--ink)}
-.chain b{display:block;font:italic 800 26px/30px var(--f-display);letter-spacing:-.03em}
-.chain b small{font:400 12px/16px var(--f-mono);color:var(--ink-3);margin-left:8px}
-.chain span{display:block;color:var(--ink-2);margin-top:4px}
-.chain .l2{padding-left:28px}.chain .l3{padding-left:56px}
-@media (max-width:900px){.hier{grid-template-columns:1fr;margin-block:var(--s8)}.chain .l2{padding-left:14px}.chain .l3{padding-left:28px}}
+.hier > p{color:var(--ink-2);max-width:34em;font-size:17px;line-height:28px}
+.diagram{margin:var(--s6) 0 var(--s9);border:1px solid var(--line);background:var(--bg-subtle)}
+.dg-scroll{overflow-x:auto}
+.dg{display:block;width:100%;min-width:880px;height:auto}
+.diagram figcaption{padding:12px 16px;border-top:1px solid var(--line);font:400 12px/18px var(--f-mono);color:var(--ink-3);background:var(--bg)}
+.dg text{font-family:var(--f-body)}
+.dg-tier{font:400 11px var(--f-mono);letter-spacing:.08em;fill:var(--ink-3)}
+.dg-band-g{fill:var(--mist-subtle)}
+.dg-n{font:italic 800 15px var(--f-display);fill:var(--link)}
+.dg-chip{fill:var(--bg);stroke:var(--ink);stroke-width:1.2}
+.dg-chip-t{font:400 14px var(--f-mono);fill:var(--ink)}
+.dg-box{fill:var(--bg);stroke:var(--ink);stroke-width:1.4}
+.dg-box-t{font:italic 800 26px var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.dg-file{fill:var(--bg);stroke:var(--ink);stroke-width:1.2}
+.dg-file-t{font:italic 800 17px var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.dg-band-s{font-size:14px;fill:var(--ink-2)}
+.dg-feed{stroke:var(--line-strong);stroke-dasharray:3 4}
+.dg-link{fill:none;stroke:var(--ink-3);stroke-width:1.2}
+.dg-thin{stroke-width:1;opacity:.6}
+.dg-share{fill:none;stroke:var(--link);stroke-width:1.2;stroke-dasharray:5 5}
+.dg-flow{stroke:var(--link);stroke-width:1.6;stroke-dasharray:6 6;animation:dgflow 1.4s linear infinite}
+@keyframes dgflow{to{stroke-dashoffset:-24}}
+.dg-talk{stroke:var(--ink);stroke-width:1.4}
+.dg-ah{fill:var(--ink)}
+.dg-note{font:400 12px var(--f-mono);fill:var(--link)}
+.dg-you{fill:var(--bg);stroke:var(--ink);stroke-width:1.4}
+.dg-you-t{font:italic 800 24px var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.dg-orc{fill:#0538ff}
+.dg-orc-i{color:#fff}
+.dg-mus{fill:var(--bg);stroke:var(--link);stroke-width:1.6}
+.dg-mus-i{color:var(--link)}
+.dg-name{font:italic 800 20px var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.dg-name-s{font-size:17px}
+.dg-sub{font-size:12px;fill:var(--ink-3)}
+.dg-ins{fill:var(--bg);stroke:var(--ink);stroke-width:1.4}
+.dg-ins-t{font-size:14px;fill:var(--ink)}
+.dg-tools{fill:var(--bg);stroke:var(--ink);stroke-width:1.2}
+.dg-tool{font:400 14px var(--f-mono);fill:var(--ink)}
+@media (max-width:900px){.hier{grid-template-columns:1fr;gap:var(--s4);margin-top:var(--s8)}}
+
 
 /* screenshots */
 .shot{border:1px solid var(--line);background:var(--bg-subtle);overflow:hidden;max-width:100%}
@@ -329,16 +354,14 @@ footer a{color:#fff}
       <div class="fact"><h3>Grows with you</h3><p>Deliverables, sources, audits and agents are editable files that build up over every project.</p></div>
     </div>
     <div class="hier">
-      <div>
-        <h3>An ensemble, set up for you</h3>
-        <p>Every project gets the same chain of command. Each level gets only the tools for its job, so the hierarchy holds even if a prompt drifts, and every agent is a markdown file you can open and change.</p>
-      </div>
-      <ol class="chain">
-        <li><span class="dot o"><svg aria-hidden="true"><use href="#int"/></svg></span><div><b>Orchestrator<small>one per project</small></b><span>Reads your research, plans the work and is the only agent that talks to you.</span></div></li>
-        <li class="l2"><span class="dot m"><svg aria-hidden="true"><use href="#int"/></svg></span><div><b>Musicians<small>one per deliverable</small></b><span>A Brand Kit, a Slide Deck, a Website. Each owns its deliverable and its tool connections.</span></div></li>
-        <li class="l3"><span class="dot i" aria-hidden="true"></span><div><b>Instruments<small>one per prerequisite</small></b><span>Brand Spec, Logo Builder, Copywriter. Built once per project and shared, so every deliverable stays consistent.</span></div></li>
-      </ol>
+      <h3>Plug in, connect, save, export</h3>
+      <p>Plug in the AI you already use and Orchestra sets up the hierarchy. The agents work in your design tools over MCP, save everything they make to a knowledge graph, and export the finished deliverables. Every agent is a markdown file you can open and change.</p>
+
     </div>
+    <figure class="diagram">
+      <div class="dg-scroll"><svg class="dg" viewBox="0 0 1240 640" role="img" aria-labelledby="dg-t dg-d"><title id="dg-t">How Orchestra works, end to end</title><desc id="dg-d">1. Plug in your AI compute: Claude, ChatGPT or any model. 2. Orchestra sets up the hierarchy: one Orchestrator per project, the only agent that talks to you, briefs one Musician per deliverable, and each Musician plays Instruments, one per prerequisite. The agents connect to your tools over MCP: Figma, Blender, Fusion, ElevenLabs. 3. Everything made is saved to a knowledge graph that agents query instead of rereading files. 4. Deliverables are exported: a brand kit, slide deck, website and 3D renders.</desc><defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" class="dg-ah"/></marker></defs><text x="30" y="140" class="dg-tier" text-anchor="start"><tspan class="dg-n">1</tspan>  PLUG IN YOUR COMPUTE</text><rect x="30" y="200" width="170" height="44" class="dg-chip"/><text x="48" y="228" class="dg-chip-t">Claude</text><line x1="200" y1="222" x2="252" y2="222" class="dg-link dg-flow" marker-end="url(#ah)"/><rect x="30" y="264" width="170" height="44" class="dg-chip"/><text x="48" y="292" class="dg-chip-t">ChatGPT</text><line x1="200" y1="286" x2="252" y2="286" class="dg-link dg-flow" marker-end="url(#ah)"/><rect x="30" y="328" width="170" height="44" class="dg-chip"/><text x="48" y="356" class="dg-chip-t">Any model</text><line x1="200" y1="350" x2="252" y2="350" class="dg-link dg-flow" marker-end="url(#ah)"/><text x="30" y="420" class="dg-sub">mix models per agent</text><rect x="262" y="150" width="538" height="330" class="dg-box"/><text x="282" y="442" class="dg-box-t">Orchestra</text><text x="282" y="462" class="dg-sub">the hierarchy, set up for you</text><rect x="336" y="40" width="88" height="48" class="dg-you"/><text x="380" y="72" class="dg-you-t" text-anchor="middle">You</text><line x1="380" y1="88" x2="380" y2="274" class="dg-talk" marker-start="url(#ah)" marker-end="url(#ah)"/><text x="392" y="128" class="dg-note">the only conversation</text><circle cx="380" cy="320" r="42" class="dg-orc"/><use href="#int" x="366" y="298" width="28" height="44" class="dg-orc-i"/><text x="380" y="388" class="dg-name" text-anchor="middle">Orchestrator</text><path d="M422 320 C 470 320, 470 225, 516 225" class="dg-link dg-flow"/><path d="M422 320 C 470 320, 470 320, 516 320" class="dg-link dg-flow"/><path d="M422 320 C 470 320, 470 415, 516 415" class="dg-link dg-flow"/><path d="M564 225 C 600 225, 602 200, 642 200" class="dg-link"/><path d="M564 225 C 600 225, 602 246, 642 246" class="dg-link"/><path d="M564 320 C 600 320, 602 292, 642 292" class="dg-link"/><path d="M564 320 C 600 320, 602 338, 642 338" class="dg-link"/><path d="M564 415 C 600 415, 602 384, 642 384" class="dg-link"/><path d="M564 415 C 600 415, 602 430, 642 430" class="dg-link"/><path d="M564 320 C 610 320, 592 200, 642 200" class="dg-share"/><path d="M564 415 C 610 415, 592 200, 642 200" class="dg-share"/><circle cx="540" cy="225" r="24" class="dg-mus"/><use href="#int" x="533" y="214" width="14" height="22" class="dg-mus-i"/><text x="540" y="267" class="dg-name dg-name-s" text-anchor="middle">Brand Kit</text><circle cx="540" cy="320" r="24" class="dg-mus"/><use href="#int" x="533" y="309" width="14" height="22" class="dg-mus-i"/><text x="540" y="362" class="dg-name dg-name-s" text-anchor="middle">Slide Deck</text><circle cx="540" cy="415" r="24" class="dg-mus"/><use href="#int" x="533" y="404" width="14" height="22" class="dg-mus-i"/><text x="540" y="457" class="dg-name dg-name-s" text-anchor="middle">Website</text><text x="540" y="186" class="dg-sub" text-anchor="middle">Musicians</text><rect x="645" y="193" width="14" height="14" class="dg-ins"/><text x="668" y="205" class="dg-ins-t">Brand Spec</text><rect x="645" y="239" width="14" height="14" class="dg-ins"/><text x="668" y="251" class="dg-ins-t">Logo Builder</text><rect x="645" y="285" width="14" height="14" class="dg-ins"/><text x="668" y="297" class="dg-ins-t">Deck Outline</text><rect x="645" y="331" width="14" height="14" class="dg-ins"/><text x="668" y="343" class="dg-ins-t">Slide Builder</text><rect x="645" y="377" width="14" height="14" class="dg-ins"/><text x="668" y="389" class="dg-ins-t">Copywriter</text><rect x="645" y="423" width="14" height="14" class="dg-ins"/><text x="668" y="435" class="dg-ins-t">Page Designer</text><text x="645" y="186" class="dg-sub">Instruments</text><text x="645" y="462" class="dg-note">built once, shared</text><text x="880" y="140" class="dg-tier" text-anchor="start"><tspan class="dg-n">2</tspan>  CONNECT YOUR TOOLS</text><rect x="880" y="150" width="150" height="330" class="dg-tools"/><text x="896" y="180" class="dg-sub">over MCP</text><text x="896" y="226" class="dg-tool">Figma</text><text x="896" y="278" class="dg-tool">Blender</text><text x="896" y="330" class="dg-tool">Fusion</text><text x="896" y="382" class="dg-tool">ElevenLabs</text><text x="896" y="462" class="dg-sub">+ any MCP server</text><line x1="800" y1="230" x2="880" y2="230" class="dg-link dg-flow" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="800" y1="315" x2="880" y2="315" class="dg-link dg-flow" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="800" y1="400" x2="880" y2="400" class="dg-link dg-flow" marker-start="url(#ah)" marker-end="url(#ah)"/><rect x="262" y="540" width="768" height="60" class="dg-band-g"/><text x="282" y="566" class="dg-tier"><tspan class="dg-n">3</tspan>  SAVE TO THE KNOWLEDGE GRAPH</text><text x="282" y="586" class="dg-band-s">Agents query the graph instead of rereading design files: cheaper, and they understand the work</text><line x1="382" y1="480" x2="382" y2="540" class="dg-feed" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="562" y1="480" x2="562" y2="540" class="dg-feed" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="722" y1="480" x2="722" y2="540" class="dg-feed" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="955" y1="480" x2="955" y2="540" class="dg-feed" marker-start="url(#ah)" marker-end="url(#ah)"/><text x="1072" y="140" class="dg-tier" text-anchor="start"><tspan class="dg-n">4</tspan>  EXPORT DELIVERABLES</text><path d="M1072 160 h118 l20 20 v40 h-138 z" class="dg-file"/><text x="1086" y="190" class="dg-file-t">Brand kit</text><text x="1086" y="208" class="dg-sub">.fig · tokens.json</text><path d="M1072 238 h118 l20 20 v40 h-138 z" class="dg-file"/><text x="1086" y="268" class="dg-file-t">Slide deck</text><text x="1086" y="286" class="dg-sub">.pptx · PDF</text><path d="M1072 316 h118 l20 20 v40 h-138 z" class="dg-file"/><text x="1086" y="346" class="dg-file-t">Website</text><text x="1086" y="364" class="dg-sub">HTML · Figma</text><path d="M1072 394 h118 l20 20 v40 h-138 z" class="dg-file"/><text x="1086" y="424" class="dg-file-t">3D renders</text><text x="1086" y="442" class="dg-sub">.blend · PNG</text><line x1="1030" y1="315" x2="1064" y2="315" class="dg-link dg-flow" marker-end="url(#ah)"/></svg></div>
+      <figcaption>Each level gets only the tools for its job: only the Orchestrator talks to you, and only Musicians create Instruments.</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -535,9 +558,14 @@ footer a{color:#fff}
 
   /* the nav marks the section in view, like the app marks where you are */
   const navs = [...document.querySelectorAll('.nav a[href^="#"]')];
+  const home = document.querySelector('.top .brand'), hero = document.querySelector('.hero');
   const spy = new IntersectionObserver(es => es.forEach(e => {
-    if (e.isIntersecting) navs.forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#' + e.target.id));
+    if (!e.isIntersecting) return;
+    const onHero = e.target === hero; // on the landing, only the logo is marked
+    home.setAttribute('aria-current', onHero ? 'page' : 'false');
+    navs.forEach(a => a.setAttribute('aria-current', !onHero && a.getAttribute('href') === '#' + e.target.id));
   }), { rootMargin: '-40% 0px -55% 0px' });
+  spy.observe(hero);
   navs.forEach(a => { const t = document.querySelector(a.getAttribute('href')); if (t) spy.observe(t); });
 
   /* hero: the violin, redrawn every tick from a stream of agent-log words */
@@ -555,9 +583,11 @@ footer a{color:#fff}
     function size() {
       const d = devicePixelRatio || 1, wide = innerWidth > 900;
       // the figure fills about half the hero (its left columns are empty); the bottom crops
-      cell = Math.max(wrap.clientHeight / R, wide ? (innerWidth * 0.64) / (C * 0.6) : 0);
+      cell = Math.max(wrap.clientHeight / R, wide ? (innerWidth * 0.6) / (C * 0.6) : 0);
       const w = Math.ceil(C * cell * 0.6), h = Math.ceil(R * cell);
-      box.style.width = w + 'px'; box.style.height = h + 'px'; box.width = w * d; box.height = h * d;
+      box.style.width = w + 'px'; box.style.height = h + 'px';
+      // lift the figure so its body, not just the scroll, sits in view above the band
+      box.style.top = -Math.round(Math.max(0, Math.min(h - wrap.clientHeight, h * 0.16))) + 'px'; box.width = w * d; box.height = h * d;
       ctx.setTransform(d, 0, 0, d, 0, 0);
       ctx.font = `${cell}px "IBM Plex Mono", ui-monospace, monospace`;
       ctx.textBaseline = 'top'; ctx.textAlign = 'right';

@@ -8,7 +8,7 @@
 <meta name="description" content="Orchestra is an open-source framework for designers that turns your AI compute into an agent hierarchy, so you can research, create and refine work across mediums without the slop.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400&family=Bodoni+Moda:ital,opsz,wght@1,6..96,400&display=swap">
 <style>
 /* Layout: a blue overture with the word-built violin, then three movements of a white score — what Orchestra is, how it works, the brand — closing on a blue call to the repo. */
 :root{
@@ -18,6 +18,7 @@
   --line:#e1e1e8; --line-strong:#a0a0ae; --link:#0538ff; --agent-text:#0326b0; --mist-subtle:#dde3ff;
   --f-display:"Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif;
   --f-body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-word:"Bodoni Moda","Didot","Bodoni 72",var(--f-display);
   --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px; --s9:96px; --s10:128px;
   --max:1240px;
@@ -75,10 +76,11 @@ a{color:var(--link)}
 .kicker{font:400 13px/20px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.9)}
 .headline{min-width:0}
 /* the integral as a giant tonal figure behind everything */
-.bg-int{position:absolute;z-index:0;left:2%;top:-8%;height:122%;width:auto;aspect-ratio:117/184;color:#2b5aff;pointer-events:none}
+.bg-int{position:absolute;z-index:0;left:2%;top:-8%;height:122%;aspect-ratio:117/184;pointer-events:none}
+.bg-int canvas{position:absolute;inset:0;width:100%;height:100%}
 .hero h1{font-weight:400;line-height:.9;letter-spacing:-.02em}
 .hl{min-width:0}
-.hero h1 .a em{font-style:italic}
+.hero h1 .a em{font-family:var(--f-word);font-style:italic;font-weight:400;font-optical-sizing:auto;letter-spacing:-.03em}
 .hero h1 .a{display:flex;align-items:baseline;gap:.24em;font:400 clamp(44px,10.4vw,168px)/1 var(--f-display);letter-spacing:-.02em;margin-top:.08em;white-space:nowrap}
 .wm-inline{height:.74em;width:auto;aspect-ratio:715.391/138.354;flex:none;transform:translateY(.02em)}
 .hero h1 .b{display:block;font:400 clamp(30px,4.8vw,78px)/1 var(--f-body);letter-spacing:-.04em}
@@ -204,6 +206,8 @@ a{color:var(--link)}
 .face{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:var(--s4);align-items:baseline;padding-block:var(--s4);border-top:1px solid var(--line)}
 .face .s{min-width:0;overflow-wrap:anywhere}
 .face .r{font:400 12px/18px var(--f-mono);color:var(--ink-3)}
+.f0{font:400 24px/1.2 var(--f-body)}
+.f0 i{font:italic 400 48px/1 var(--f-word);letter-spacing:-.02em}
 .f1{font:400 44px/1.05 var(--f-display);letter-spacing:-.5px}
 .f2{font:500 22px/1.3 var(--f-body)}
 .f3{font:400 15px/1.5 var(--f-mono)}
@@ -269,7 +273,7 @@ footer a{color:#fff}
 
 <main id="top">
 <section class="blue hero" aria-labelledby="hero-title">
-  <svg class="bg-int" viewBox="0 0 117 184" aria-hidden="true"><use href="#int"/></svg>
+  <div class="bg-int" aria-hidden="true"><canvas id="intc"></canvas></div>
   <div class="score-canvas" aria-hidden="true"><canvas id="score"></canvas></div>
   <div class="wrap">
     <div aria-hidden="true"></div>
@@ -429,7 +433,8 @@ footer a{color:#fff}
       <div class="tile t-type">
         <h3>Type</h3>
         <div class="faces">
-          <div class="face"><div class="s f1">Instrument Serif, <i>in italic for the name</i></div><div class="r">headlines · wordmark</div></div>
+          <div class="face"><div class="s f0"><i>One Orchestra</i>, Bodoni Moda italic</div><div class="r">wordmark · its lockups</div></div>
+          <div class="face"><div class="s f1">Instrument Serif for headlines</div><div class="r">headlines · display</div></div>
           <div class="face"><div class="s f2">Instrument Sans for the interface</div><div class="r">UI · labels · body</div></div>
           <div class="face"><div class="s f3">[14:02] type-agent swapped Söhne for Instrument Sans</div><div class="r">agent logs only</div></div>
         </div>
@@ -530,15 +535,49 @@ footer a{color:#fff}
         ctx.fillText(line, 0, r * cell);
       }
     }
+    /* the integral behind the headline, filled with the same words, in a quieter tone */
+    const ib = document.getElementById('intc'), ic = ib.getContext('2d');
+    const INT = new Path2D(document.querySelector('#int path').getAttribute('d'));
+    let IM = [], IR = 0, ICOL = 0, icell = 10;
+    function isize() {
+      const box = ib.parentElement, W = box.clientWidth, H = box.clientHeight, d = devicePixelRatio || 1;
+      if (!W || !H) return;
+      icell = Math.max(9, Math.min(14, H / 110));
+      IR = Math.ceil(H / icell); ICOL = Math.ceil(W / (icell * 0.6));
+      ib.width = W * d; ib.height = H * d; ic.setTransform(d, 0, 0, d, 0, 0);
+      ic.font = `${icell}px "IBM Plex Mono", ui-monospace, monospace`; ic.textBaseline = 'top';
+      const off = document.createElement('canvas'); off.width = ICOL; off.height = IR;
+      const o = off.getContext('2d'); o.scale(ICOL / 117, IR / 184); o.fill(INT);
+      const px = o.getImageData(0, 0, ICOL, IR).data, inside = (c, r) => c >= 0 && r >= 0 && c < ICOL && r < IR && px[(r * ICOL + c) * 4 + 3] > 110;
+      IM = [];
+      for (let r = 0; r < IR; r++) { const row = []; for (let c = 0; c < ICOL; c++) {
+        row.push(!inside(c, r) ? 0 : (inside(c - 1, r) && inside(c + 1, r) && inside(c, r - 1) && inside(c, r + 1) ? 1 : 2)); } IM.push(row); }
+    }
+    function iframe(now) {
+      const t = (now - start) / 1000;
+      ic.clearRect(0, 0, ib.width, ib.height);
+      for (let r = 0; r < IR; r++) {
+        const off = reduce ? r * 23 : Math.floor(t * speed[r % R] * 1.5) + r * 23;
+        let body = '', edge = '';
+        for (let c = 0; c < ICOL; c++) {
+          const v = IM[r][c], ch = LOG[((c + off) % LOG.length + LOG.length) % LOG.length];
+          body += v === 1 ? ch : ' ';
+          edge += v === 2 ? (ch === '.' ? ':' : ch) : ' ';
+        }
+        ic.fillStyle = 'rgba(255,255,255,.2)'; ic.fillText(body, 0, r * icell);
+        ic.fillStyle = 'rgba(255,255,255,.42)'; ic.fillText(edge, 0, r * icell);
+      }
+    }
     function loop(now) {
-      if (visible && now - last > 110) { frame(now); last = now; }
+      if (visible && now - last > 110) { frame(now); iframe(now); last = now; }
       raf = requestAnimationFrame(loop);
     }
-    size(); frame(performance.now());
+    size(); isize(); frame(performance.now()); iframe(performance.now());
     if (!reduce) raf = requestAnimationFrame(loop);
     new IntersectionObserver(e => { visible = e[0].isIntersecting; }).observe(wrap);
-    addEventListener('resize', () => { size(); frame(performance.now()); });
-    if (document.fonts) document.fonts.ready.then(() => { size(); frame(performance.now()); });
+    const redraw = () => { size(); isize(); frame(performance.now()); iframe(performance.now()); };
+    addEventListener('resize', redraw);
+    if (document.fonts) document.fonts.ready.then(redraw);
   })();
   const CREDITS = {
     hand: 'Albrecht Dürer, Study of a Hand and a Pillow, 1493 · CC0',

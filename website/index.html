@@ -77,9 +77,12 @@ a{color:var(--link)}
 .headline .int{width:clamp(96px,15vw,240px);height:auto;aspect-ratio:117/184;color:#eef1ff}
 .hero h1{font-weight:400;line-height:.9;letter-spacing:-.02em}
 .hl{min-width:0}
-.hero h1 .a{display:block;font:400 clamp(52px,8.6vw,138px)/.94 var(--f-display);letter-spacing:-.02em}
-.hero h1 .b{display:block;font:700 clamp(46px,7.6vw,122px)/.96 var(--f-body);letter-spacing:-.06em;margin-top:.04em}
+.hero h1 .a{display:flex;align-items:baseline;gap:.24em;font:400 clamp(44px,10.4vw,168px)/1 var(--f-display);letter-spacing:-.02em;margin-top:.08em;white-space:nowrap}
+.wm-inline{height:.74em;width:auto;aspect-ratio:715.391/138.354;flex:none;transform:translateY(.02em)}
+.hero h1 .b{display:block;font:700 clamp(30px,4.8vw,78px)/1 var(--f-body);letter-spacing:-.05em}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
 .hero .actions{margin-top:var(--s6)}
+.hero .btn-white{border-color:#fff}
 .btn-lg{padding:16px 26px;font-size:18px}
 .btn-lg svg{width:20px;height:20px}
 .hero-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--s4);flex-wrap:wrap;font:400 12px/20px var(--f-mono);color:rgba(255,255,255,.8)}
@@ -270,8 +273,8 @@ footer a{color:#fff}
     <div class="kicker">An open-source agent framework for designers</div>
     <div class="headline">
       <svg class="int" viewBox="0 0 117 184" aria-hidden="true"><use href="#int"/></svg>
-      <div class="hl"><h1 id="hero-title"><span class="a">Your compute.</span><span class="a">Your agents.</span><span class="b">One orchestra.</span></h1>
-        <div class="actions"><a class="btn btn-white btn-lg" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a></div></div>
+      <div class="hl"><h1 id="hero-title"><span class="b">Your compute. Your agents.</span><span class="a">One <svg class="wm-inline" role="img" aria-label="Orchestra" viewBox="0 0 715.391 138.354"><use href="#wm"/></svg></span></h1>
+        <div class="actions"><a class="btn btn-white btn-lg" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a><a class="btn btn-line btn-lg" href="#how">How it works</a></div></div>
     </div>
     <div class="hero-foot"><span>Orchestrator → Musicians → Instruments</span></div>
   </div>

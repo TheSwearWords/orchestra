@@ -203,6 +203,32 @@ a{color:var(--link)}
 .graph canvas{position:absolute;inset:0;width:100%;height:100%}
 .graph figcaption{position:absolute;left:12px;bottom:10px;font:400 11px/16px var(--f-mono);color:var(--ink-3)}
 .how-end{padding-bottom:var(--s9)}
+/* How it works: on wide screens the section pins and the four steps slide in from the right */
+.hs-bar{width:100%;display:flex;align-items:center;gap:var(--s5);flex-wrap:wrap;position:relative;padding-block:var(--s4);border-top:1px solid var(--ink)}
+.hs-bar button{display:inline-flex;align-items:baseline;gap:8px;border:0;background:none;padding:6px 0;cursor:pointer;color:var(--ink-3);font:500 15px/20px var(--f-body)}
+.hs-bar button b{font:italic 800 18px/20px var(--f-display);letter-spacing:-.03em;color:var(--link)}
+.hs-bar button:hover,.hs-bar button[aria-selected="true"]{color:var(--ink)}
+.hs-prog{position:absolute;left:max(24px,env(safe-area-inset-left,0px));right:max(24px,env(safe-area-inset-right,0px));top:-1px;height:3px;pointer-events:none}
+.hs-prog i{display:block;height:100%;width:0;background:var(--blue)}
+.shot-switch .stack{position:relative;aspect-ratio:16/10}
+.shot-switch .stack img{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .35s}
+.shot-switch .stack img.on{opacity:1}
+.views{display:flex;gap:4px;margin-left:var(--s3)}
+.views button{border:1px solid var(--line);background:var(--bg);color:var(--ink-2);font:500 12px/16px var(--f-body);padding:4px 9px;cursor:pointer}
+.views button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+@media (min-width:961px){
+  .hs.on{position:relative}
+  .hs.on .hs-pin{position:sticky;top:72px;height:calc(100svh - 72px);overflow:hidden;display:flex;flex-direction:column}
+  .hs.on .hs-track{display:flex;flex:1;min-height:0;will-change:transform}
+  .hs.on .mv{flex:0 0 100%;max-width:none;margin:0;padding-inline:max(24px,calc((100% - var(--max)) / 2 + 24px));border:0;align-items:center;padding-block:var(--s5) var(--s6)}
+  .hs.on .mv-text{position:static}
+  .hs.on .mv .shot,.hs.on .mv .graph{max-height:calc(100svh - 72px - 150px);aspect-ratio:auto}
+  .hs.on .mv .shot img{max-height:calc(100svh - 72px - 230px);width:100%;object-fit:cover;object-position:top}
+  .hs.on .shot-switch .stack{aspect-ratio:auto;height:calc(100svh - 72px - 230px)}
+  .hs.on .mv .graph{height:calc(100svh - 72px - 190px)}
+  .hs.on .how-end{padding-bottom:var(--s6)}
+}
+@media (max-width:960px){.hs-bar{display:none}}
 
 /* 3 · brand */
 .b-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--s4)}
@@ -371,7 +397,17 @@ footer a{color:#fff}
       <div><span class="num">II.</span><h2 id="how-title">How it works</h2></div>
       <p>Every project moves through three movements with the designer in the loop, and everything you make is kept in a knowledge graph your agents can read. These are screens from the app, running a project for Orchestra’s own brand.</p>
     </div>
-
+  </div>
+  <div class="hs" id="hs">
+    <div class="hs-pin">
+      <div class="wrap hs-bar" role="tablist" aria-label="Steps">
+        <button type="button" role="tab" data-i="0" aria-selected="true"><b>1</b> Research</button>
+        <button type="button" role="tab" data-i="1" aria-selected="false"><b>2</b> Create</button>
+        <button type="button" role="tab" data-i="2" aria-selected="false"><b>3</b> Refine</button>
+        <button type="button" role="tab" data-i="3" aria-selected="false"><b>4</b> Knowledge graph</button>
+        <span class="hs-prog" aria-hidden="true"><i id="hs-fill"></i></span>
+      </div>
+      <div class="hs-track" id="hs-track">
     <article class="mv">
       <div class="mv-text">
         <div class="n">1</div>
@@ -397,13 +433,14 @@ footer a{color:#fff}
         </ul>
         <div class="tools" aria-label="Tools"><span>Figma</span><span>Blender</span><span>Fusion</span><span>ElevenLabs</span><span>any MCP server</span></div>
       </div>
-      <div class="mv-media">
-        <figure class="shot"><div class="shot-bar"><i><b></b><b></b><b></b></i>Create · Brand Kit chat<span>app screen</span></div><img src="assets/app-chat.webp" alt="A Brand Kit chat with the Orchestrator, beside a live tree of agents and work: foundations ready, the Brand Kit Musician and Kit Builder Instrument working, and a list of created files" width="1680" height="1050" loading="lazy"></figure>
-        <div class="pair">
-          <figure class="shot"><img src="assets/app-picker.webp" alt="The deliverable picker with Brand Kit, Logo, Slide Deck and Website selected and seven foundations listed to build first" width="1680" height="1050" loading="lazy"><figcaption>Pick deliverables; foundations come first</figcaption></figure>
-          <figure class="shot"><img src="assets/app-channel.webp" alt="The agent channel: a read-only log of each agent's tool calls and messages in IBM Plex Mono on Orchestra blue" width="1680" height="1050" loading="lazy"><figcaption>The agent channel, read-only</figcaption></figure>
+      <figure class="shot shot-switch">
+        <div class="shot-bar"><i><b></b><b></b><b></b></i><span class="views" role="group" aria-label="Create views"><button type="button" data-v="0" aria-pressed="true">Chat</button><button type="button" data-v="1" aria-pressed="false">Deliverables</button><button type="button" data-v="2" aria-pressed="false">Agent channel</button></span><span>app screen</span></div>
+        <div class="stack">
+          <img class="on" src="assets/app-chat.webp" alt="A Brand Kit chat with the Orchestrator, beside a live tree of agents and work: foundations ready, the Brand Kit Musician and Kit Builder Instrument working, and a list of created files" width="1680" height="1050" loading="lazy">
+          <img src="assets/app-picker.webp" alt="The deliverable picker with Brand Kit, Logo, Slide Deck and Website selected and seven foundations listed to build first" width="1680" height="1050" loading="lazy">
+          <img src="assets/app-channel.webp" alt="The agent channel: a read-only log of each agent's tool calls and messages in IBM Plex Mono on Orchestra blue" width="1680" height="1050" loading="lazy">
         </div>
-      </div>
+      </figure>
     </article>
 
     <article class="mv">
@@ -433,6 +470,8 @@ footer a{color:#fff}
       </div>
       <figure class="graph"><canvas id="graph" role="img" aria-label="An illustrative knowledge graph linking three projects through shared fonts, colours and references"></canvas><figcaption>illustration · three projects, shared nodes in blue</figcaption></figure>
     </article>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -686,6 +725,50 @@ footer a{color:#fff}
     const fallback = () => { const r = document.createRange(); r.selectNodeContents(cmd); const s = getSelection(); s.removeAllRanges(); s.addRange(r); setLabel(copy, 'Selected'); };
     try { navigator.clipboard.writeText(cmd.textContent).then(done, fallback); } catch { fallback(); }
   });
+
+  /* Create: switch the framed screen between its three views */
+  document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => {
+    const i = +b.dataset.v, fig = b.closest('.shot-switch');
+    fig.querySelectorAll('.views button').forEach((x, k) => x.setAttribute('aria-pressed', k === i));
+    fig.querySelectorAll('.stack img').forEach((im, k) => im.classList.toggle('on', k === i));
+  }));
+
+  /* How it works: pin the section and slide the steps in from the right as you scroll */
+  (() => {
+    const hs = document.getElementById('hs'), track = document.getElementById('hs-track'), fill = document.getElementById('hs-fill');
+    const tabs = [...hs.querySelectorAll('.hs-bar button')], N = tabs.length, wide = matchMedia('(min-width: 961px)');
+    const STEP = 0.75; // screen-heights of scrolling per slide
+    let active = -1;
+    const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    function layout() {
+      const on = wide.matches && !reduce;
+      hs.classList.toggle('on', on);
+      hs.style.height = on ? `calc(100svh - 72px + ${(N - 1) * STEP * 100}svh)` : '';
+      if (!on) { track.style.transform = ''; }
+      update();
+    }
+    function update() {
+      if (!hs.classList.contains('on')) return;
+      const r = hs.getBoundingClientRect(), travel = hs.offsetHeight - (innerHeight - 72);
+      const p = Math.min(1, Math.max(0, (72 - r.top) / Math.max(1, travel)));
+      const seg = p * (N - 1), i = Math.min(N - 2, Math.floor(seg)), f = seg - i;
+      // each slide holds, then moves: the middle 70% of every segment carries the swipe
+      const t = ease(Math.min(1, Math.max(0, (f - .15) / .7)));
+      track.style.transform = `translate3d(${-(i + t) * 100}%,0,0)`;
+      fill.style.width = (p * 100) + '%';
+      const now = Math.round(i + t);
+      if (now !== active) { active = now; tabs.forEach((b, k) => b.setAttribute('aria-selected', k === now)); }
+    }
+    tabs.forEach((b, k) => b.addEventListener('click', () => {
+      if (!hs.classList.contains('on')) return document.querySelectorAll('#hs .mv')[k].scrollIntoView({ behavior: 'smooth' });
+      const travel = hs.offsetHeight - (innerHeight - 72), y = hs.getBoundingClientRect().top + scrollY - 72;
+      scrollTo({ top: y + travel * (k / (N - 1)) + (k ? 1 : 0), behavior: 'smooth' });
+    }));
+    addEventListener('scroll', update, { passive: true });
+    addEventListener('resize', layout);
+    wide.addEventListener('change', layout);
+    layout();
+  })();
 
   /* knowledge graph illustration */
   const cv = document.getElementById('graph');

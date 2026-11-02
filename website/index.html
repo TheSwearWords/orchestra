@@ -282,7 +282,7 @@ a{color:var(--link)}
 .read-head{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s6);align-items:end}
 .read-head h3{font:italic 800 clamp(30px,3.2vw,44px)/1.05 var(--f-display);letter-spacing:-.03em;text-transform:none;color:var(--ink)}
 .read-head p{font-size:17px;line-height:28px;max-width:34em}
-.readings{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--ink)}
+.readings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--ink)}
 .reading{padding:var(--s5) var(--s5) 0 0;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:var(--s3)}
 .reading + .reading{padding-left:var(--s5)}
 .reading:last-child{border-right:0}
@@ -290,7 +290,8 @@ a{color:var(--link)}
 .rd-art svg{display:block;width:100%;height:100%}
 .rd-k{font:400 12px/16px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--link);margin-top:var(--s2)}
 .reading h4{margin:0;font:italic 800 22px/1.15 var(--f-display);letter-spacing:-.03em;text-wrap:balance}
-.reading p{font-size:15px;line-height:24px}
+.reading p{font-size:16px;line-height:26px;max-width:34em}
+.rd-art{max-width:520px}
 .rd-axis{fill:none;stroke:var(--line-strong);stroke-width:1}
 .rd-dash{stroke-dasharray:3 4}
 .rd-curve{fill:none;stroke:var(--ink);stroke-width:2}
@@ -304,7 +305,6 @@ a{color:var(--link)}
 .rd-mono{font:400 11px var(--f-mono);fill:var(--ink-3)}
 .rd-spin{transform-box:view-box;transform-origin:120px 68px;animation:rdspin 5s cubic-bezier(.7,0,.3,1) infinite}
 @keyframes rdspin{0%,30%{transform:rotate(0)}50%,80%{transform:rotate(180deg)}100%{transform:rotate(360deg)}}
-@media (max-width:1100px){.readings{grid-template-columns:1fr 1fr}.reading:nth-child(2){border-right:0}.reading:nth-child(3){padding-left:0}.reading:nth-child(n+3){padding-top:var(--s6)}}
 @media (max-width:640px){.read-head{grid-template-columns:1fr}.readings{grid-template-columns:1fr}.reading,.reading + .reading{padding-left:0;border-right:0;padding-top:var(--s5)}}
 .mk-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border:1px solid var(--line)}
 .mk{aspect-ratio:1;display:grid;place-items:center}
@@ -571,7 +571,7 @@ main.leaving{opacity:0}
       <section class="tile t-read" aria-labelledby="read-title">
         <div class="read-head">
           <h3 id="read-title">Reading the mark</h3>
-          <p>One stroke, four readings. Each is a way of saying what Orchestra does: many agents, working on small parts, heard as one piece of work.</p>
+          <p>One stroke, two readings. Each is a way of saying what Orchestra does: many agents, working on small parts, heard as one piece of work.</p>
         </div>
         <div class="readings">
           <article class="reading">
@@ -595,30 +595,6 @@ main.leaving{opacity:0}
             <span class="rd-k">II. The f-hole</span>
             <h4>The opening the whole instrument sounds through</h4>
             <p>A violin’s f-holes are where its vibrations leave the body, every string heard through one shape. In Orchestra that opening is the Orchestrator: the one agent that talks to you, so a crowd of agents reaches you as a single voice.</p>
-          </article>
-          <article class="reading">
-            <div class="rd-art"><svg viewBox="0 0 240 160" role="img" aria-label="The mark turning half a revolution about its centre and landing on itself, with its top terminal labelled brief and its bottom terminal labelled deliverable">
-              <g class="rd-spin"><use href="#int" x="96" y="30" width="48" height="76" class="rd-ink"/></g>
-              <circle cx="120" cy="68" r="3" class="rd-c"/>
-              <text x="152" y="40" class="rd-mono">brief</text>
-              <text x="40" y="104" class="rd-mono">deliverable</text>
-              <path d="M70 140 A 50 18 0 0 0 170 140" class="rd-axis" marker-end="url(#rd-ah)"/>
-              <defs><marker id="rd-ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" class="rd-ah"/></marker></defs>
-              <text x="120" y="156" class="rd-mono" text-anchor="middle">180°</text>
-            </svg></div>
-            <span class="rd-k">III. The symmetry</span>
-            <h4>What goes in comes back, resolved</h4>
-            <p>Turn the mark half a revolution about its centre and it lands on itself; the two terminals are identical. One is your brief going in, the other is the finished work coming out: the same idea, carried all the way through by the agents in between.</p>
-          </article>
-          <article class="reading">
-            <div class="rd-art"><svg viewBox="0 0 240 160" role="img" aria-label="The mark inside its ring, surrounded by small dots for agents, all held within the circle">
-              <circle cx="120" cy="80" r="66" class="rd-ring"/>
-              <g id="ring-dots"></g>
-              <use href="#int" x="106" y="58" width="28" height="44" class="rd-ink"/>
-            </svg></div>
-            <span class="rd-k">IV. The ring</span>
-            <h4>One score that every player reads from</h4>
-            <p>The ring is the project: its brand kit, its tokens, its knowledge graph. Every Musician and Instrument works inside it, so no agent plays off the page, and everything they make holds together.</p>
           </article>
         </div>
       </section>
@@ -966,12 +942,6 @@ main.leaving{opacity:0}
     };
     show(reduce ? 32 : 4);
     if (!reduce) setInterval(() => { k = (k + 1) % ns.length; show(ns[k]); }, 1400);
-    const dots = document.getElementById('ring-dots'); let d = '';
-    for (let i = 0; i < 28; i++) { const a = i * 2.39996, r = 20 + 40 * Math.sqrt((i + .5) / 28);
-      const x = 120 + Math.cos(a) * r, y = 80 + Math.sin(a) * r * .92;
-      if (Math.abs(x - 120) < 16 && Math.abs(y - 80) < 26) continue;
-      d += `<circle class="rd-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i % 5 ? 2.4 : 4}"/>`; }
-    dots.innerHTML = d;
   })();
 
   /* knowledge graph illustration */

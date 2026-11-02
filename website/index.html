@@ -86,8 +86,9 @@ a{color:var(--link)}
 .band{position:relative;z-index:3;background:var(--bg);color:var(--ink);border-bottom:1px solid var(--line)}
 .band .wrap{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,5fr) minmax(0,3fr);gap:var(--s7);align-items:start;padding-block:var(--s5) var(--s6)}
 .band p{font-size:17px;line-height:27px;color:var(--ink-2);max-width:30em}
+.band-go{display:flex;flex-direction:column;align-items:flex-end;gap:var(--s3)}
 .band small{font:400 13px/20px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);justify-self:end;padding-top:4px}
-@media (max-width:900px){.band .wrap{grid-template-columns:1fr;gap:var(--s4)}.band small{justify-self:start}}
+@media (max-width:900px){.band .wrap{grid-template-columns:1fr;gap:var(--s4)}.band small{justify-self:start}.band-go{align-items:flex-start}}
 .kicker{font:400 clamp(14px,1.25vw,18px)/1.5 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
 .caret{display:inline-block;width:.6em;height:1.1em;margin-left:.12em;vertical-align:-.18em;background:var(--link);animation:blink 1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
@@ -344,7 +345,7 @@ footer a{color:#fff}
 </header>
 
 <main id="top">
-<section class="blue hero" aria-labelledby="hero-title">
+<section class="blue hero" data-view="home" aria-labelledby="hero-title">
   <div class="hero-stage">
     <div class="bg-int" aria-hidden="true"><canvas id="intc"></canvas></div>
     <div class="score-canvas" aria-hidden="true"><canvas id="score"></canvas></div>
@@ -360,12 +361,12 @@ footer a{color:#fff}
     <div class="wrap">
       <div class="kicker">An open-source agent framework for <span class="type" id="who" aria-live="off">designers</span><span class="caret" aria-hidden="true"></span></div>
       <p>Orchestra is an open-source framework that turns your AI into a studio of agents. Bring your references and a concept; the agents research, build and refine your work with you, in the tools you already use.</p>
-      <small>From references to system.</small>
+      <div class="band-go"><a class="btn btn-blue" href="#what">What is Orchestra</a><small>From references to system.</small></div>
     </div>
   </div>
 </section>
 
-<section id="what" class="sec" aria-labelledby="what-title">
+<section id="what" class="sec page" data-view="what" aria-labelledby="what-title" hidden>
   <div class="wrap">
     <div class="sec-head">
       <div><span class="num">I.</span><h2 id="what-title">What is Orchestra</h2></div>
@@ -391,7 +392,7 @@ footer a{color:#fff}
   </div>
 </section>
 
-<section id="how" class="sec" aria-labelledby="how-title">
+<section id="how" class="sec page" data-view="how" aria-labelledby="how-title" hidden>
   <div class="wrap">
     <div class="sec-head">
       <div><span class="num">II.</span><h2 id="how-title">How it works</h2></div>
@@ -475,7 +476,7 @@ footer a{color:#fff}
   </div>
 </section>
 
-<section id="brand" class="sec" aria-labelledby="brand-title">
+<section id="brand" class="sec page" data-view="brand" aria-labelledby="brand-title" hidden>
   <div class="wrap">
     <div class="sec-head">
       <div><span class="num">III.</span><h2 id="brand-title">The brand</h2></div>
@@ -544,7 +545,7 @@ footer a{color:#fff}
   </div>
 </section>
 
-<section class="blue cta" aria-labelledby="cta-title">
+<section class="blue cta" data-view="what how brand" aria-labelledby="cta-title" hidden>
   <div class="wrap">
     <div class="cta-grid">
       <h2 id="cta-title">Make it your orchestra.</h2>
@@ -597,15 +598,20 @@ footer a{color:#fff}
 
   /* the nav marks the section in view, like the app marks where you are */
   const navs = [...document.querySelectorAll('.nav a[href^="#"]')];
-  const home = document.querySelector('.top .brand'), hero = document.querySelector('.hero');
-  const spy = new IntersectionObserver(es => es.forEach(e => {
-    if (!e.isIntersecting) return;
-    const onHero = e.target === hero; // on the landing, only the logo is marked
-    home.setAttribute('aria-current', onHero ? 'page' : 'false');
-    navs.forEach(a => a.setAttribute('aria-current', !onHero && a.getAttribute('href') === '#' + e.target.id));
-  }), { rootMargin: '-40% 0px -55% 0px' });
-  spy.observe(hero);
-  navs.forEach(a => { const t = document.querySelector(a.getAttribute('href')); if (t) spy.observe(t); });
+  /* each section is its own page, addressed by the hash: #what, #how, #brand; anything else is the landing */
+  const home = document.querySelector('.top .brand'), views = [...document.querySelectorAll('[data-view]')];
+  const TITLES = { home: 'Orchestra', what: 'What is Orchestra · Orchestra', how: 'How it works · Orchestra', brand: 'The brand · Orchestra' };
+  function route() {
+    const h = location.hash.slice(1), v = h in TITLES ? h : 'home';
+    views.forEach(el => { el.hidden = !el.dataset.view.split(' ').includes(v); });
+    home.setAttribute('aria-current', v === 'home' ? 'page' : 'false');
+    navs.forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#' + v ? 'true' : 'false'));
+    document.title = TITLES[v];
+    scrollTo(0, 0);
+    dispatchEvent(new Event('resize')); // canvases and the pinned scroll re-measure in their new page
+  }
+  addEventListener('hashchange', route);
+  route();
 
   /* hero: the violin, redrawn every tick from a stream of agent-log words */
   (() => {

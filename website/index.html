@@ -255,8 +255,8 @@ footer a{color:#fff}
 .lbl > span,.lbl::after{grid-area:1/1;text-align:center}
 .lbl::after{content:attr(data-t);visibility:hidden;font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}
 .cur{font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}
-:is(.btn,.nav a,.figs button,#copy):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl > span{font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}
-:is(.btn,.nav a,.figs button,#copy):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl::after{font-family:inherit;font-style:normal;font-weight:inherit;font-size:1em}
+:is(.nav a,.figs button):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl > span{font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}
+:is(.nav a,.figs button):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl::after{font-family:inherit;font-style:normal;font-weight:inherit;font-size:1em}
 .nav a:hover{text-decoration:none}
 .nav a[aria-current="true"]{opacity:1}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -508,7 +508,7 @@ footer a{color:#fff}
       n.replaceWith(w);
     });
   };
-  document.querySelectorAll('.btn, .nav a, .figs button, #copy').forEach(label);
+  document.querySelectorAll('.nav a:not(.btn), .figs button').forEach(label);
   const setLabel = (el, t) => { const l = el.querySelector('.lbl'); if (!l) return (el.textContent = t); l.dataset.t = t; l.firstChild.textContent = t; };
 
   /* the nav marks the section in view, like the app marks where you are */

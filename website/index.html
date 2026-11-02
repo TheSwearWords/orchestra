@@ -8,7 +8,7 @@
 <meta name="description" content="Orchestra is an open-source framework for designers that turns your AI compute into an agent hierarchy, so you can research, create and refine work across mediums without the slop.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400&family=Bodoni+Moda:ital,opsz,wght@1,6..96,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&display=swap">
 <style>
 /* Layout: a blue overture with the word-built violin, then three movements of a white score — what Orchestra is, how it works, the brand — closing on a blue call to the repo. */
 :root{
@@ -16,7 +16,7 @@
   --bg:#ffffff; --bg-subtle:#f7f7f9; --bg-muted:#efeff3;
   --ink:#0b0b12; --ink-2:#575766; --ink-3:#767685;
   --line:#e1e1e8; --line-strong:#a0a0ae; --link:#0538ff; --agent-text:#0326b0; --mist-subtle:#dde3ff;
-  --f-display:"Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --f-display:"Bodoni Moda","Didot","Bodoni 72","Iowan Old Style",Georgia,serif;
   --f-body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-word:"Bodoni Moda","Didot","Bodoni 72",var(--f-display);
   --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
@@ -81,7 +81,7 @@ a{color:var(--link)}
 .hero h1{font-weight:400;line-height:.9;letter-spacing:-.02em}
 .hl{min-width:0}
 .hero h1 .a em{font-family:var(--f-word);font-style:italic;font-weight:400;font-optical-sizing:auto;letter-spacing:-.03em}
-.hero h1 .a{display:flex;align-items:baseline;gap:.24em;font:400 clamp(44px,10.4vw,168px)/1 var(--f-display);letter-spacing:-.02em;margin-top:.08em;white-space:nowrap}
+.hero h1 .a{display:flex;align-items:baseline;gap:.22em;font:400 clamp(44px,10.4vw,168px)/1 var(--f-display);letter-spacing:-.02em;margin-top:.08em;white-space:nowrap}
 .wm-inline{height:.74em;width:auto;aspect-ratio:715.391/138.354;flex:none;transform:translateY(.02em)}
 .hero h1 .b{display:block;font:400 clamp(30px,4.8vw,78px)/1 var(--f-body);letter-spacing:-.04em}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
@@ -110,7 +110,7 @@ a{color:var(--link)}
 .sec{border-bottom:1px solid var(--line)}
 .sec-head{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);padding-block:var(--s9) var(--s7);align-items:end}
 .sec-head .num{font:italic 400 20px/24px var(--f-display);color:var(--link);display:block;margin-bottom:var(--s3)}
-.sec-head h2{font-size:clamp(44px,5.6vw,76px);line-height:1;letter-spacing:-1.5px}
+.sec-head h2{font-size:clamp(40px,5vw,68px);line-height:1.04;letter-spacing:-1.5px}
 .sec-head p{font-size:19px;line-height:30px;color:var(--ink-2);max-width:34em}
 .sec-head p + p{margin-top:var(--s4)}
 @media (max-width:900px){.sec-head{grid-template-columns:1fr;gap:var(--s5);padding-block:var(--s8) var(--s6)}}
@@ -237,7 +237,7 @@ a{color:var(--link)}
 .cta > .wrap{padding-block:var(--s9)}
 .cta-grid > *{min-width:0}
 .cta-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:var(--s7);align-items:end}
-.cta h2{font-size:clamp(56px,8.4vw,120px);line-height:.96;letter-spacing:-2px}
+.cta h2{font-size:clamp(48px,7.2vw,104px);line-height:1;letter-spacing:-2px}
 .cta p{font-size:19px;line-height:30px;color:rgba(255,255,255,.9);max-width:28em}
 .clone{display:flex;align-items:stretch;margin-top:var(--s5);border:1px solid rgba(255,255,255,.5);max-width:100%}
 .clone code{flex:1;min-width:0;padding:12px 14px;font:400 13px/20px var(--f-mono);overflow-x:auto;white-space:nowrap}
@@ -253,9 +253,9 @@ footer a{color:#fff}
    reserved, so nothing shifts. */
 .lbl{display:inline-grid;line-height:1.15}
 .lbl > span,.lbl::after{grid-area:1/1;text-align:center}
-.lbl::after{content:attr(data-t);visibility:hidden;font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.3em;letter-spacing:0}
-.cur{font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.3em;letter-spacing:0}
-:is(.btn,.nav a,.figs button,#copy):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl > span{font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.3em;letter-spacing:0}
+.lbl::after{content:attr(data-t);visibility:hidden;font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}
+.cur{font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}
+:is(.btn,.nav a,.figs button,#copy):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl > span{font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}
 :is(.btn,.nav a,.figs button,#copy):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl::after{font-family:inherit;font-style:normal;font-weight:inherit;font-size:1em}
 .nav a:hover{text-decoration:none}
 .nav a[aria-current="true"]{opacity:1}
@@ -444,8 +444,7 @@ footer a{color:#fff}
       <div class="tile t-type">
         <h3>Type</h3>
         <div class="faces">
-          <div class="face"><div class="s f0"><i>One Orchestra</i>, Bodoni Moda italic</div><div class="r">wordmark · its lockups</div></div>
-          <div class="face"><div class="s f1">Instrument Serif for headlines</div><div class="r">headlines · display</div></div>
+          <div class="face"><div class="s f1">Bodoni Moda, <i>in italic for the name</i></div><div class="r">headlines · wordmark</div></div>
           <div class="face"><div class="s f2">Instrument Sans for the interface</div><div class="r">UI · labels · body</div></div>
           <div class="face"><div class="s f3">[14:02] type-agent swapped Söhne for Instrument Sans</div><div class="r">agent logs only</div></div>
         </div>
@@ -636,7 +635,7 @@ footer a{color:#fff}
   const cv = document.getElementById('graph');
   const rand = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(7);
   const P = [{ n: 'Orchestra Brand', x: .2, y: .3 }, { n: 'Forma Editorial', x: .76, y: .26 }, { n: 'Still House', x: .5, y: .8 }];
-  const S = [{ n: 'Instrument Serif', x: .47, y: .28 }, { n: '#0538FF', x: .33, y: .58 }, { n: 'modular grid', x: .65, y: .55 }];
+  const S = [{ n: 'Bodoni Moda', x: .47, y: .28 }, { n: '#0538FF', x: .33, y: .58 }, { n: 'modular grid', x: .65, y: .55 }];
   const L = []; P.forEach((p, i) => { for (let k = 0; k < 10; k++) { const a = rand() * 6.283, r = .07 + rand() * .1; L.push({ p: i, x: p.x + Math.cos(a) * r * .8, y: p.y + Math.sin(a) * r }); } });
   let vis = true;
   function draw(t) {
@@ -653,7 +652,7 @@ footer a{color:#fff}
     c.globalAlpha = 1;
     c.fillStyle = tok('--ink-3'); L.forEach(l => { const [x, y] = at(l); c.beginPath(); c.arc(x, y, 2.2, 0, 7); c.fill(); });
     S.forEach(s => { const [x, y] = at(s); c.fillStyle = tok('--link'); c.beginPath(); c.arc(x, y, 5 + pulse * 1.5, 0, 7); c.fill(); c.font = '11px "IBM Plex Mono", monospace'; c.fillText(s.n, x + 9, y + 4); });
-    P.forEach(p => { const [x, y] = at(p); c.fillStyle = tok('--ink'); c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); c.font = 'italic 17px "Instrument Serif", Georgia, serif'; c.fillText(p.n, x + 10, y - 8); });
+    P.forEach(p => { const [x, y] = at(p); c.fillStyle = tok('--ink'); c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); c.font = 'italic 16px "Bodoni Moda", Didot, Georgia, serif'; c.fillText(p.n, x + 10, y - 8); });
   }
   new IntersectionObserver(e => { vis = e[0].isIntersecting; }).observe(cv);
   const loop = t => { if (vis) draw(t); if (!reduce) requestAnimationFrame(loop); };

@@ -76,8 +76,12 @@ a{color:var(--link)}
 .headline{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:clamp(24px,5vw,96px)}
 .headline .int{width:clamp(96px,15vw,240px);height:auto;aspect-ratio:117/184;color:#eef1ff}
 .hero h1{font-weight:400;line-height:.9;letter-spacing:-.02em}
-.hero h1 .a{display:block;font:400 clamp(64px,11.8vw,190px)/.92 var(--f-display);letter-spacing:-.02em}
-.hero h1 .b{display:block;font:700 clamp(58px,10.6vw,172px)/.92 var(--f-body);letter-spacing:-.065em;margin-top:.02em}
+.hl{min-width:0}
+.hero h1 .a{display:block;font:400 clamp(52px,8.6vw,138px)/.94 var(--f-display);letter-spacing:-.02em}
+.hero h1 .b{display:block;font:700 clamp(46px,7.6vw,122px)/.96 var(--f-body);letter-spacing:-.06em;margin-top:.04em}
+.hero .actions{margin-top:var(--s6)}
+.btn-lg{padding:16px 26px;font-size:18px}
+.btn-lg svg{width:20px;height:20px}
 .hero-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--s4);flex-wrap:wrap;font:400 12px/20px var(--f-mono);color:rgba(255,255,255,.8)}
 .score-canvas{position:absolute;z-index:1;top:0;right:0;bottom:0;left:0;pointer-events:none}
 .score-canvas{overflow:hidden}
@@ -266,7 +270,8 @@ footer a{color:#fff}
     <div class="kicker">An open-source agent framework for designers</div>
     <div class="headline">
       <svg class="int" viewBox="0 0 117 184" aria-hidden="true"><use href="#int"/></svg>
-      <h1 id="hero-title"><span class="a">Many hands.</span><span class="b">One score.</span></h1>
+      <div class="hl"><h1 id="hero-title"><span class="a">Your compute.</span><span class="a">Your agents.</span><span class="b">One orchestra.</span></h1>
+        <div class="actions"><a class="btn btn-white btn-lg" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a></div></div>
     </div>
     <div class="hero-foot"><span>Orchestrator → Musicians → Instruments</span></div>
   </div>
@@ -274,11 +279,11 @@ footer a{color:#fff}
 
 <section class="strip" aria-label="Get started">
   <div class="wrap">
-    <div class="mono">Your compute.<br>Your agents.<br>One orchestra.</div>
+    <div class="mono">Many hands.<br>One score.</div>
     <p>Orchestra is an open-source framework that turns your AI into a studio of agents. Bring your references and a concept; the agents research, build and refine your work with you, in the tools you already use.</p>
     <div class="go">
-      <a class="btn btn-blue" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a>
       <small>From references to system.</small>
+      <a class="btn btn-blue" href="#how">See how it works</a>
     </div>
   </div>
 </section>

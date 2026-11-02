@@ -73,13 +73,15 @@ a{color:var(--link)}
 .hero{position:relative;overflow:hidden;isolation:isolate}
 .hero .wrap{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:space-between;gap:var(--s8);min-height:min(820px,calc(100svh - 64px));padding-block:var(--s8) var(--s7)}
 .kicker{font:400 13px/20px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.9)}
-.headline{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:clamp(24px,5vw,96px)}
-.headline .int{width:clamp(96px,15vw,240px);height:auto;aspect-ratio:117/184;color:#eef1ff}
+.headline{min-width:0}
+/* the integral as a giant tonal figure behind everything */
+.bg-int{position:absolute;z-index:0;left:2%;top:-8%;height:122%;width:auto;aspect-ratio:117/184;color:#2b5aff;pointer-events:none}
 .hero h1{font-weight:400;line-height:.9;letter-spacing:-.02em}
 .hl{min-width:0}
+.hero h1 .a em{font-style:italic}
 .hero h1 .a{display:flex;align-items:baseline;gap:.24em;font:400 clamp(44px,10.4vw,168px)/1 var(--f-display);letter-spacing:-.02em;margin-top:.08em;white-space:nowrap}
 .wm-inline{height:.74em;width:auto;aspect-ratio:715.391/138.354;flex:none;transform:translateY(.02em)}
-.hero h1 .b{display:block;font:700 clamp(30px,4.8vw,78px)/1 var(--f-body);letter-spacing:-.05em}
+.hero h1 .b{display:block;font:400 clamp(30px,4.8vw,78px)/1 var(--f-body);letter-spacing:-.04em}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
 .hero .actions{margin-top:var(--s6)}
 .hero .btn-white{border-color:#fff}
@@ -91,8 +93,7 @@ a{color:var(--link)}
 .score-canvas canvas{position:absolute;top:0;right:0}
 @media (max-width:900px){
   .hero .wrap{min-height:0;padding-block:var(--s7) var(--s6)}
-  .headline{grid-template-columns:1fr;gap:var(--s5)}
-  .headline .int{width:72px}
+  .bg-int{left:-30%;top:-6%;height:112%}
   .score-canvas{opacity:.45}
 }
 .strip{background:var(--bg-subtle);border-bottom:1px solid var(--line)}
@@ -268,12 +269,12 @@ footer a{color:#fff}
 
 <main id="top">
 <section class="blue hero" aria-labelledby="hero-title">
+  <svg class="bg-int" viewBox="0 0 117 184" aria-hidden="true"><use href="#int"/></svg>
   <div class="score-canvas" aria-hidden="true"><canvas id="score"></canvas></div>
   <div class="wrap">
     <div class="kicker">An open-source agent framework for designers</div>
     <div class="headline">
-      <svg class="int" viewBox="0 0 117 184" aria-hidden="true"><use href="#int"/></svg>
-      <div class="hl"><h1 id="hero-title"><span class="b">Your compute. Your agents.</span><span class="a">One <svg class="wm-inline" role="img" aria-label="Orchestra" viewBox="0 0 715.391 138.354"><use href="#wm"/></svg></span></h1>
+      <div class="hl"><h1 id="hero-title"><span class="b">Your compute. Your agents.</span><span class="a"><em>One</em> <svg class="wm-inline" role="img" aria-label="Orchestra" viewBox="0 0 715.391 138.354"><use href="#wm"/></svg></span></h1>
         <div class="actions"><a class="btn btn-white btn-lg" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a><a class="btn btn-line btn-lg" href="#how">How it works</a></div></div>
     </div>
     <div class="hero-foot"><span>Orchestrator → Musicians → Instruments</span></div>

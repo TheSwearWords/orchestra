@@ -251,7 +251,7 @@ footer a{color:#fff}
 /* "You are here", as in the app: hover, focus or selection switches a control's label to the
    display serif italic, a step up in size so it reads at the same weight. Both widths are
    reserved, so nothing shifts. */
-.lbl{display:inline-grid;line-height:1.15}
+.lbl{display:inline-grid;place-items:center;line-height:1.15}
 .lbl > span,.lbl::after{grid-area:1/1;text-align:center}
 .lbl::after{content:attr(data-t);visibility:hidden;font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}
 .cur{font-family:var(--f-display);font-style:italic;font-weight:400;font-size:1.2em;letter-spacing:0}

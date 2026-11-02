@@ -5,502 +5,534 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Orchestra</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Orchestra is a design studio of agents. Research, create and refine brand kits, decks, UI, motion and 3D from one project brief.">
+<meta name="description" content="Orchestra is an open-source framework for designers that turns your AI compute into an agent hierarchy, so you can research, create and refine work across mediums without the slop.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400&display=swap">
 <style>
-/* Layout: a stark blue overture, then a white score — three movements, an ensemble, and the instruments it plays. Blue marks brand fields and actions only. */
+/* Layout: a blue overture with the word-built violin, then three movements of a white score — what Orchestra is, how it works, the brand — closing on a blue call to the repo. */
 :root{
-  --blue:#0538ff; --blue-hover:#0430d9; --blue-pressed:#0326b0;
-  --mist:#b8c4ff; --mist-subtle:#dde3ff; --agent-text:#0326b0;
-  --signal:#ff5a1f; --signal-subtle:#ffe6dc; --signal-text:#b33a0e;
-  --success:#1f9d55; --success-subtle:#ddf5e6; --success-text:#13693a;
+  --blue:#0538ff; --blue-hover:#0430d9; --blue-pressed:#0326b0; --mist:#b8c4ff; --signal:#ff5a1f;
   --bg:#ffffff; --bg-subtle:#f7f7f9; --bg-muted:#efeff3;
   --ink:#0b0b12; --ink-2:#575766; --ink-3:#767685;
-  --line:#e1e1e8; --line-strong:#a0a0ae;
-  --link:#0538ff; --on-blue:#ffffff;
-  --f-display:"Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --f-body:"Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --f-mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px; --s9:96px; --s10:128px;
+  --line:#e1e1e8; --line-strong:#a0a0ae; --link:#0538ff; --agent-text:#0326b0; --mist-subtle:#dde3ff;
+  --f-display:"Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --f-body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px; --s9:96px; --s10:128px;
   --max:1240px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0b0b12; --bg-subtle:#121219; --bg-muted:#1a1a23;
-  --ink:#ffffff; --ink-2:#c9c9d3; --ink-3:#a0a0ae;
-  --line:#272732; --line-strong:#575766;
-  --link:#8a9eff; --mist-subtle:#1c2457; --agent-text:#b8c4ff;
-  --signal-subtle:#4a1805; --signal-text:#ff9c78;
-  --success-subtle:#0a3820; --success-text:#7fd3a0;
-  color-scheme:dark }}
+  --bg:#0b0b12; --bg-subtle:#121219; --bg-muted:#1a1a23; --ink:#ffffff; --ink-2:#c9c9d3; --ink-3:#a0a0ae;
+  --line:#272732; --line-strong:#575766; --link:#8a9eff; --agent-text:#b8c4ff; --mist-subtle:#1c2457; color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#0b0b12; --bg-subtle:#121219; --bg-muted:#1a1a23;
-  --ink:#ffffff; --ink-2:#c9c9d3; --ink-3:#a0a0ae;
-  --line:#272732; --line-strong:#575766;
-  --link:#8a9eff; --mist-subtle:#1c2457; --agent-text:#b8c4ff;
-  --signal-subtle:#4a1805; --signal-text:#ff9c78;
-  --success-subtle:#0a3820; --success-text:#7fd3a0;
-  color-scheme:dark }
+  --bg:#0b0b12; --bg-subtle:#121219; --bg-muted:#1a1a23; --ink:#ffffff; --ink-2:#c9c9d3; --ink-3:#a0a0ae;
+  --line:#272732; --line-strong:#575766; --link:#8a9eff; --agent-text:#b8c4ff; --mist-subtle:#1c2457; color-scheme:dark }
 
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:26px;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--blue)}
-h1,h2,h3,p{margin:0}
-h1,h2{text-wrap:balance;font-family:var(--f-display);font-weight:400}
+h1,h2,h3,p,figure{margin:0}
+h1,h2{font-family:var(--f-display);font-weight:400;text-wrap:balance}
 a{color:var(--link)}
 :focus-visible{outline:2px solid var(--blue);outline-offset:3px}
-.band-blue :focus-visible{outline-color:#fff}
+.blue :focus-visible{outline-color:#fff}
 .wrap{max-width:var(--max);margin:0 auto;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
 @media (max-width:520px){.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
 .eyebrow{font:500 12px/16px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
-.mono{font-family:var(--f-mono)}
+.blue{background:var(--blue);color:#fff}
+.blue .eyebrow{color:rgba(255,255,255,.75)}
 
-/* ---------- header ---------- */
-.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--blue);color:var(--on-blue)}
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;font:500 16px/20px var(--f-body);text-decoration:none;border:1px solid transparent;cursor:pointer;background:none;color:inherit;white-space:nowrap}
+.btn svg{width:18px;height:18px;flex:none}
+.btn-white{background:#fff;color:#0538ff}
+.btn-white:hover{background:#dde3ff;color:#0326b0}
+.btn-line{border-color:rgba(255,255,255,.7);color:#fff}
+.btn-line:hover{background:rgba(255,255,255,.12)}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-blue:hover{background:var(--blue-hover)}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--blue);color:#fff}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:var(--s5);height:64px}
 .brand{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}
 .brand svg{width:30px;height:30px;flex:none}
-.brand span{font:italic 400 28px/36px var(--f-display);letter-spacing:-.2px}
+.brand span{font:italic 400 28px/36px var(--f-display)}
 .nav{display:flex;gap:var(--s5);align-items:center}
 .nav a{color:inherit;text-decoration:none;font:500 14px/20px var(--f-body);opacity:.86}
 .nav a:hover{opacity:1;text-decoration:underline;text-underline-offset:4px}
-.pill{border:1px solid rgba(255,255,255,.55);padding:6px 12px;font:500 12px/16px var(--f-body);white-space:nowrap}
-@media (max-width:820px){.nav a:not(.keep){display:none}}
+.nav .btn{opacity:1;padding:8px 14px;font-size:14px}
+.nav .btn:hover{text-decoration:none}
+.nav .btn-white{color:#0538ff}
+.nav .btn-white:hover{color:#0326b0}
+@media (max-width:760px){.nav a:not(.btn){display:none}}
 
-/* ---------- hero ---------- */
-.band-blue{background:var(--blue);color:var(--on-blue)}
+/* hero */
 .hero{position:relative;overflow:hidden}
-.hero .wrap{position:relative;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:var(--s6);padding-block:var(--s9) var(--s8);min-height:min(760px,calc(100svh - 64px))}
-.hero-copy{display:flex;flex-direction:column;justify-content:space-between;gap:var(--s8);position:relative;z-index:2;min-width:0}
-.ring-mark{width:132px;height:132px}
-.hero h1{font-size:clamp(56px,10.5vw,148px);line-height:.92;letter-spacing:-2px}
-.hero h1 em{font-style:italic;display:block;font-size:.44em;letter-spacing:-.5px;margin-bottom:.3em;opacity:.92}
-.hero .lede{font-size:18px;line-height:28px;max-width:30em;margin-top:var(--s5);color:rgba(255,255,255,.9)}
-.hero-actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s6)}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;font:500 16px/20px var(--f-body);text-decoration:none;border:1px solid transparent;cursor:pointer;background:none;color:inherit}
-.btn-white{background:#fff;color:var(--blue)}
-.btn-white:hover{background:var(--mist-subtle);color:var(--blue-pressed)}
-:root .band-blue .btn-white:hover{background:#dde3ff}
-.btn-line{border-color:rgba(255,255,255,.7);color:#fff}
-.btn-line:hover{background:rgba(255,255,255,.12)}
-.violin{position:absolute;right:-4%;top:0;bottom:0;width:58%;z-index:1;pointer-events:none}
-.violin i{position:absolute;inset:0;background:#fff;
-  -webkit-mask:url("assets/violin.png") right top / contain no-repeat;mask:url("assets/violin.png") right top / contain no-repeat;
-  transform:translateY(calc(var(--sy,0) * -0.12px));animation:scan 2.4s steps(36) both}
+.hero .wrap{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:var(--s6);padding-block:var(--s9) var(--s8)}
+.hero-copy{display:flex;flex-direction:column;gap:var(--s8);min-width:0;position:relative;z-index:2}
+.ring-mark{width:120px;height:120px}
+.hero h1{font-size:clamp(56px,9.4vw,136px);line-height:.94;letter-spacing:-2px}
+.hero h1 em{display:block;font-size:.42em;letter-spacing:-.5px;margin-bottom:.32em}
+.lede{font-size:19px;line-height:30px;max-width:31em;margin-top:var(--s5);color:rgba(255,255,255,.92)}
+.actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s6)}
+.hero-foot{display:flex;justify-content:space-between;gap:var(--s4);flex-wrap:wrap;font:400 12px/20px var(--f-mono);color:rgba(255,255,255,.78);border-top:1px solid rgba(255,255,255,.35);padding-top:var(--s3)}
+.figure-box{position:relative;min-height:560px;container-type:size}
+.ascii{position:absolute;margin:0;font-family:var(--f-mono);white-space:pre;line-height:1;letter-spacing:0;color:#fff;user-select:none;pointer-events:none}
+.hero .ascii{right:0;bottom:0;font-size:calc(100cqh / 96)}
+.hero .ascii span{display:inline}
+.hero .ascii.reveal{animation:scan 2.2s steps(32) both}
 @keyframes scan{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
-.hero-foot{display:flex;justify-content:space-between;gap:var(--s5);flex-wrap:wrap;font:400 12px/20px var(--f-mono);color:rgba(255,255,255,.78);border-top:1px solid rgba(255,255,255,.35);padding-top:var(--s3)}
-@media (max-width:860px){
-  .hero .wrap{grid-template-columns:1fr;min-height:0;padding-block:var(--s8) var(--s6)}
-  .violin{width:92%;right:-34%;opacity:.38}
-  .ring-mark{width:96px;height:96px}
+@media (max-width:900px){
+  .hero .wrap{grid-template-columns:1fr;padding-block:var(--s8) var(--s6)}
+  .figure-box{position:absolute;right:-10%;top:0;bottom:0;width:70%;min-height:0;opacity:.32}
+  .ring-mark{width:88px;height:88px}
 }
 
-/* ---------- tagline strip ---------- */
-.overture{border-bottom:1px solid var(--line)}
-.overture .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--s7);padding-block:var(--s9)}
-.overture h2{font-size:clamp(40px,5.4vw,72px);line-height:1.05;letter-spacing:-1px}
-.overture p{font-size:18px;line-height:28px;color:var(--ink-2);max-width:34em}
-.overture p + p{margin-top:var(--s4)}
-@media (max-width:860px){.overture .wrap{grid-template-columns:1fr;gap:var(--s5);padding-block:var(--s8)}}
+/* section frame */
+.sec{border-bottom:1px solid var(--line)}
+.sec-head{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);padding-block:var(--s9) var(--s7);align-items:end}
+.sec-head .num{font:italic 400 20px/24px var(--f-display);color:var(--link);display:block;margin-bottom:var(--s3)}
+.sec-head h2{font-size:clamp(44px,5.6vw,76px);line-height:1;letter-spacing:-1.5px}
+.sec-head p{font-size:19px;line-height:30px;color:var(--ink-2);max-width:34em}
+.sec-head p + p{margin-top:var(--s4)}
+@media (max-width:900px){.sec-head{grid-template-columns:1fr;gap:var(--s5);padding-block:var(--s8) var(--s6)}}
 
-/* ---------- movements ---------- */
-.sec-head{display:flex;justify-content:space-between;align-items:end;gap:var(--s5);flex-wrap:wrap;padding-block:var(--s9) var(--s7)}
-.sec-head h2{font-size:clamp(36px,4.4vw,56px);line-height:1.1;letter-spacing:-1px;max-width:14em}
-.sec-head p{max-width:28em;color:var(--ink-2)}
-.movements{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s8);padding-bottom:var(--s10)}
-.steps{display:flex;flex-direction:column}
-.step{padding-block:var(--s6) var(--s8);border-top:1px solid var(--line);min-height:62vh;transition:opacity .3s}
-.step:last-child{min-height:0}
-.step .num{font:italic 400 44px/52px var(--f-display);color:var(--blue)}
-:root .step .num{color:var(--link)}
-.step h3{font:600 22px/30px var(--f-body);letter-spacing:-.5px;margin-top:var(--s2)}
-.step p{color:var(--ink-2);margin-top:var(--s3);max-width:30em}
-.step ul{list-style:none;padding:0;margin:var(--s5) 0 0;display:flex;flex-direction:column;gap:var(--s2)}
-.step li{display:flex;gap:var(--s3);font-size:15px;line-height:22px}
-.step li::before{content:"";flex:none;width:6px;height:6px;margin-top:8px;background:var(--blue)}
-.step .shot-inline{display:none;margin-top:var(--s5)}
-.stage{position:sticky;top:96px;align-self:start}
-.frame{border:1px solid var(--line);background:var(--bg-subtle);overflow:hidden}
-.frame-bar{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:10px 14px;border-bottom:1px solid var(--line);font:400 12px/16px var(--f-mono);color:var(--ink-3)}
-.frame-bar b{font-weight:400;color:var(--ink)}
-.frame-dots{display:flex;gap:6px}.frame-dots span{width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
-.frame-view{position:relative;aspect-ratio:1200/1184;max-width:100%;background:#fff}
-.frame-view img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top left;opacity:0;transition:opacity .45s ease}
-.frame-view img.on{opacity:1}
-.stage-cap{display:flex;gap:var(--s2);margin-top:var(--s3);flex-wrap:wrap}
-.stage-cap button{font:500 12px/16px var(--f-body);padding:6px 10px;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);cursor:pointer}
-.stage-cap button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
-@media (max-width:960px){
-  .movements{grid-template-columns:1fr;gap:0;padding-bottom:var(--s8)}
-  .stage{display:none}
-  .step{min-height:0;padding-bottom:var(--s7)}
-  .step .shot-inline{display:block}
-  .step .shot-inline img{display:block;width:100%;height:auto;border:1px solid var(--line)}
-}
+/* 1 · what */
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--ink)}
+.fact{padding:var(--s5) var(--s5) var(--s6) 0;border-right:1px solid var(--line)}
+.fact + .fact{padding-left:var(--s5)}
+.fact:last-child{border-right:0}
+.fact h3{font:400 30px/36px var(--f-display)}
+.fact p{color:var(--ink-2);margin-top:var(--s3);max-width:24em}
+@media (max-width:860px){.facts{grid-template-columns:1fr}.fact,.fact+.fact{padding-left:0;border-right:0;border-bottom:1px solid var(--line)}}
+.hier{margin-block:var(--s9);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);align-items:start}
+.hier h3{font:400 clamp(32px,3.4vw,44px)/1.1 var(--f-display);letter-spacing:-.5px}
+.hier > div > p{color:var(--ink-2);margin-top:var(--s4);max-width:30em}
+.chain{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.chain li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:var(--s4);padding:var(--s4) 0;border-top:1px solid var(--line)}
+.chain li:last-child{border-bottom:1px solid var(--line)}
+.dot{width:36px;height:36px;border-radius:50%;display:grid;place-items:center}
+.dot.o{background:var(--blue);color:#fff}
+.dot.o svg{width:22px;height:22px}
+.dot.m{border:1.5px solid var(--link);color:var(--link)}
+.dot.m svg{width:14px;height:14px}
+.dot.i{width:14px;height:14px;margin:11px;border:1.5px solid var(--ink)}
+.chain b{display:block;font:400 26px/30px var(--f-display)}
+.chain b small{font:400 12px/16px var(--f-mono);color:var(--ink-3);margin-left:8px}
+.chain span{display:block;color:var(--ink-2);margin-top:4px}
+.chain .l2{padding-left:28px}.chain .l3{padding-left:56px}
+@media (max-width:900px){.hier{grid-template-columns:1fr;margin-block:var(--s8)}.chain .l2{padding-left:14px}.chain .l3{padding-left:28px}}
 
-/* ---------- the score (deliverables) ---------- */
-.score-sec{background:var(--bg-subtle);border-block:1px solid var(--line)}
-.score-grid{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:var(--s7);padding-bottom:var(--s9)}
-.picker{display:flex;flex-direction:column;gap:var(--s2)}
-.pick{display:flex;align-items:flex-start;gap:var(--s3);padding:14px 16px;background:var(--bg);border:1px solid var(--line);cursor:pointer;text-align:left;color:inherit;font:inherit;width:100%}
-.pick:hover{border-color:var(--line-strong)}
-.pick .box{flex:none;width:18px;height:18px;border:1.5px solid var(--line-strong);margin-top:3px;display:grid;place-items:center}
-.pick[aria-checked="true"] .box{background:var(--blue);border-color:var(--blue)}
-.pick[aria-checked="true"] .box::after{content:"";width:9px;height:5px;border:2px solid #fff;border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
-.pick .t{font-weight:500}
-.pick .d{display:block;font-size:13px;line-height:18px;color:var(--ink-3);margin-top:2px}
-.pick .req{display:inline-block;font:500 11px/14px var(--f-body);color:var(--agent-text);background:var(--mist-subtle);padding:2px 6px;margin-left:6px;vertical-align:1px}
-.pick[data-locked="true"]{cursor:default}
-.pick[data-locked="true"] .box{background:var(--mist);border-color:var(--mist)}
-.score{background:var(--bg);border:1px solid var(--line);min-width:0}
-.score-head{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s4);flex-wrap:wrap;padding:var(--s5) var(--s5) var(--s4);border-bottom:1px solid var(--line)}
-.score-head h3{font:400 28px/36px var(--f-display)}
-.score-head span{font:400 12px/18px var(--f-mono);color:var(--ink-3)}
-.score-scroll{overflow-x:auto}
-.staves{min-width:620px;padding:var(--s4) var(--s5) var(--s5)}
-.bars{display:grid;grid-template-columns:150px repeat(3,minmax(0,1fr));font:500 12px/16px var(--f-body);color:var(--ink-3);padding-bottom:var(--s2)}
-.bars span{padding-left:10px}
-.stave{display:grid;grid-template-columns:150px repeat(3,minmax(0,1fr));align-items:center;height:56px;position:relative}
-.stave .inst{font:italic 400 20px/24px var(--f-display);padding-right:var(--s3)}
-.stave .inst small{display:block;font:400 11px/14px var(--f-mono);font-style:normal;color:var(--ink-3)}
-.stave .cell{position:relative;height:100%;border-left:1px solid var(--line-strong);
-  background:repeating-linear-gradient(to bottom,transparent 0 13px,var(--line) 13px 14px) center/100% 56px no-repeat}
-.stave .cell:last-child{border-right:2px solid var(--ink)}
-.note{position:absolute;top:50%;height:18px;transform:translateY(-50%);background:var(--blue);display:flex;align-items:center;padding:0 8px;color:#fff;font:400 11px/14px var(--f-mono);white-space:nowrap;overflow:hidden}
-.note.rest{background:transparent;color:var(--ink-3);padding:0 10px}
-.note.wait{background:var(--mist);color:#0326b0}
-.stave[hidden]{display:none!important}
-.stave.enter .note{animation:play .6s cubic-bezier(.2,.7,.2,1) both}
-@keyframes play{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
-.score-empty{padding:var(--s6) var(--s5);color:var(--ink-3)}
-.score-foot{display:flex;justify-content:space-between;gap:var(--s4);flex-wrap:wrap;padding:var(--s4) var(--s5);border-top:1px solid var(--line);font:400 12px/18px var(--f-mono);color:var(--ink-2)}
-@media (max-width:960px){.score-grid{grid-template-columns:1fr}}
+/* screenshots */
+.shot{border:1px solid var(--line);background:var(--bg-subtle);overflow:hidden;max-width:100%}
+.shot-bar{display:flex;align-items:center;gap:var(--s3);padding:9px 12px;border-bottom:1px solid var(--line);font:400 12px/16px var(--f-mono);color:var(--ink-3)}
+.shot-bar i{display:flex;gap:6px}.shot-bar i b{width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
+.shot-bar span{margin-left:auto}
+.shot img{display:block;width:100%;height:auto;aspect-ratio:16/10}
+.shot figcaption{padding:10px 12px;font:400 12px/18px var(--f-mono);color:var(--ink-3);border-top:1px solid var(--line);background:var(--bg)}
 
-/* ---------- ensemble ---------- */
-.ensemble .wrap{padding-block:var(--s9)}
-.ens-grid{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,6fr);gap:var(--s7);margin-top:var(--s7)}
-.ens-grid h2{font-size:clamp(40px,5vw,64px);line-height:1.05;letter-spacing:-1px}
-.ens-grid > div > p{font-size:18px;line-height:28px;color:rgba(255,255,255,.88);margin-top:var(--s5);max-width:30em}
-.tree{list-style:none;margin:var(--s6) 0 0;padding:0;font:400 14px/22px var(--f-mono);color:#fff}
-.tree li{padding:8px 0 8px 0;border-top:1px solid rgba(255,255,255,.28);display:flex;justify-content:space-between;gap:var(--s4)}
-.tree li span:last-child{color:rgba(255,255,255,.72)}
-.tree .l1{padding-left:20px}.tree .l2{padding-left:44px}
-.log{background:#0b0b12;color:#e1e1e8;border:1px solid rgba(255,255,255,.2);min-width:0;display:flex;flex-direction:column}
-.log-head{display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #272732;font:500 12px/16px var(--f-body);color:#a0a0ae}
-.log-head .live{display:inline-flex;align-items:center;gap:6px;color:#b8c4ff}
-.log-head .live::before{content:"";width:7px;height:7px;border-radius:50%;background:#5a75ff;animation:pulse 1.6s ease-in-out infinite}
-@keyframes pulse{50%{opacity:.3}}
-.log-body{padding:12px 16px;height:360px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;font:400 13px/21px var(--f-mono)}
-.log-body div{white-space:pre-wrap;word-break:break-word}
-.log-body .t{color:#767685}.log-body .who{color:#b8c4ff}.log-body .sig{color:#ff9c78}
-.decide{border-top:1px solid #272732;padding:16px;background:#121219}
-.decide .q{display:flex;gap:10px;align-items:flex-start;color:#fff;font:500 15px/22px var(--f-body)}
-.decide .q::before{content:"";flex:none;width:10px;height:10px;margin-top:6px;background:var(--signal)}
-.decide p{font:400 13px/20px var(--f-body);color:#a0a0ae;margin:4px 0 12px 20px}
-.decide .acts{display:flex;gap:8px;flex-wrap:wrap;margin-left:20px}
-.decide button{font:500 13px/18px var(--f-body);padding:8px 12px;border:1px solid #575766;background:transparent;color:#fff;cursor:pointer}
-.decide button:hover{border-color:#fff}
-.decide button.pri{background:var(--signal);border-color:var(--signal);color:#0b0b12}
-.decide button.pri:hover{background:#e04812;border-color:#e04812}
-.decide .done{margin-left:20px;font:400 13px/20px var(--f-mono);color:#7fd3a0}
-@media (max-width:960px){.ens-grid{grid-template-columns:1fr}}
-
-/* ---------- voice principles ---------- */
-.principles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-top:1px solid var(--line);margin-bottom:var(--s9)}
-.principle{padding:var(--s6) var(--s5) var(--s6) 0;border-right:1px solid var(--line)}
-.principle + .principle{padding-left:var(--s5)}
-.principle:last-child{border-right:0}
-.principle h3{font:400 28px/36px var(--f-display)}
-.principle p{color:var(--ink-2);margin-top:var(--s3)}
-.principle .ex{margin-top:var(--s5);padding:12px 14px;background:var(--bg-subtle);border-left:2px solid var(--blue);font-size:14px;line-height:22px}
-.principle .ex.mono{font-size:13px;border-color:var(--mist)}
-.principle .ex.sig{border-color:var(--signal)}
-.principle .ex s{color:var(--ink-3)}
-@media (max-width:900px){.principles{grid-template-columns:1fr}.principle,.principle + .principle{border-right:0;border-bottom:1px solid var(--line);padding-left:0;padding-right:0}}
-
-/* ---------- instruments ---------- */
-.inst-sec{border-top:1px solid var(--line)}
-.inst-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--ink);margin-bottom:var(--s9)}
-.inst{padding:var(--s5) var(--s4) var(--s6) 0;border-bottom:1px solid var(--line)}
-.inst h3{font:400 28px/36px var(--f-display)}
-.inst .role{font:400 12px/18px var(--f-mono);color:var(--agent-text);margin-top:2px}
-.inst p{font-size:14px;line-height:22px;color:var(--ink-2);margin-top:var(--s3);max-width:22em}
-@media (max-width:1000px){.inst-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:520px){.inst-list{grid-template-columns:1fr}}
-
-/* ---------- memory ---------- */
-.memory{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);align-items:center;padding-bottom:var(--s9)}
-.memory h2{font-size:clamp(36px,4.4vw,56px);line-height:1.1;letter-spacing:-1px}
-.memory > div > p{color:var(--ink-2);font-size:18px;line-height:28px;margin-top:var(--s4);max-width:30em}
-.mem-list{list-style:none;padding:0;margin:var(--s5) 0 0;display:grid;gap:var(--s2)}
-.mem-list li{display:grid;grid-template-columns:120px minmax(0,1fr);gap:var(--s3);font-size:14px;line-height:22px;padding-top:var(--s2);border-top:1px solid var(--line)}
-.mem-list b{font:400 12px/22px var(--f-mono);color:var(--ink-3)}
-.graph{border:1px solid var(--line);background:var(--bg-subtle);aspect-ratio:7/5;max-width:100%;position:relative}
+/* 2 · how */
+.mv{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:var(--s7);padding-block:var(--s8);border-top:1px solid var(--line);align-items:start}
+.mv:first-of-type{border-top:1px solid var(--ink)}
+.mv-text{position:sticky;top:96px;min-width:0}
+.mv .n{font:italic 400 56px/56px var(--f-display);color:var(--link)}
+.mv h3{font:600 26px/32px var(--f-body);letter-spacing:-.5px;margin-top:var(--s3)}
+.mv p{color:var(--ink-2);margin-top:var(--s3);font-size:17px;line-height:28px}
+.mv ul{list-style:none;padding:0;margin:var(--s5) 0 0;display:grid;gap:var(--s2)}
+.mv li{display:flex;gap:var(--s3);font-size:15px;line-height:22px}
+.mv li::before{content:"";flex:none;width:6px;height:6px;margin-top:8px;background:var(--blue)}
+.tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:var(--s5)}
+.tools span{font:400 12px/16px var(--f-mono);padding:6px 9px;border:1px solid var(--line);color:var(--ink-2)}
+.mv-media{display:grid;gap:var(--s4);min-width:0}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4)}
+@media (max-width:960px){.mv{grid-template-columns:1fr;gap:var(--s5);padding-block:var(--s7)}.mv-text{position:static}.pair{grid-template-columns:1fr}}
+.graph{position:relative;aspect-ratio:16/10;max-width:100%;border:1px solid var(--line);background:var(--bg-subtle)}
 .graph canvas{position:absolute;inset:0;width:100%;height:100%}
 .graph figcaption{position:absolute;left:12px;bottom:10px;font:400 11px/16px var(--f-mono);color:var(--ink-3)}
-@media (max-width:900px){.memory{grid-template-columns:1fr}}
+.how-end{padding-bottom:var(--s9)}
 
-/* ---------- coda ---------- */
-.coda .wrap{padding-block:var(--s9)}
-.coda-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:var(--s7);align-items:end}
-.coda h2{font-size:clamp(52px,8vw,112px);line-height:.98;letter-spacing:-2px}
-.coda p{font-size:18px;line-height:28px;color:rgba(255,255,255,.9);max-width:28em}
-.coda .next{margin-top:var(--s7);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid rgba(255,255,255,.4)}
-.coda .next div{padding:var(--s4) var(--s4) 0 0}
-.coda .next b{display:block;font:400 12px/18px var(--f-mono);color:rgba(255,255,255,.7)}
-.coda .next span{display:block;margin-top:4px;font-size:15px;line-height:22px}
+/* 3 · brand */
+.b-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--s4)}
+.tile{border:1px solid var(--line);padding:var(--s5);min-width:0;display:flex;flex-direction:column;gap:var(--s4)}
+.tile h3{font:500 12px/16px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.tile p{color:var(--ink-2);font-size:15px;line-height:24px}
+.t-mark{grid-column:span 5;background:var(--blue);border-color:var(--blue);color:#fff}
+.t-mark h3{color:rgba(255,255,255,.75)}
+.t-mark p{color:rgba(255,255,255,.88)}
+.t-mark .big{display:grid;place-items:center;padding-block:var(--s6)}
+.t-mark .big svg{width:min(260px,70%);height:auto;aspect-ratio:1}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font:400 12px/18px var(--f-mono);color:rgba(255,255,255,.85);border-top:1px solid rgba(255,255,255,.35);padding-top:var(--s3)}
+.spec dt{color:rgba(255,255,255,.62)}.spec dd{margin:0}
+.t-word{grid-column:span 7;justify-content:space-between}
+.t-word .w{font:italic 400 clamp(72px,10vw,150px)/1 var(--f-display);letter-spacing:-2px;padding-block:var(--s5)}
+.t-word .tag{font:400 clamp(28px,3vw,40px)/1.1 var(--f-display)}
+.t-color{grid-column:span 12}
+.swatches{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid var(--line)}
+.sw{min-height:180px;padding:var(--s4);display:flex;flex-direction:column;justify-content:flex-end;gap:2px;font:400 12px/18px var(--f-mono)}
+.sw b{font:400 24px/28px var(--f-display)}
+.sw.blue{background:#0538ff;color:#fff}.sw.ink{background:#0b0b12;color:#fff}.sw.white{background:#fff;color:#0b0b12;border-left:1px solid #e1e1e8}
+.sw.mist{background:#b8c4ff;color:#0b0b12}.sw.signal{background:#ff5a1f;color:#0b0b12}
+@media (max-width:760px){.swatches{grid-template-columns:1fr 1fr}.sw{min-height:120px}}
+.t-type{grid-column:span 7}
+.faces{display:grid;gap:0}
+.face{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:var(--s4);align-items:baseline;padding-block:var(--s4);border-top:1px solid var(--line)}
+.face .s{min-width:0;overflow-wrap:anywhere}
+.face .r{font:400 12px/18px var(--f-mono);color:var(--ink-3)}
+.f1{font:400 44px/1.05 var(--f-display);letter-spacing:-.5px}
+.f2{font:500 22px/1.3 var(--f-body)}
+.f3{font:400 15px/1.5 var(--f-mono)}
+@media (max-width:520px){.face{grid-template-columns:1fr}}
+.scale{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;margin:0;border-top:1px solid var(--line);padding-top:var(--s4)}
+.scale dt{font:500 12px/16px var(--f-body);color:var(--ink-3);grid-row:1}
+.scale dd{margin:4px 0 0;font:400 13px/18px var(--f-mono);font-variant-numeric:tabular-nums;grid-row:2}
+@media (max-width:640px){.scale{grid-template-columns:auto 1fr;column-gap:16px}.scale dt,.scale dd{grid-row:auto;margin:0}}
+.t-img{grid-column:span 5;padding:0;overflow:hidden}
+.t-img .pane{position:relative;height:360px;background:var(--bg-subtle);container-type:size;overflow:hidden}
+.t-img .ascii{color:var(--ink);font-size:calc(100cqh / 100);right:0;bottom:0}
+.t-img .cap{padding:var(--s5);display:flex;flex-direction:column;gap:var(--s3)}
+.figs{display:flex;gap:6px;flex-wrap:wrap}
+.figs button{font:500 12px/16px var(--f-body);padding:6px 10px;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);cursor:pointer}
+.figs button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+.credit{font:400 12px/18px var(--f-mono);color:var(--ink-3)}
+.t-voice{grid-column:span 12;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s5)}
+.t-voice > h3{grid-column:1/-1}
+.v b{display:block;font:400 26px/32px var(--f-display)}
+.v p{margin-top:var(--s2)}
+.v code{display:block;margin-top:var(--s3);padding:10px 12px;background:var(--bg-subtle);border-left:2px solid var(--blue);font:400 13px/20px var(--f-mono);color:var(--ink)}
+.v code.sig{border-color:var(--signal)}
+@media (max-width:960px){.t-mark,.t-word,.t-type,.t-img{grid-column:span 12}.t-voice{grid-template-columns:1fr}}
+.brand-end{padding-bottom:var(--s9)}
+
+/* cta */
+.cta > .wrap{padding-block:var(--s9)}
+.cta-grid > *{min-width:0}
+.cta-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:var(--s7);align-items:end}
+.cta h2{font-size:clamp(56px,8.4vw,120px);line-height:.96;letter-spacing:-2px}
+.cta p{font-size:19px;line-height:30px;color:rgba(255,255,255,.9);max-width:28em}
+.clone{display:flex;align-items:stretch;margin-top:var(--s5);border:1px solid rgba(255,255,255,.5);max-width:100%}
+.clone code{flex:1;min-width:0;padding:12px 14px;font:400 13px/20px var(--f-mono);overflow-x:auto;white-space:nowrap}
+.clone button{flex:none;border:0;border-left:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;font:500 13px/18px var(--f-body);padding:0 14px;cursor:pointer}
+.clone button:hover{background:rgba(255,255,255,.12)}
+@media (max-width:860px){.cta-grid{grid-template-columns:1fr}}
 footer{border-top:1px solid rgba(255,255,255,.35)}
 footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:var(--s4);flex-wrap:wrap;padding-block:var(--s5);font:400 12px/18px var(--f-mono);color:rgba(255,255,255,.8)}
-@media (max-width:860px){.coda-grid{grid-template-columns:1fr}.coda .next{grid-template-columns:1fr}}
+footer a{color:#fff}
 
-@media (prefers-reduced-motion:reduce){
-  html{scroll-behavior:auto}
-  *,*::before,*::after{animation:none!important;transition:none!important}
-  .violin i{transform:none}
-}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="int" viewBox="0 0 117 184"><path fill="currentColor" d="M50.4918 92C54.1458 48.6789 57.1354 0 93.0112 0C104.97 0 117 10.0025 117 19.8448C117 35.6265 95.076 35.6265 95.076 19.8448C95.076 14.3369 100.319 11.3362 96.6652 7.6686C88.3606 -0.666835 79.0595 13.6701 75.0733 29.3407C71.0871 45.0113 68.5013 68.3505 66.5082 92C62.8542 135.321 59.8646 184 23.9888 184C12.0303 184 0 173.997 0 164.155C0 148.374 21.9241 148.374 21.9241 164.155C21.9241 169.663 16.6808 172.664 20.3348 176.331C28.6394 184.667 37.9405 170.33 41.9267 154.659C45.9129 138.989 48.4987 115.649 50.4918 92Z"/></symbol>
   <symbol id="mark" viewBox="0 0 300 300"><circle cx="150" cy="150" r="147.5" fill="none" stroke="currentColor" stroke-width="5"/><use href="#int" x="91.5" y="58" width="117" height="184"/></symbol>
+  <symbol id="gh" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></symbol>
 </svg>
 
 <header class="top">
   <div class="wrap">
     <a class="brand" href="#top" aria-label="Orchestra home"><svg aria-hidden="true"><use href="#mark"/></svg><span>Orchestra</span></a>
     <nav class="nav" aria-label="Sections">
-      <a href="#movements">How it works</a>
-      <a href="#score">Deliverables</a>
-      <a href="#ensemble">Agents</a>
-      <a href="#instruments">Tools</a>
-      <span class="pill keep">In development</span>
+      <a href="#what">What is Orchestra</a>
+      <a href="#how">How it works</a>
+      <a href="#brand">The brand</a>
+      <a class="btn btn-white" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a>
     </nav>
   </div>
 </header>
 
 <main id="top">
-<section class="band-blue hero" aria-labelledby="hero-title">
-  <div class="violin" aria-hidden="true"><i></i></div>
+<section class="blue hero" aria-labelledby="hero-title">
   <div class="wrap">
     <div class="hero-copy">
       <svg class="ring-mark" role="img" aria-label="The Orchestra mark: an integral sign inside a ring"><use href="#mark"/></svg>
       <div>
         <h1 id="hero-title"><em>Orchestra</em>Many hands. One&nbsp;score.</h1>
-        <p class="lede">A design studio of agents: research, create, refine. Give it one brief and it plans the brand kit, deck, interface, motion and 3D renders, then asks you whenever taste is on the line.</p>
-        <div class="hero-actions">
-          <a class="btn btn-white" href="#movements">See how it works</a>
-          <a class="btn btn-line" href="#score">Build a score</a>
+        <p class="lede">An open-source framework for designers that turns your AI compute into an agent hierarchy. Research, create and refine across brand, slides, UI, motion and 3D, faster and without the slop.</p>
+        <div class="actions">
+          <a class="btn btn-white" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a>
+          <a class="btn btn-line" href="#how">How it works</a>
         </div>
       </div>
-      <div class="hero-foot"><span>∫ many parts, summed into one</span><span>Figma · Blender · Fusion · ElevenLabs</span></div>
+      <div class="hero-foot"><span>Open source · bring your own compute</span><span>violin.txt · built from agent-log words</span></div>
     </div>
+    <div class="figure-box" aria-hidden="true"><pre class="ascii reveal" id="violin">                                                           
+                            sca                            
+                            nne                            
+                          r.read                           
+                        .8.of.8.re                         
+                         ferences.                         
+                          ..colo                           
+                              r                            
+                    .d     r   aft ed.a.                   
+                  palet   te   .    fro                    
+                  m.#05 38FF  ..                           
+                  .type   .p   a                           
+                          us   e     d:.                   
+                          So   h    ne.ne                  
+                          ed    s.a .lice                  
+                  nce     .         ..orc                  
+                 hestr  ato  r.wa                          
+                 iting   .o  n.1.                          
+                  dec                                      
+                                                           
+                           ision                           
+                           ...la                           
+                           yout.                           
+                           queue                           
+                           d...a                           
+                           sset-                           
+                           b uil                           
+                           d er.                           
+                           q ueu                           
+                           ed...                           
+                           many.                           
+                           hands                           
+                           .one.                           
+                           score                           
+                           ...sc                           
+                           anner                           
+                          .rea d.                          
+                          8.of .8                          
+                          .refere                          
+                          nces...                          
+                          color.d                          
+                          r af t                           
+                     ed.a . pale  tt                       
+                e.from.#0 538FF.. .type.pa                 
+              used:.Sohne.needs.a .licence...              
+            orchestrator.waiting. on.1.decision            
+           ...layout.queued...ass et-builder.que           
+         ued...many.hands.one.sco re...scanner.re          
+        ad.8.of.8.references...co lor.drafted.a.pa         
+        lette.from.#0538FF...type .paused:.Sohne.ne        
+       eds.a.licence...o rchestrator.waiting.on.1.de       
+       cision...layout.q ueued... asset-builder.queu       
+       ed...many.hands.o ne .scor e...scanner.read.8       
+       .of.8.references. ..color.drafted.a.palette.f       
+       rom.#0538FF...typ e.paused:.Sohne.needs.a.lic       
+       ence...orchestrat or.waiting.on.1.decision...       
+       layout.queued...a sset-builder.queued...many.       
+        hands.one.score...scanner.read.8.of.8.refer        
+        ences...color.draft ed .a .palette.from.#0         
+        538FF...type.pau se d: .S ohne.needs.a.lic         
+         ence...orchestr at or.waiting.on.1.decisi         
+        on...layout.queu ed ...asset-builder.queue         
+        d...many.hands.o ne .score...scanner.read.         
+            8.of.8.refer en ces...color.drafte             
+             d.a.palette .f rom.#0538FF...typ              
+              e.paused:. So hne.needs.a.licen              
+              ce...orche st rat or.waiting.on              
+               .1.decision. ..l ayout.queued.              
+               ..asset-builder.queued...many.              
+               hands.on e.s core.. .scanner.r              
+               ead.8.of .8. refere  nc  es...              
+              color .dr aft ed.a.p alette.fro              
+              m.#05 38FF... type.p aused:.Sohn             
+             e.needs.a.licence...o rchestrator             
+             .waiti ng.on.1.decisi on.. .layout            
+            .queued ... asset-buil der. queued..           
+           .many.hands.one. score...scanner.read.          
+     8.of.8.references...co lo  r.drafted.a.palette.fr     
+     om.#0538FF... type.pau sed:.Sohne.needs. a.licenc     
+     e...orchestra tor.wait ing.on.1.deci sion...layou     
+     t.queued...asset-build er.queued...many.hands.one     
+     .score...scanner.read.8.of.8.references...color.dr    
+    afted.a.palette.from.#0538FF...type.paused:.Sohne.n    
+    eeds.a.licence...orchestrator.waiting.on.1.decision.   
+   ..layout.queued...asset-b uild er.queued...many.hands.  
+   one.score...scanner.re ad.8.of.8.references...color.dr  
+  afted.a.palette.from.#0538FF...type.paused:.Sohne.needs  
+  .a.licence...orchestrator.waiting.on.1.decision...layout 
+  .queued...asset-builder.queued...many.hands.one.score... 
+  scanner.read.8.of.8.references...color.drafted.a.palette 
+  .from.#0538FF...type.paused:.Sohne.needs.a.licence...orc 
+  hestrator.waiting.on.1.decision...layout.queued...asset  
+   -builder.queued...many.hands.one.score...scanner.read.  
+   8.of.8.references...color.drafted.a.palette.from.#053   
+    8FF...type.paused:.Sohne.needs.a.licence...orchestr    
+     ator.waiting.on.1.decision...layout.queued...asse</pre></div>
   </div>
 </section>
 
-<section class="overture">
-  <div class="wrap">
-    <h2>The project is the score. The agents are the players.</h2>
-    <div>
-      <p>Freelance design work spans a dozen tools: Figma for identity and UI, Blender and Fusion for models, a motion tool for the trailer, a voice tool for the narration. Each one now has an MCP server, so an agent can drive it directly.</p>
-      <p>Orchestra puts a conductor over all of them. The Orchestrator reads your concept and references and hands each deliverable to a Musician. Each Musician plays the Instruments it needs, one per prerequisite, and every Instrument builds from the same foundations, so the deck, the app screens and the renders read as one piece of work.</p>
-    </div>
-  </div>
-</section>
-
-<section id="movements" aria-labelledby="mv-title">
+<section id="what" class="sec" aria-labelledby="what-title">
   <div class="wrap">
     <div class="sec-head">
-      <h2 id="mv-title">Three movements, every project</h2>
-      <p>Each project moves through Research, Create and Refine. Refine can send work back to Create, as often as it takes.</p>
-    </div>
-    <div class="movements">
-      <div class="steps">
-        <article class="step" data-shot="0">
-          <div class="num">I.</div>
-          <h3>Research</h3>
-          <p>Start with a name, a client and a goal. Pull references from Are.na, Cosmos, Savee, designreviewed and Fonts In Use, or drop in your own files, and note what you like about each one.</p>
-          <ul>
-            <li>Every reference is tagged inspiration or usable asset, so licensing never gets lost</li>
-            <li>A reference scanner extracts palette, type, mood and composition from each image</li>
-            <li>Choose the foundations to generate first: palette, type styles, spacing, grid, components</li>
-          </ul>
-          <div class="shot-inline"><img src="assets/research.webp" alt="Orchestra Research tab for the Hermes Rebrand project, showing reference sites, a table of six reference links and uploaded reference files" loading="lazy" width="1200" height="1184"></div>
-        </article>
-        <article class="step" data-shot="1">
-          <div class="num">II.</div>
-          <h3>Create</h3>
-          <p>Talk to the Orchestrator in plain language. It dispatches Musicians and their Instruments, shows live status for each, and previews the Figma frames as they land.</p>
-          <ul>
-            <li>Shared foundations are built once, then handed to every Musician</li>
-            <li>The project design system rides along on every request, shown as a pinned “Using: design system v1” chip</li>
-            <li>Tokens are written once as tokens.json and a project SKILL.md, the same source for Figma, code and agents</li>
-                      </ul>
-          <div class="shot-inline"><img src="assets/create.webp" alt="Orchestra Create tab: a chat with the orchestrator, a live agent status panel, a desktop hero preview and a list of created files" loading="lazy" width="1100" height="1200"></div>
-        </article>
-        <article class="step" data-shot="2">
-          <div class="num">III.</div>
-          <h3>Refine</h3>
-          <p>Run the audit suite on selected frames or the whole file. Spacing, grid, type scale, contrast and AI-slop checks come back as a scored report with specific fixes.</p>
-          <ul>
-            <li>Stress tests for long names and numeric edge cases, before a client finds them</li>
-            <li>Pick the fixes you agree with and send them back to Create; your original frames stay intact</li>
-            <li>Every run is saved, so you can compare passes over time</li>
-          </ul>
-          <div class="shot-inline"><img src="assets/refine.webp" alt="Orchestra Refine tab: a test runner dashboard with six audits, three passed, two warnings and one failed, plus findings to send back to Create" loading="lazy" width="1200" height="1431"></div>
-        </article>
-      </div>
-      <div class="stage" aria-hidden="true">
-        <div class="frame">
-          <div class="frame-bar"><div class="frame-dots"><span></span><span></span><span></span></div><span>Hermes Rebrand · <b id="stage-label">Research</b></span><span>example project</span></div>
-          <div class="frame-view">
-            <img class="on" src="assets/research.webp" alt="" width="1200" height="1184">
-            <img src="assets/create.webp" alt="" width="1100" height="1200" loading="lazy">
-            <img src="assets/refine.webp" alt="" width="1200" height="1431" loading="lazy">
-          </div>
-        </div>
-        <div class="stage-cap">
-          <button type="button" data-go="0" aria-pressed="true" tabindex="-1">I. Research</button>
-          <button type="button" data-go="1" aria-pressed="false" tabindex="-1">II. Create</button>
-          <button type="button" data-go="2" aria-pressed="false" tabindex="-1">III. Refine</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="score" class="score-sec" aria-labelledby="score-title">
-  <div class="wrap">
-    <div class="sec-head">
-      <h2 id="score-title">Check off what the client needs</h2>
-      <p>Pick deliverables and Orchestra writes the score: who plays, in which movement, and what has to finish first. Every deliverable type is an editable markdown file in your library, and you can add your own.</p>
-    </div>
-    <div class="score-grid">
-      <div class="picker" id="picker" role="group" aria-label="Deliverables"></div>
-      <div class="score" aria-live="polite">
-        <div class="score-head"><h3>Score for this project</h3><span id="score-meta"></span></div>
-        <div class="score-scroll">
-          <div class="staves" id="staves">
-            <div class="bars" aria-hidden="true"><span></span><span>I. Research</span><span>II. Create</span><span>III. Refine</span></div>
-          </div>
-        </div>
-        <div class="score-foot"><span id="score-foot"></span><span>example plan · timings vary by project</span></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="ensemble" class="band-blue ensemble" aria-labelledby="ens-title">
-  <div class="wrap">
-    <span class="eyebrow" style="color:rgba(255,255,255,.75)">The ensemble</span>
-    <div class="ens-grid">
+      <div><span class="num">I.</span><h2 id="what-title">What is Orchestra</h2></div>
       <div>
-        <h2 id="ens-title">Orchestrator, Musicians, Instruments.</h2>
-        <p>One Orchestrator, the only agent that talks to you. One Musician per deliverable. Instruments are the subagents a Musician plays for each prerequisite. Each level gets only the tools for its job, so the chain of command holds even if a prompt drifts, and every agent is a markdown file you can edit.</p>
-        <ul class="tree" aria-label="Agent hierarchy">
-          <li><span>Orchestrator</span><span>talks to you</span></li>
-          <li class="l1"><span>Brand kit Musician</span><span>Figma · FigJam</span></li>
-          <li class="l2"><span>Typography · Color · Layout · Spacing</span><span>4 Instruments</span></li>
-          <li class="l1"><span>Slide deck Musician</span><span>Figma Slides</span></li>
-          <li class="l2"><span>Narrative · Visual pacing</span><span>2 Instruments</span></li>
-          <li class="l1"><span>3D renders Musician</span><span>Blender · Fusion</span></li>
+        <p>Orchestra is an open-source project for designers who work across mediums. It acts as a framework for your AI compute and sets up an agent hierarchy for you, so your design workflow gets faster and more efficient, and the generated work loses its sameness.</p>
+        <p>It is shaped to conform to you with use. The more assets you add and the more agents you make, the closer it pairs with how you work. And because it is open source, you can use your own agents to redesign Orchestra or add to it.</p>
+      </div>
+    </div>
+    <div class="facts">
+      <div class="fact"><h3>Open source</h3><p>Fork it, extend it, or point your own agents at it to redesign your orchestra.</p></div>
+      <div class="fact"><h3>Your compute</h3><p>Claude, ChatGPT or whatever you plug in follows the same hierarchy and the same rules.</p></div>
+      <div class="fact"><h3>Grows with you</h3><p>Deliverables, sources, audits and agents are editable files that build up over every project.</p></div>
+    </div>
+    <div class="hier">
+      <div>
+        <h3>An ensemble, set up for you</h3>
+        <p>Every project gets the same chain of command. Each level gets only the tools for its job, so the hierarchy holds even if a prompt drifts, and every agent is a markdown file you can open and change.</p>
+      </div>
+      <ol class="chain">
+        <li><span class="dot o"><svg aria-hidden="true"><use href="#int"/></svg></span><div><b>Orchestrator<small>one per project</small></b><span>Reads your research, plans the work and is the only agent that talks to you.</span></div></li>
+        <li class="l2"><span class="dot m"><svg aria-hidden="true"><use href="#int"/></svg></span><div><b>Musicians<small>one per deliverable</small></b><span>A Brand Kit, a Slide Deck, a Website. Each owns its deliverable and its tool connections.</span></div></li>
+        <li class="l3"><span class="dot i" aria-hidden="true"></span><div><b>Instruments<small>one per prerequisite</small></b><span>Brand Spec, Logo Builder, Copywriter. Built once per project and shared, so every deliverable stays consistent.</span></div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="sec" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><span class="num">II.</span><h2 id="how-title">How it works</h2></div>
+      <p>Every project moves through three movements with the designer in the loop, and everything you make is kept in a knowledge graph your agents can read. These are screens from the app, running a project for Orchestra’s own brand.</p>
+    </div>
+
+    <article class="mv">
+      <div class="mv-text">
+        <div class="n">1</div>
+        <h3>Research</h3>
+        <p>Compile all of your inspiration in one place. Open your reference sites in one click, paste links or drop in files, and note what you like about each. The Orchestrator interprets the collection into a research file that becomes the source of truth for your designs.</p>
+        <ul>
+          <li>Tag each reference as inspiration or a usable asset, so licensing never gets lost</li>
+          <li>Interpret writes research.md: what you seem to want, and what to avoid</li>
         </ul>
       </div>
-      <div class="log" role="region" aria-label="Example agent log">
-        <div class="log-head"><span>Agent log · Hermes Rebrand</span><span class="live">Live example</span></div>
-        <div class="log-body" id="log" aria-live="off"></div>
-        <div class="decide" id="decide">
-          <div class="q">Canela is a paid font.</div>
-          <p>Typography needs your choice before the type styles can be exported.</p>
-          <div class="acts">
-            <button type="button" data-choice="buy">Buy licence</button>
-            <button type="button" class="pri" data-choice="swap">Swap for Instrument Serif</button>
-          </div>
+      <figure class="shot"><div class="shot-bar"><i><b></b><b></b><b></b></i>Orchestra Brand · Research<span>app screen</span></div><img src="assets/app-research.webp" alt="Orchestra's Research tab: reference site buttons, a table of reference links tagged inspiration or usable asset, and uploaded reference files" width="1680" height="1050"></figure>
+    </article>
+
+    <article class="mv">
+      <div class="mv-text">
+        <div class="n">2</div>
+        <h3>Create</h3>
+        <p>The part designers know best. Select which deliverables to make first, then work on them iteratively with your agents. Connect your favourite design tools over MCP and work in tandem: the agents build in the file while you keep your hands on it.</p>
+        <ul>
+          <li>Picking deliverables shows the shared foundations that get built first</li>
+          <li>Each deliverable gets its own chat with the Orchestrator and a live tree of who is working</li>
+          <li>The agent channel shows every tool call and message, read-only</li>
+        </ul>
+        <div class="tools" aria-label="Tools"><span>Figma</span><span>Blender</span><span>Fusion</span><span>ElevenLabs</span><span>any MCP server</span></div>
+      </div>
+      <div class="mv-media">
+        <figure class="shot"><div class="shot-bar"><i><b></b><b></b><b></b></i>Create · Brand Kit chat<span>app screen</span></div><img src="assets/app-chat.webp" alt="A Brand Kit chat with the Orchestrator, beside a live tree of agents and work: foundations ready, the Brand Kit Musician and Kit Builder Instrument working, and a list of created files" width="1680" height="1050" loading="lazy"></figure>
+        <div class="pair">
+          <figure class="shot"><img src="assets/app-picker.webp" alt="The deliverable picker with Brand Kit, Logo, Slide Deck and Website selected and seven foundations listed to build first" width="1680" height="1050" loading="lazy"><figcaption>Pick deliverables; foundations come first</figcaption></figure>
+          <figure class="shot"><img src="assets/app-channel.webp" alt="The agent channel: a read-only log of each agent's tool calls and messages in IBM Plex Mono on Orchestra blue" width="1680" height="1050" loading="lazy"><figcaption>The agent channel, read-only</figcaption></figure>
         </div>
       </div>
-    </div>
+    </article>
+
+    <article class="mv">
+      <div class="mv-text">
+        <div class="n">3</div>
+        <h3>Refine</h3>
+        <p>Periodically, audit what was generated: for usability, for compliance with your brand kit, and for the hallmarks of AI-generated work. Unslop it, one pass at a time, with you deciding which fixes go back to Create.</p>
+        <ul>
+          <li>Usability: contrast, spacing, grid, type scale and edge-case stress tests</li>
+          <li>Brand compliance: every frame checked against your tokens and type styles</li>
+          <li>Unslop: generic fonts, stock gradients and templated layouts flagged with fixes</li>
+        </ul>
+      </div>
+      <figure class="shot"><div class="shot-bar"><i><b></b><b></b><b></b></i>Refine · test runner<span>Figma design</span></div><img src="assets/refine.webp" alt="The Refine test runner design: six audits with three passed, two warnings and one failed, and findings to send back to Create" width="1200" height="1431" style="aspect-ratio:16/10;object-fit:cover;object-position:top"><figcaption>Refine is designed in Figma and next on the build plan</figcaption></figure>
+    </article>
+
+    <article class="mv how-end">
+      <div class="mv-text">
+        <div class="n">4</div>
+        <h3>The knowledge graph</h3>
+        <p>As you create, your work is saved and structured into a knowledge graph. Agents query the graph instead of rereading design files, which is faster and cheaper, and lets them understand your designs natively.</p>
+        <ul>
+          <li>A query returns the few nodes an agent needs, not a whole design file</li>
+          <li>Palettes, type, references and decisions stay linked across projects</li>
+          <li>Stored as a plain Markdown vault you can open in Obsidian</li>
+        </ul>
+      </div>
+      <figure class="graph"><canvas id="graph" role="img" aria-label="An illustrative knowledge graph linking three projects through shared fonts, colours and references"></canvas><figcaption>illustration · three projects, shared nodes in blue</figcaption></figure>
+    </article>
   </div>
 </section>
 
-<section aria-labelledby="voice-title">
+<section id="brand" class="sec" aria-labelledby="brand-title">
   <div class="wrap">
     <div class="sec-head">
-      <h2 id="voice-title">It asks instead of guessing</h2>
-      <p>Art direction stays with you. Agents do the production, and stop to ask when a choice is a matter of taste, money or licensing.</p>
+      <div><span class="num">III.</span><h2 id="brand-title">The brand</h2></div>
+      <p>One saturated blue, a classical serif and figures built from the words agents write. Orchestra’s brand was its own first test project, run through its own three movements.</p>
     </div>
-    <div class="principles">
-      <div class="principle">
-        <h3>Plain over clever</h3>
-        <p>Buttons say what happens next. The musical language stays in the brand line.</p>
-        <div class="ex">Generate palette <s>not “Compose your colour symphony”</s></div>
+    <div class="b-grid">
+      <div class="tile t-mark">
+        <h3>The mark</h3>
+        <div class="big"><svg role="img" aria-label="The Orchestra mark"><use href="#mark"/></svg></div>
+        <p>The integral sign ∫: many parts summed into one whole. It is also a violin’s f-hole, the opening the whole instrument sounds through.</p>
+        <dl class="spec"><dt>outline</dt><dd>12 anchors, 180° rotational symmetry</dd><dt>terminal axis</dt><dd>33.4° from vertical</dd><dt>proportion</dt><dd>mark : ring = 184 : 300</dd><dt>clear space</dt><dd>2x, where x is the terminal Ø</dd><dt>minimum</dt><dd>24 px with ring, 16 px alone</dd></dl>
       </div>
-      <div class="principle">
-        <h3>Name the player</h3>
-        <p>Agents report by name, in a monospaced log, so the record of every change is readable.</p>
-        <div class="ex mono">[14:02] type-agent swapped Söhne for Instrument Sans</div>
+      <div class="tile t-word">
+        <h3>Wordmark and tagline</h3>
+        <div class="w">Orchestra</div>
+        <div><div class="tag">Many hands. One score.</div><p style="margin-top:8px">The agents are the many hands; the project is the score they play from. Two sentences, two full stops, never rewritten.</p></div>
       </div>
-      <div class="principle">
-        <h3>Ask, don’t assume</h3>
-        <p>When an agent needs you, an orange marker flags it with clear choices attached.</p>
-        <div class="ex sig">This font needs a licence. Buy it, or use a free alternative?</div>
+      <div class="tile t-color">
+        <h3>Colour</h3>
+        <div class="swatches">
+          <div class="sw blue"><b>Orchestra Blue</b>#0538FF · brand fields and actions</div>
+          <div class="sw ink"><b>Ink</b>#0B0B12 · text and dark mode</div>
+          <div class="sw white"><b>White</b>#FFFFFF · the workspace</div>
+          <div class="sw mist"><b>Mist</b>#B8C4FF · agent activity</div>
+          <div class="sw signal"><b>Signal</b>#FF5A1F · when an agent needs you</div>
+        </div>
+      </div>
+      <div class="tile t-type">
+        <h3>Type</h3>
+        <div class="faces">
+          <div class="face"><div class="s f1">Instrument Serif, <i>in italic for the name</i></div><div class="r">headlines · wordmark</div></div>
+          <div class="face"><div class="s f2">Instrument Sans for the interface</div><div class="r">UI · labels · body</div></div>
+          <div class="face"><div class="s f3">[14:02] type-agent swapped Söhne for Instrument Sans</div><div class="r">agent logs only</div></div>
+        </div>
+        <dl class="scale"><dt>Display XL</dt><dd>72 / 80</dd><dt>Heading L</dt><dd>36 / 44</dd><dt>Heading S</dt><dd>22 / 30</dd><dt>Body M</dt><dd>16 / 26</dd><dt>Label M</dt><dd>14 / 20</dd><dt>Log M</dt><dd>14 / 22</dd></dl>
+        <p>Radius stays sharp: 0 for containers, 2 px for controls, full only for pills.</p>
+      </div>
+      <div class="tile t-img">
+        <div class="pane" aria-hidden="true"><pre class="ascii" id="fig"></pre></div>
+        <div class="cap">
+          <h3>Imagery</h3>
+          <p>Public-domain figures rebuilt in text from agent-log words, so the brand is literally made of the work.</p>
+          <div class="figs" role="group" aria-label="Figures">
+            <button type="button" data-f="hand" aria-pressed="true">Hand</button>
+            <button type="button" data-f="apollo" aria-pressed="false">Apollo</button>
+            <button type="button" data-f="concert" aria-pressed="false">Concert</button>
+          </div>
+          <div class="credit" id="credit"></div>
+        </div>
+      </div>
+      <div class="tile t-voice">
+        <h3>Voice</h3>
+        <div class="v"><b>Plain over clever</b><p>Buttons say what happens next. Musical language stays in the brand line.</p><code>Generate palette, not “Compose your colour symphony”</code></div>
+        <div class="v"><b>Name the player</b><p>Agents report by name, in mono, so you always know who did what.</p><code>Brand Spec · Write prereqs/tokens.json</code></div>
+        <div class="v"><b>Ask, don’t assume</b><p>When an agent needs you, Signal marks it and it offers clear choices.</p><code class="sig">This font needs a licence. Buy it, or use a free alternative?</code></div>
       </div>
     </div>
+    <div class="brand-end"></div>
   </div>
 </section>
 
-<section id="instruments" class="inst-sec" aria-labelledby="inst-title">
+<section class="blue cta" aria-labelledby="cta-title">
   <div class="wrap">
-    <div class="sec-head">
-      <h2 id="inst-title">The tools it plays through</h2>
-      <p>Orchestra drives the tools a designer already uses, through their MCP servers, on a workstation with enough compute to render.</p>
-    </div>
-    <div class="inst-list">
-      <div class="inst"><h3>Figma</h3><div class="role">brand kit · UI · decks</div><p>Foundations, Color, Type and Components pages, plus desktop and mobile frames, written straight into one file per project.</p></div>
-      <div class="inst"><h3>Blender</h3><div class="role">renders · product shots</div><p>Scenes, materials and lighting for print renders and hero imagery, rendered on the workstation GPU.</p></div>
-      <div class="inst"><h3>Fusion</h3><div class="role">CAD · physical prototypes</div><p>Parametric models for enclosures and objects, ready to print or hand to fabrication.</p></div>
-      <div class="inst"><h3>ElevenLabs</h3><div class="role">voice · narration</div><p>Voiceover for trailers and motion assets, cut to the same script the deck uses.</p></div>
-    </div>
-  </div>
-</section>
-
-<section aria-labelledby="mem-title">
-  <div class="wrap memory">
-    <div>
-      <span class="eyebrow">Memory</span>
-      <h2 id="mem-title" style="margin-top:12px">It learns your taste across projects</h2>
-      <p>Each project folder is indexed into a knowledge graph, and the graphs join into one across all your work. The orchestrator queries it before it proposes a direction.</p>
-      <ul class="mem-list">
-        <li><b>references</b><span>What you saved and what you said you liked</span></li>
-        <li><b>type &amp; color</b><span>Fonts and palettes you kept, and the ones you rejected</span></li>
-        <li><b>audits</b><span>Which fixes you accepted, so the next pass starts closer</span></li>
-        <li><b>vault</b><span>Plain Markdown you can open and edit in Obsidian</span></li>
-      </ul>
-    </div>
-    <figure class="graph" style="margin:0">
-      <canvas id="graph" aria-label="An illustrative knowledge graph linking three projects through shared fonts, colors and references" role="img"></canvas>
-      <figcaption>illustration · 3 projects, shared nodes in blue</figcaption>
-    </figure>
-  </div>
-</section>
-
-<section class="band-blue coda" aria-labelledby="coda-title">
-  <div class="wrap">
-    <div class="coda-grid">
-      <h2 id="coda-title">Many hands. One score.</h2>
-      <p>Orchestra is in development as a desktop app, built as a framework you plug your own compute into. It ships with enough defaults to start; the long-term value is what you add.</p>
-    </div>
-    <div class="next">
-      <div><b>now</b><span>Research, the deliverable library and Create, with the Orchestrator chat and live agent tree</span></div>
-      <div><b>next</b><span>Refine audits, the Agents editor, Files and the knowledge graph</span></div>
-      <div><b>later</b><span>Mix models per agent, share it with others, and an Advanced mode for reshaping Orchestra itself</span></div>
+    <div class="cta-grid">
+      <h2 id="cta-title">Make it your orchestra.</h2>
+      <div>
+        <p>Orchestra is open source and in active development as a desktop app. Clone it, plug in your compute and start with your own brand.</p>
+        <div class="clone"><code id="cmd">git clone https://github.com/TheSwearWords/orchestra</code><button type="button" id="copy">Copy</button></div>
+        <div class="actions"><a class="btn btn-white" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a></div>
+      </div>
     </div>
   </div>
   <footer>
     <div class="wrap">
       <a class="brand" href="#top" style="color:#fff"><svg aria-hidden="true" style="width:24px;height:24px"><use href="#mark"/></svg><span style="font-size:22px">Orchestra</span></a>
-      <span>A design studio of agents: research, create, refine.</span>
+      <span>Many hands. One score.</span>
     </div>
   </footer>
 </section>
@@ -509,172 +541,59 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:v
 <script>
 (() => {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  /* hero parallax */
-  const violin = document.querySelector('.violin i');
-  if (!reduce && violin) {
-    let raf = 0;
-    addEventListener('scroll', () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => { raf = 0; violin.style.setProperty('--sy', Math.min(scrollY, 900)); });
-    }, { passive: true });
-  }
-
-  /* movements: sticky stage follows the step in view */
-  const imgs = [...document.querySelectorAll('.frame-view img')];
-  const btns = [...document.querySelectorAll('.stage-cap button')];
-  const steps = [...document.querySelectorAll('.step')];
-  const label = document.getElementById('stage-label');
-  const names = ['Research', 'Create', 'Refine'];
-  const show = i => {
-    imgs.forEach((im, k) => im.classList.toggle('on', k === i));
-    btns.forEach((b, k) => b.setAttribute('aria-pressed', k === i));
-    label.textContent = names[i];
+  const FIGS = {"hand": "                                      scanne                                    r.       re a                        d.   \n                                        8.of.8.ref  e                           r         enc               e        s.   \n                                     .    .color.dra fted.a                     .        pal e             t        te.   \n                            f      ro m    .#053 8FF    .   .   .type.paus      e        d:. So h          n        e .   \n                              needs.a .l icenc                      e    ...     o         rc he           s tr   a tor   \n                         .w aiting.on.1.d                            e c    i              si o  n         ...       la   \n                         y  out.queued.            ..as               s     et             -b uild         er      . qu   \n                       e u   ed...m            a n y                      . ha               nd s          .o      n      \n                      e   .  sc or          e...scanne            r       .  r   e           ad .          8.       o     \n                       f.   8     .r e    ferences...c o    l   o    r.d    ra      f         t e                  d.     \n                   a.   pale    t te. from.#0538 FF...type.pa u      s ed  :.So               h                    ne .   \n                    n   e e   ds. a.lice nce...  orchestr a to r   .w  aiting.o                                    n. 1   \n                     .  de c       ision  ..   .layout.queued...asset-bui ld er                   .        q        u e   \n                      ue d  .    ..ma ny.han ds.one .score...scanner.re   ad.8.               of  .       8.        r e   \n                         fe   re   n ces...co    lo    r.dr  afted.a.pal ette.f    ro         m.#                  0538   \n                         FF..   .type.   p             aus      ed:.Sohne.need      s          .a .l               ice    \n                  n        ce...or      c              he             strator       .wai    t   i ng                .o    \n                  n   .     1. de      c               is           ion...lay       out.q  u    e  u               ed     \n                  ...a      ss  e      t              -b            uilder.qu       eu   ed.   ..m  a                     \n                          n y.  h      a             nds.           one.score     ..  .  sc  anner  .r            e       \n                 a          d  .8    .          o    f.8            .refe ren               c   es. ..                    \n                 co      l  or. d                   raft         e   d.a.pal              et    t  e.           f         \n                  r o       m .  #                 0538F              F...ty              pe   .p au             se       \n                  d              :                 .Sohn         e  .n  eeds              .a  .lic               e        \n                           n c   e         .. .orches  t            ra tor.               wa  iti   n          g.o        \n                          n.1    .  de      c   ision...          lay out.qu             eu ed                 ..         \n                .                  a  s   set-       bu           ilder .qu             eued...    m          a           \n               n                y .                                han  d             s.one.s      c          o           \n               r          e   ..                      . sca nn   er.read              .8.of.                  8.          \n              r              e f e                   ren  ce  s  ...col             or.draft         e        d.          \n              a                .p                      al      ette.fr   o      m  .#0 538            F F.  .             \n                               .                         type.pause     d      :.Sohne.nee            ds .a. li           \n                            c en                               ce.    . .    orc  hestrat          o        r.w           \n            a           i   t i                               n       g  .on.1.decis  io           n.   ..layo            \n                        u t. queue      d                           .  ..asset-builder.q         u  eued  ..              \n                        .many.hand                                   s   .one.   score                ...sc               \n                      anner.read.8. of   .                       8  .refe   r    ence        s.    . .col                 \n                      or.drafte d.a. pa    l                       ette.f        rom.  #    0  5  38FF                    \n                     ...type.p aused:.Soh n                      e.needs          .a .    l  i     ce                     \n                    nce..  .orchestrat or .        w          a                    itin  g        .o                      \n                    n.1.de ci sion...layou  t.q u e u e     d..                    .a  s  s     et                        \n       -            bui ld er.queued...many.hands.o  n  e.scor                      e. ..sca   nn                         \n                       er  .read.8.of.8.references.. .color.d                     r a f   ted.a.                          \n                       p alette.from.#0538FF...ty pe.pau s                      e          d:.                            \n                        Sohne.needs.a.lic ence...orchestrat or                .  wai       ti                             \n                       ng.  on.1 .decision...layout.queue d.                   .   .     as s                             \n                     et-b uilde r .queued...many.hands.on  e                    .  s     c or                             \n                    e..   . s c a nner.read.8.of.8.referenc                   e  s.    ..col                              \n                    o   r.   drafte  d.a.palette.from.#0538                    F      F...t                               \n                  yp   e. p aus ed:. Sohne.needs.a.licence                    ..        .o                                \n                rc   hes   trator. w  aiting.on.1.de  cis i                    on       ..                                \n                    .la   yout.que       ued...a sset-bui                      l        d                                 \n  e                r.    q  ueued .    ..many.hands.o  ne                              .s                                 \n                   c        or e    .   ..scanner.rea d.                          8   .o                                  \n                  f.       8.r e    f      eren ce   s..                       .  c olo                                   \n               r           .  dr   a       fte d. a .pa                     l  e tt e.f                                   \n                             rom. #       053 8FF...ty                       pe .paused:                                  \n                            .Sohn         e.n ee  ds.                        a. licence                                   \n     .                     ..orche       stra tor.wa                         iting.  o                                    \n                          n. 1.dec       i s ion...l                         ayout   .                                    \n                          q ueued..      . a sse t-b                          uil  de                                     \n                           r.queued.       . .ma ny.                          han  ds                                     \n                           .one.sco         re.. .s                           ca    n                                     \n                           ne r.rea d       .8.o f.  8                       .re   f                                      \n                             erenc e          s.  ..                          col  o                                      \n                           r.d ra ft e       d.   a                          .pal  e                                      \n                           t te.  f  r      om. #05                            38  F                                      \n     F                        .. .   t      yp  e.      p                   a   us e                                      \n     d                       :.So   h      ne  .ne                            e ds .                                      \n                            a. l   i  c e nce   ..                             .or c                                      \n                           h  e      s    tr    a                          t o r.                                         \n     w                   a      it      ing     .                        o n .  1 .                                       \n    de                     c   i   s  ion.     .                           .   l  a                                       \n     y                       o         u      t.                               q u                                        \n     eu                             ed...     as                              set-                                        \n      bu                          ilde r      .q                                ue                                        \n       ued                       ...m an      y.                                h                                         \n         an                 d  s.     o       ne    .                          sc                                         \n          o               r  e        .       ..     s                        ca                                          \n          n                                     n                        er  .r                                           \n         e                                             ad      . 8   .of .8 .r                                            \n         e                                               f          er ences.                                             \n        ..c          o               l                    or.dr    afted.a.p                                              \n                a                    l                 et   te.from.#0538F                                                \n                  F                                     ...  type.paused:.                                                \n                                                          So h  ne.needs.                                                 \n                                                               a.licence.                                                 \n                                                 .            .o rchestra                                                 \n                                                  t         or. waiting.                                                  \n                                                         on.1.    decisi                                                  \n                                                   on ...layou  t .queu                                                   \n                                                   ed...asset-build er                                                    \n                                                 .   queued...m any.                                                      \n                                            h    ands .one.score...                                                       \n                                                 scanner.rea d.8.                                                         \n                                                   of.8.referenc                                                          \n                                                    es...   c                                                             \n                                                           o                                                              \n                                                          l                                                               \n                                                      o  r", "apollo": "                                                                                                                                           \n                                                                                                                                           \n                                                                                                                                           \n                                                        sca                                                                                \n                                                       nner.read.                                                                          \n                                                        8.of.8.re                                                                          \n                                                      ferences...                                                                          \n                                                c   o lor.drafted                                                                          \n                                                .  a.palet te.fro                                                                          \n                                                m.#0538FF...type                                                                           \n                                                .paus   ed:.Sohn                                                                           \n                                               e.nee       d  s.                                                                           \n                                                a.l        ic en                                                                           \n                                                 ce.       ..or                                                                            \n                                                 che       stra                                                                            \n                                                 to     r    .w                                                                            \n                                                  a    iting.                                                                              \n                                                       o n.1.                                                                              \n                                                          deci                                                                             \n                                                         s  ion..  .layout.                                                                \n                                              qu           eued...asse    t-bu                                                             \n                                            ilde         r.q           ueued.  ..man                                               y       \n                                                         .       h   ands.   one.scor                                           e...sc     \n                                                   anne r.        read.8  .of.8.r                                              ef eren     \n                                                               c es...color.draft                                             ed    .      \n                                                       a.palette.from.#0538FF...ty                     pe.  paused:           .S  ohne     \n                                                   .needs.a.lice       nce...orchest                 rator.waiting         .o n.   1.d     \n                                                                       ecision...layout            .queue  d...         asse  t-build      \n                                      e                                r.queued...many.han        ds.o ne .sco       re..       .sca       \n                                       n                          n er.read.8.o   f.8.reference  s ...col or.d   rafted                    \n                                       .                           a.palette.fro m.#05    38FF. . .type.  paused:.Sohne                    \n                                       .n                          eeds.a.licenc   e..           .orche   s trator.w ai                    \n                                      ting                         .on.1.decision  ...          layout.   qu   eued  ..                    \n                                      .ass                        et-builder.qu e       ued    .. .many   .h   ands  .o                    \n                                      ne.                        score...scanner .           read.8.of.  8.r   efer  en                    \n                                     ces                     ...color.drafted.a. pa        lette.fro m.  #05   38FF  ..                    \n                                     .ty                      pe.paused:.Sohne.ne e   ds.a.licence.  ..  orc   hest  ra                    \n                                    tor                      .waiting.on.1.decision     ...layout.q  u   eue   d...a sse                   \n                                   t-bu                      ilder.queued...many      .hands.one.s  co    re  ...scanner                   \n                                  .rea                      d.8.of.8.reference   s     ... color.d  ra    ft  ed.a.palet                   \n                                  te.                      from.#0538FF...type .p         aused:.  So     hn  e.ne  eds.                   \n                                a.li                       cence...orchestrator .        waiting  .on     .1  .dec isi o                   \n                              n...l                        ayout.queued...ass et          -buil  der.     q   ueue d..                     \n                             .many                         .hand s.one.score.   .     .scanner   .re    a d   .8.o f.8                     \n                             .refe                        rences...color.dra          fted.a.   pa l   e  t   te.f rom.                    \n                             #053                          8FF...type.paused           :.Soh   ne.     n  e  eds.a.lice                    \n                            nce.                           ..orchestrator.wai           tin    g. o   n  .1  .decision.                    \n                           ..la                            yout.queued...as s            e    t-b     u  il  der.queued                    \n                          ...m                             any.hands.one.sc  o             r e.. .       sc   anner.rea                    \n                        d.8.                              of.8.references... co             lor. d   ra fte     d.a . p                    \n                      alet                               te.from.#0538FF...ty               pe. p     aused      :.So                      \n                    hne.                                needs.a.licence...orc              hestra     to r.                                \n                  waitin                               g.on.1.de cision...layo           ut.qu e     ued ..                                \n                .asset-buil                              der.que  ued...many. h      ands.o n  e      .s                                   \n              core...scanne                     r.     r   ead.   8.of.8.refe  r  ences... co lo      r                                    \n     .drafted.a.palette.fro                 m.  #           05    38FF...typ    e    .pau  s  e       d :.                                 \n     Sohne.needs.a.licence..                .orc             h    estrator.wa          i  ti n        g .o                                 \n    n.1.decision...layout.qu                eued   ..    .a   s    set-builde          r  .  q       ueued                                 \n   .. .man    y.hands.one.sco               re...s         c       anner.read.        8             .o  f.                                 \n     8. r    eferences...colo               r.draf         te      d.a.palette.       f             ro  m.                                 \n                #0538FF...type              .pause        d:       .Sohne.needs.     a                . li                                 \n                cence...orches    t         rator.wa    iti         ng.on.1.decis   io                 n..                                 \n                .layou    t.    queu        ed...asset-bui          lder.queued   ...              m  an                                   \n                y.han     d    s.one        .score... sca           nner.read.8.of.8   .           re                                      \n               feren   ces..   .colo        r.drafted .a.           palette.from.  #  0            53                                      \n               8F F   ...typ   e.pau        sed:.Sohn  e.           needs.a.licence                                                        \n                ...o  rchest    rato        r.waitin   g.o          n.1.decision...  l ay     ou                                           \n                t.q  ueue       d...        asset-bu    ild         er.queued...man  y.h       a                                           \n                  nd s.o        ne.s        core...s    can         ner.read.8.of   .8.                                                    \n                    refe  re    nces        ...colo      r.d        rafted.a.palette.                                                      \n                      f   ro    m.#05        38FF..       .ty       pe.paused:.Sohne                                                       \n                         .ne   eds.a.        licen        ce.       ..o                                                                    \n                       rche    strato        r.wai        tin       g.o                                                                    \n                     n.1.   d  ecision       ...la         yo       ut.                                                                    \n                    q          ueued..       .ass          et-     buil                                                                    \n                    d         er.queued     ...ma          ny.h     and                                                                    \n                    s         .one.scor      e...           sca    nne                                                                     \n                    r          .read.8.     of.8.            re    fer                                                                     \n                   e              nces..   .color            .d     ra                                                                     \n                              ft ed.a.pa    lette            .fr    om                                                                     \n                               .#0538FF.   ..typ              e.paused:                                                                    \n                                  .Sohne   .needs             .a.licenc                                                                    \n                                 e...orc   hestrat            or.waitin                                                                    \n                                g.on.1.d    ecisio            n...layout                                                                   \n                         .     que ued..    .asset-             builder.                                                                   \n                                 queued.    ..many.             hands.on                                                                   \n                         e.                  score.             ..scanne                                                                   \n                                       r     .read.8            .of.8.re                                                                   \n                    fe               ren     ces...c         ol or.draf                                                                    \n                     t                ed.     a.pale          tte.from.                                                                    \n                                      #053     8FF..          .type.pau                                                                    \n                                  sed:.Soh     ne.ne          eds.a.li                                                                     \n                                  cence...     orche          strator.                                                                     \n                        wai    ti   ng.on.1    .deci          sion...                                                                      \n                           l    ayout.queued   ...as           set-bu                                                                      \n                                 ilder.queue    d...           many.                                                                       \n                                 hands.one.sc   ore.           ..sca                                                                       \n                            n    ner.read.8.o    f.8          .refer                                                                       \n                            e    nces...color.   dra          fted.a                                                                       \n                            .    palette.from.   #05         38FF...t", "concert": "                                        s    c    anne r .re  ad.8.of.8.references...color.drafted.a.pale tte.from         .#053                                                  \n                                        8    F    F...             type.paused:.Sohne.needs.a  . licence...orche             st                                                   \n                                        r   at   or.wa             iting.on.1.decision.. .layo      ut.queu  ed.     ..       as se                                               \n             t-        builde           r.queued...                    many.hand s.one.sc ore...    scan    n er     .r      ea                                                   \n                                             d.8.of                     .8.refer ences... colo r.draf     t ed.a. p  al      ette   .    fr                                       \nom . #   0                                538FF...type.paused:.Sohne.needs.a.licence.. .o  rch   estra    tor.waiting.on  .1 .                                                    \n d e    c i   si on...layo ut.queued...asset-builder.queued...many.hands.one.score. ..sc   anner    .        read.8.of.8.ref                             eren                     \n      ces . . .  c    o l    o r  . d  r a fted.a.pal  e  t te .  f  r  om.#0538FF. ..t    ype.pa           used:.Soh   n e.         n        eeds.a. licen         c             \ne.   .. o r c         h es t r a  t or . w aiting.on.  1  . de    c  i  sion...layout.q u   eue  d ... asset-builde  r   . q                   ueue   d      .     .              \n.many.hands.one.         s c o re . .. s ca nner.rea                    d.8.of.8.refere     nces    ...col  or.dra       f t      ed            .  a    .pal      et              \n  te .from.#0538FF...type.paused:.Sohne.needs.a.licence...orchestrator.waiting.on.1. de      cisi     o    n.. .lay   o     u   t .             queu   ed. .    .   a             \n                 s set-b uilder.queued...ma ny.hands.         one.score...scanner.re a       d .8.o  f.8  .re  fere   nc       es..                   . c       o                 \n                                             lor.draf                 t ed.a.palette .f      r  om       .#   053 8             FF .                         ..                   \nt       y       p     e     . paus ed:       .Sohne.n                 eeds.a.licence  ..     .o               rch                est             rator.  wa    i   t              \ni                    ng     .o  n .  1       .decisio                   n...l ayout.q  u     eu     ed       ...a  s            set-b            u ilder    .qu  eue              \nd  ...many.hands.one.score...scanner .       read.8.o                   f.8.r eferenc        es             ...co             lor.dra         fted  . a.p   al  et                \n           t    e.from.#0538FF...type.       paused:.                   Sohne.needs.         a.            licenc             e...orche     str ator.wa     iting                 \n                                  .o n       .1.decis                   ion...layout         .            queued.   .        .asset-b     ui lder.qu     e   ued                  \n                 .                .. m          any.h                   ands.one.sco          r          e.  ..sc          anner.r   e     ad  .8  .of.8   .    r                 \n                                  ef e           renc                   es...color. dr               af             te d.  a.pale  t       te    .from .# 0 53                    \n                                  8F F            ...                   type.pause   d:              .S              ohne    .ne eds              .a.l i     c ence               \n                                  ...o             rc                    hestrator.                w  a              itin         g      .          o n    .   1. d               \n        e                         cisi             on                   ...layout.que              u                   e           d .   .             .      a                   \n                                  sset -            b                    uilder.queued     ...ma  n                         y        .han             ds.o                        \n                                 ne.score.          .                    .scanner.read.   8.of.8. re  f                 e   r           e             nces        .             ..\n       c                         olor.dr           af                    ted.a.         palette.f ro  m                  .  #0           5              3    8  FF             ...\n       typ                     e.paused:           .S                o   hne.ne         eds. a.li  cence...o r           c  he           st               ra to r.             wai\n      ti ng                  .on. 1.dec           isi            on..      .lay         out.       queued..               .as s          et-             bu ild er            .que\n       ued...m              an   y.h  a            nd          s.o          ne           .sc        ore...s               cann             e             r. read.8            .of.\n        8.r       e        fe  renc    e            s         ...            c            olo           r .d r          af                ted             .a .pale           tte.f\n       ro         m       .#   0538   F                      F..              .           type.             p           a u                s               ed:.Soh           ne.ne\n       ed                  s  .a.li  c                       en               ce..         .orc           hes          trat                 o         r      .wait           ing.o\n      n.                     1.decis            i           on.               ..la yo      ut.             qu e     ued..              .    asset-  bui       lde           r.queu\n      ed ..                  .many.h            a          nds.on e            .sco        re   .          .         .sca              n  n  er.rea d.        8.o           f.8.re\n     feren             c      es...             co          lor.dr              aft        ed.  a                                     .pa     lette           .fr          om.#053\n     8FF..                       .t y               p     e.paus ed: .        Sohne.        ne  e        d                           s      .  a.l   i        cen          ce...or\n      ches                        trat  o               r.waiting.on.        1  .d ec       is   io     n .                                  . .la   y        out         .queued.\n      ..ass       e                    t              -builde  r.q          ueue d ... ma n y.  ha   nds.on                         e        .s co  r        e..          .scanner\n      .read       .8                  .o     f.8.r eferences     .      .           .col o r.d       raft                          ed         .a .p  a       let          te .from\n       .#05        3                 8F      F ..  .type.pa      u                sed:.Soh  ne   .  need                         s.a.         lic en ce  ...orch         estrator.\n       wait i     ng                  .         on.1.deci                     sion...layo u t.   q  ueue         d                            ...a sset-  builde         r. queued\n       ...m an    y.         h       a         nds. one.s         c        ore...scann  er   .r  ead.8.o        f.   8   .r  e                 fere nc    es...c        olo r.draf\n        ted  .                   a  .p    a  let te .from.       #0         538FF...type.paused   :.So h         n   e   .  n             eed  s.a.  l     icence   ..  .orchestra\n        tor.wa           i   tin  g.o   n.1.decisi  on...la      you        t.queued...asset-bu   ild er        . q  u  eu  e             d .    ..m       any.    h   ands.one.sc\n        ore...s        c a    nner.   read.8.of .8 .referen       ce s..  .color  .dra  f t  ed   .a. pal       ett  e.fr   o                 m.#0538     FF     .     ..type.paus\n        ed:.So          hn    e .n   eeds.a.lic en ce...orch      estr a   tor.w aitin  g. o n.   1.  dec     i   si    on..                      .lay  ou    t.q      ueued...ass\n         et-buil              d      er.queued...m any.hands     .one.sco   re...scanne r. re ad  .8. of     .8          .r      eference         s.  .               .color.draft\n        ed.a .p                      alette.fr om  .#0538FF..     .type.pa  used:.Sohne  .n eeds  .a.    l  i                    cence...o   rch e                    strator.wait\n        ing.on.1                     .decisio n.   ..layout.q      ueued..  .asset-build  er .qu   e ue  d..                               .m    a       ny          .hands.one.sc\n        ore...sca    nne             r.read. 8.o  f.8.referen      ces...co lor.drafted.a.palett   e .from.                                #   0      5              38FF...type.p\n       aused:                        .Soh    ne.  needs.a.lic       ence. .  .orchestrator.wa it   i ng.o      n     .         1.d      eci         s                ion...layout.\n       q                             ueue  d...asset-builder.q       ueue d. ..many.hands.     o       ne           .score..     .scann er        .re                 ad.8.of.8.re\n                                      fere  n ces...color.drafte      d.a.pa lette.from.#      0   5    38FF.        ..type.paused     :.        S  o                   hne.needs.\n                                       a.l  icence...orchestrat         or.waiting.on.1.       de  c     isio        n...layout.queued...asset-builder.queued...many.hands.one.sco\n                                        re  ...scanner.read.8.o         f. 8.references.       ..         co          lor.drafted.a.palette.from.#0538FF...type.paused:.Sohne.need\n                                        s     .a.lic  ence...orc       he    strator.wai        t         in          g.on.1.decision...layout.queued...asset-builder.queued...man\ny.hands.one.score...scanner.read.8.of.8.  references ... color.dra  f  ted      .a.pa le        t          t          e.from.#0538FF...type.paused:.Sohne.needs.a.licence...orches\ntrator.waiting.on.1.decision...layout.qu   eued...as  set-builder.que u ed.      .   .ma           n       y.         hands.one.score...scanner.read.8.of.8.references...color.dra\nfted .a.palette.from.#0538FF    ..   .t    ype.paus   ed:.Sohne.needs.a .l icen c      e                              ...orchestrator.waiting.on.1.decision...layout.queued...asse\nt-bui lder. qu eu ed...man      y.hands.one.score...s  c anner.read.8.of.8.refe                            re nc      es...color.drafted.a.palette.from.#0538FF...type.paused:.Soh\nne.needs.a.licence...orchestrator.wai ti ng.on.1.de cis ion...layout.queued...as  se                      t-bui       lder.queued...many.hands.one.score...scanner.read.8.of.8.ref\nerences...color.drafted.a.palette.from.#0538FF...type.p aused:.Sohne.needs.a.lic  enc                     e...        orchestrator.waiting.on.1.decision...layout.queued...asset-b\nuilder.queued...many.hands.one.score.. .scanner.read. 8.of.8.referen  c e  s...co lor.d                   raf          ted.a.palette.from.#0538FF...type.paused:.Sohne.needs.a.lic\nence. ..o rchestrator.waiti ng     .on. 1.decision...layout.queu ed.   ..a sset-buil de                              r.qu  eued...m any.hands.one.score...scanner . r ead.8.of.8.r\neferences...color.drafted.a.palette.f rom.#0538FF... type.paus ed:.Soh  ne.needs.a.l icenc            e              ...  orc  hest rator.waiting.on.1.decision...layout.queued...\nasset-builder.queued...many    .han ds.one.score...s  canner. read.8.of.8.references...co                lor          .drafte  d.a .palette.from.#0538FF...type.paused:. Sohne.nee\n  d   s .a.l  icence...orch  estrator.waiting.on.1.de cision...layout.que    ued...asset                  -bui  ld    er.queu   ed...ma          ny.hands.one.score...scanner.read\n  .8  .of.8.r eferences...    c olor.drafted.a.palette.from.#0538FF...t        ype.paus                   ed:.S     ohne.nee     ds.a.licence. ..orc hestrator.waiting .on.1.decis\n  ion ...la   y  out.queued . ..asset-builder.queued...many.hands.one.           score..          .         s  ca     nner.r     ead.8.of.8 .r  e ferences...color.draft  ed.a.pal\n  et   te.from.#0538FF...ty  p  e.paused:.Soh ne.needs.a.licence...orc             hestra                   to       r.waiti     ng.on.1. d  ecision...layout.queued...asset-build\ne    r.queued...many.hands.one.score...scanne  r.read.8.of.8.references .           ..col                   or.     drafted.a    .palette.from.# 0538FF...type.paused:.Sohne.needs\n.   a . licence...orch est rato     r .waiting  .on.1.decision...layout.qu          eued.                    ..a    sset-buil    der. que  ued ...many.hands.one.score...scanner.r\n        ead.8.of.8 .reference s.  . . color.dra  fted.a.palette.from.#0538FF.  .    .typ          e          .paus   e  d:.So   hne.n  ee   ds.a.l ic   enc e...orchestrator.waiti\nng    .on.1.decision...layout.queued..  .asset-b uilder.queued...many.hands.one.     sco          r           e.. .sc   anner. read.8  .of   .8   . re   ferences...color.drafted.\na.palette.from.#0538FF...type.p aused:.Sohne.nee  ds.a.licence...orchestrator.wai    tin          g           .on.1.     decis ion...  lay    out    .   queued...asset-builder.qu\ne ue d...many .ha nds.one.score .. . scanner.read .8.of.8.references...color.draft    ed          .           a.pa   le  tte.fr om.#   053     8FF. ..type.paused:.Sohne.needs.a.l\ni ce nce .. . orc he st ra tor.  w a  it i ng.on.1 .decision...layout.queued...a  s    s          e           t-b  u  il  der.q ueue   d...    many.hands.one. score...scanner.rea\nd    . 8  . o  f  .8 .r e  f  e  r e      n ces...c olor.drafted.a.palette.from.  #               05     38   FF. .     .t  ype.paused:.Sohne.needs .a .lic  e nce...orchestrator.\nw    a i  t i ng .on.1. d  e  c   is  i   o n...layout.queued...asset-builder.queu                ed     ..   .m   an    y. hands.one.score... scanner. read   .8.of.8.references.\n. .c  olo r . dr afted  .a .  p a lette.  f rom.#0538FF...type.paused:.Sohne.needs .             a.l ice     nce. ..orche strator.waiting.on.1 .deci  s  ion...layout.queued...ass\net-builder.queued...many.hands.one.score...scanner.read.8.of.8.references...color.dr     a        ft e     d.a.pal ett  e.fro m.#05 38FF...type  .paused:.Sohne.needs.a.licence...\norchestrator.waiting.on.1.decision...layout.queued...asset-builder.queued...many.hand     s.o n e.score...scanner.r ead.8.of.8.references. ..color.drafted.a.palette.from.#0538FF.\n..type.paused:.Sohne.needs.a.licence...orchestrator.waiting.on.1.decision...layout.que     ued...asset-builder.q u     eued...many.hands.one.score...scanner.read.8.of.8.reference\ns...color.drafted.a.palette.from.#0538FF...type.paused:.Sohne.needs.a.licence...orchest    rator.waiting.on.1.decision  ...layout.queued...asset-builder.queued...many.hands.one.s\ncore...scanner.read.8.of.8.references...color.drafted.a.palette.from.#0538FF...type.paus    ed:.Sohne.needs.a.licence...orchestrator.waiting.on.1.decision...layout.queued...asset\n-builder.queued...many.hands.one.score...scanner.read.8.of.8.references...color.drafted.a.      palette.from.#0538FF...type.paused:.Sohne.needs.a.licence...orchestrator.waiting.o\nn.1.decision...layout.queued...asset-builder.queued...many.hands.one.score...scanner.read.8            .  of.8.references...color.drafted.a.palette.from.#0538FF...type.paused:.So\nhne.needs.a.licence...orchestrator.waiting.on.1.decision...layout.queued...asset-builder.queu ed                          ...many.hands.one.score...scanner.read.8.of.8.references\n...color.drafted.a.palette.from.#0538FF...type.paused:.Sohne.needs.a.licence...orchestrator.wa     iti                   ng.on.1.decision...layout.queued...as s  et -build     e \nr.queued...many.hands.one.score...scanner.read.8.of.8.references...color.drafted.a.palette.from.#0    5                 38FF...type.paused:.Sohne.needs.a.licence...orchestrator.w\naiting.on.1.decision...layout.queued...asset-builder.queued...many.hands.one.score...scanner.read.8.of .             8.references...color.drafted.a.palette.from.#0538FF...type.pa\nused:.Sohne.needs.a.licence...orchestrator.waiting.on.1.decision...layout.queued           .     ..ass             et-builder.queued...many.hands.one.score...scanner.read.8.of.8."};
+  const CREDITS = {
+    hand: 'Albrecht Dürer, Study of a Hand and a Pillow, 1493 · CC0',
+    apollo: 'Asher Brown Durand, Apollo Belvedere, 1825 · CC0',
+    concert: 'Mechanisch concert, 1769, Rijksmuseum · CC0'
   };
-  btns.forEach(b => b.addEventListener('click', () => {
-    const i = +b.dataset.go; show(i);
-    steps[i].scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-  }));
-  const io = new IntersectionObserver(es => {
-    es.forEach(e => { if (e.isIntersecting) show(+e.target.dataset.shot); });
-  }, { rootMargin: '-45% 0px -50% 0px' });
-  steps.forEach(s => io.observe(s));
+  const fig = document.getElementById('fig'), credit = document.getElementById('credit');
+  const show = (k) => {
+    const lines = FIGS[k].replace(/\s+$/, '').split('\n');
+    const cols = Math.max(...lines.map(l => l.trimEnd().length));
+    fig.textContent = lines.join('\n');
+    fig.style.fontSize = `min(calc(100cqh / ${lines.length}), calc(100cqw / ${cols * 0.6}))`;
+    credit.textContent = CREDITS[k];
+    document.querySelectorAll('.figs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === k));
+  };
+  document.querySelectorAll('.figs button').forEach(b => b.addEventListener('click', () => show(b.dataset.f)));
+  show('hand');
 
-  /* the score */
-  const D = [
-    { id: 'concept', name: 'Concept', sub: 'goal · references', needs: [], parts: [['brief + moodboard', 0, 1]] , agent: 'orchestrator' },
-    { id: 'brand', name: 'Brand kit', sub: 'Figma', needs: ['concept'], parts: [['scan refs', 0, 1], ['palette · type · grid', 1, 2], ['audit', 2, 3]], agent: 'brand-kit musician' },
-    { id: 'deck', name: 'Slide deck', sub: 'Figma Slides', needs: ['brand'], parts: [['waits on brand kit', 1, 1.5, 'wait'], ['narrative · pacing', 1.5, 2], ['audit', 2, 3]], agent: 'deck musician' },
-    { id: 'ui', name: 'UI', sub: 'desktop · mobile', needs: ['brand'], parts: [['waits on kit', 1, 1.4, 'wait'], ['screens · components', 1.4, 2], ['stress tests', 2, 3]], agent: 'ui musician' },
-    { id: 'motion', name: 'Motion', sub: 'trailer · voice', needs: ['brand'], parts: [['waits on kit', 1, 1.6, 'wait'], ['animatic', 1.6, 2], ['timing pass', 2, 3]], agent: 'motion musician' },
-    { id: '3d', name: '3D renders', sub: 'Blender · Fusion', needs: ['concept'], parts: [['form studies', 0, 1], ['model · light · render', 1, 2], ['print check', 2, 3]], agent: '3d musician' }
-  ];
-  const sel = new Set(['concept', 'brand', 'deck', 'ui']);
-  const picker = document.getElementById('picker');
-  const staves = document.getElementById('staves');
-  const requiredBy = id => D.filter(d => sel.has(d.id) && d.needs.includes(id)).map(d => d.name);
-  const closure = () => { let changed = true; while (changed) { changed = false; for (const d of D) if (sel.has(d.id)) for (const n of d.needs) if (!sel.has(n)) { sel.add(n); changed = true; } } };
-
-  D.forEach(d => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'pick'; b.setAttribute('role', 'checkbox'); b.dataset.id = d.id;
-    b.innerHTML = `<span class="box" aria-hidden="true"></span><span><span class="t">${d.name}</span><span class="req" hidden></span><span class="d">${d.sub}</span></span>`;
-    b.addEventListener('click', () => {
-      if (b.dataset.locked === 'true') return;
-      sel.has(d.id) ? sel.delete(d.id) : sel.add(d.id);
-      render(d.id);
-    });
-    picker.appendChild(b);
-
-    const row = document.createElement('div');
-    row.className = 'stave'; row.dataset.id = d.id;
-    row.innerHTML = `<div class="inst">${d.name}<small>${d.agent}</small></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>`;
-    const cells = row.querySelectorAll('.cell');
-    d.parts.forEach(([txt, a, z, kind], k) => {
-      const c = Math.floor(a), cell = cells[Math.min(c, 2)];
-      const n = document.createElement('div');
-      n.className = 'note' + (kind ? ' ' + kind : '');
-      n.textContent = txt;
-      const left = (a - c) * 100, width = (Math.min(z, c + 1) - a) * 100;
-      n.style.left = `calc(${left}% + 4px)`; n.style.width = `calc(${width}% - 8px)`;
-      n.style.animationDelay = (k * 0.12) + 's';
-      cell.appendChild(n);
-    });
-    staves.appendChild(row);
+  const copy = document.getElementById('copy'), cmd = document.getElementById('cmd');
+  copy.addEventListener('click', () => {
+    const done = () => { copy.textContent = 'Copied'; setTimeout(() => copy.textContent = 'Copy', 1600); };
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents(cmd); const s = getSelection(); s.removeAllRanges(); s.addRange(r); copy.textContent = 'Selected'; };
+    try { navigator.clipboard.writeText(cmd.textContent).then(done, fallback); } catch { fallback(); }
   });
 
-  function render(changed) {
-    closure();
-    picker.querySelectorAll('.pick').forEach(b => {
-      const id = b.dataset.id, on = sel.has(id), by = on ? requiredBy(id) : [];
-      b.setAttribute('aria-checked', on);
-      b.dataset.locked = by.length ? 'true' : 'false';
-      const req = b.querySelector('.req');
-      req.hidden = !by.length;
-      req.textContent = by.length ? 'needed by ' + (by.length > 1 ? by.length + ' parts' : by[0]) : '';
-      b.title = by.length ? `Required by ${by.join(', ')}` : '';
-    });
-    staves.querySelectorAll('.stave').forEach(r => {
-      const on = sel.has(r.dataset.id), was = !r.hidden;
-      r.hidden = !on;
-      if (on && !was) { r.classList.remove('enter'); void r.offsetWidth; r.classList.add('enter'); }
-    });
-    const picked = D.filter(d => sel.has(d.id));
-    const principals = picked.filter(d => d.id !== 'concept').length;
-    document.getElementById('score-meta').textContent = `${picked.length} parts · ${principals} Musician${principals === 1 ? '' : 's'}`;
-    const waits = picked.filter(d => d.parts.some(p => p[3] === 'wait')).length;
-    document.getElementById('score-foot').textContent = picked.length
-      ? `${waits ? waits + ' part' + (waits > 1 ? 's wait' : ' waits') + ' on the brand kit' : 'no dependencies waiting'}`
-      : 'nothing selected';
-  }
-  render();
-
-  /* agent log */
-  const log = document.getElementById('log');
-  const lines = [
-    ['10:42', 'orchestrator', 'received brief: Hermes Rebrand, Atelier North'],
-    ['10:42', 'ref-scanner', 'scanned 6 references → quiet geometry, monochrome imagery'],
-    ['10:43', 'brand-kit', 'playing typography, color, layout, spacing'],
-    ['10:43', 'color', 'exported palette + tokens.json (8 KB)'],
-    ['10:44', 'layout', 'applied 8 px spacing scale to hero v3'],
-    ['10:44', 'typography', 'needs input: Canela requires a licence', 'sig'],
-    ['10:45', 'iconography', 'queued; inherits approved type scale'],
-    ['10:46', 'refine', 'contrast audit: caption 3.2:1, below 4.5:1', 'sig'],
-    ['10:47', 'layout', 'section gap 52 px → 48 px'],
-    ['10:47', 'brand-kit', 'wrote SKILL.md for design system v1'],
-    ['10:48', 'refine', 'suite run: 3 passed · 2 warnings · 1 failed']
-  ];
-  const add = ([t, who, msg, cls]) => {
-    const el = document.createElement('div');
-    el.innerHTML = `<span class="t">[${t}]</span> <span class="who">${who}</span> <span class="${cls || ''}"></span>`;
-    el.lastElementChild.textContent = msg;
-    log.appendChild(el);
-    while (log.children.length > 14) log.firstElementChild.remove();
-  };
-  lines.slice(0, 6).forEach(add);
-  let li = 6;
-  if (!reduce) setInterval(() => { add(lines[li % lines.length]); li++; }, 2600);
-  else lines.slice(6).forEach(add);
-
-  document.querySelectorAll('#decide button').forEach(b => b.addEventListener('click', () => {
-    const swap = b.dataset.choice === 'swap';
-    add(['10:49', 'typography', swap ? 'swapped Canela for Instrument Serif; exporting type styles' : 'licence purchase queued for your approval; type styles on hold']);
-    const box = document.getElementById('decide');
-    box.innerHTML = `<div class="done">✓ ${swap ? 'Swapped for Instrument Serif' : 'Licence purchase sent to you for approval'} · example only</div>`;
-  }));
-
-  /* memory graph */
+  /* knowledge graph illustration */
   const cv = document.getElementById('graph');
-  const css = getComputedStyle(document.documentElement);
   const rand = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(7);
-  const projects = [{ n: 'Hermes Rebrand', x: .22, y: .32 }, { n: 'Forma Editorial', x: .74, y: .28 }, { n: 'Still House', x: .5, y: .78 }];
-  const shared = [{ n: 'Instrument Serif', x: .48, y: .3 }, { n: '#0538FF', x: .36, y: .56 }, { n: 'modular grid', x: .64, y: .54 }];
-  const leaves = [];
-  projects.forEach((p, pi) => { for (let i = 0; i < 9; i++) { const a = rand() * Math.PI * 2, r = .07 + rand() * .1; leaves.push({ p: pi, x: p.x + Math.cos(a) * r * .8, y: p.y + Math.sin(a) * r }); } });
-  function draw(tk) {
-    const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1;
-    if (!r.width) return;
-    cv.width = r.width * dpr; cv.height = r.height * dpr;
-    const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const W = r.width, H = r.height, P = (o) => [o.x * W, o.y * H];
-    const ink = css.getPropertyValue('--ink').trim(), line = css.getPropertyValue('--line-strong').trim(), blue = css.getPropertyValue('--link').trim(), ink3 = css.getPropertyValue('--ink-3').trim();
+  const P = [{ n: 'Orchestra Brand', x: .2, y: .3 }, { n: 'Forma Editorial', x: .76, y: .26 }, { n: 'Still House', x: .5, y: .8 }];
+  const S = [{ n: 'Instrument Serif', x: .47, y: .28 }, { n: '#0538FF', x: .33, y: .58 }, { n: 'modular grid', x: .65, y: .55 }];
+  const L = []; P.forEach((p, i) => { for (let k = 0; k < 10; k++) { const a = rand() * 6.283, r = .07 + rand() * .1; L.push({ p: i, x: p.x + Math.cos(a) * r * .8, y: p.y + Math.sin(a) * r }); } });
+  let vis = true;
+  function draw(t) {
+    const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; if (!r.width) return;
+    if (cv.width !== Math.round(r.width * d)) { cv.width = r.width * d; cv.height = r.height * d; }
+    const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); c.clearRect(0, 0, r.width, r.height);
+    const cs = getComputedStyle(document.documentElement), tok = k => cs.getPropertyValue(k).trim();
+    const W = r.width, H = r.height, at = o => [o.x * W, o.y * H], pulse = reduce ? 0 : (Math.sin(t / 900) + 1) / 2;
     c.lineWidth = 1;
-    leaves.forEach(l => { const [x, y] = P(l), [px, py] = P(projects[l.p]); c.strokeStyle = line; c.globalAlpha = .7; c.beginPath(); c.moveTo(px, py); c.lineTo(x, y); c.stroke(); });
+    c.strokeStyle = tok('--line-strong'); c.globalAlpha = .7;
+    L.forEach(l => { const [x, y] = at(l), [a, b] = at(P[l.p]); c.beginPath(); c.moveTo(a, b); c.lineTo(x, y); c.stroke(); });
+    c.strokeStyle = tok('--link'); c.globalAlpha = .55;
+    S.forEach(s => P.forEach(p => { const [x, y] = at(s), [a, b] = at(p); c.beginPath(); c.moveTo(a, b); c.lineTo(x, y); c.stroke(); }));
     c.globalAlpha = 1;
-    shared.forEach(s => projects.forEach(p => { const [x, y] = P(s), [px, py] = P(p); c.strokeStyle = blue; c.globalAlpha = .55; c.beginPath(); c.moveTo(px, py); c.lineTo(x, y); c.stroke(); }));
-    c.globalAlpha = 1;
-    const pulse = reduce ? 0 : (Math.sin(tk / 900) + 1) / 2;
-    leaves.forEach(l => { const [x, y] = P(l); c.fillStyle = ink3; c.beginPath(); c.arc(x, y, 2.2, 0, 7); c.fill(); });
-    shared.forEach(s => { const [x, y] = P(s); c.fillStyle = blue; c.beginPath(); c.arc(x, y, 5 + pulse * 1.5, 0, 7); c.fill(); c.font = '11px "IBM Plex Mono", monospace'; c.fillStyle = blue; c.fillText(s.n, x + 9, y + 4); });
-    projects.forEach(p => { const [x, y] = P(p); c.fillStyle = ink; c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); c.font = 'italic 17px "Instrument Serif", Georgia, serif'; c.fillText(p.n, x + 10, y - 8); });
+    c.fillStyle = tok('--ink-3'); L.forEach(l => { const [x, y] = at(l); c.beginPath(); c.arc(x, y, 2.2, 0, 7); c.fill(); });
+    S.forEach(s => { const [x, y] = at(s); c.fillStyle = tok('--link'); c.beginPath(); c.arc(x, y, 5 + pulse * 1.5, 0, 7); c.fill(); c.font = '11px "IBM Plex Mono", monospace'; c.fillText(s.n, x + 9, y + 4); });
+    P.forEach(p => { const [x, y] = at(p); c.fillStyle = tok('--ink'); c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); c.font = 'italic 17px "Instrument Serif", Georgia, serif'; c.fillText(p.n, x + 10, y - 8); });
   }
-  let vis = false;
-  new IntersectionObserver(es => { vis = es[0].isIntersecting; }).observe(cv);
-  const loop = t => { if (vis || t < 100) draw(t); if (!reduce) requestAnimationFrame(loop); };
-  requestAnimationFrame(loop);
+  new IntersectionObserver(e => { vis = e[0].isIntersecting; }).observe(cv);
+  const loop = t => { if (vis) draw(t); if (!reduce) requestAnimationFrame(loop); };
+  draw(0); requestAnimationFrame(loop);
   addEventListener('resize', () => draw(performance.now()));
-  document.fonts && document.fonts.ready.then(() => draw(performance.now()));
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(() => location.reload ? draw(performance.now()) : 0, 0));
+  if (document.fonts) document.fonts.ready.then(() => draw(performance.now()));
 })();
 </script>
 </body>

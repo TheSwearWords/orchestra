@@ -8,7 +8,7 @@
 <meta name="description" content="Orchestra is an open-source framework for designers that turns your AI compute into an agent hierarchy, so you can research, create and refine work across mediums without the slop.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400&family=Bodoni+Moda:ital,opsz,wght@0,6..96,800;1,6..96,800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400&family=Bodoni+Moda:ital,opsz,wght@1,6..96,800&display=swap">
 <style>
 /* Layout: a blue overture with the word-built violin, then three movements of a white score — what Orchestra is, how it works, the brand — closing on a blue call to the repo. */
 :root{
@@ -22,7 +22,7 @@
   --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px; --s9:96px; --s10:128px;
   --max:1240px;
-;letter-spacing:-.03em}
+;letter-spacing:-.03em;font-style:italic}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0b0b12; --bg-subtle:#121219; --bg-muted:#1a1a23; --ink:#ffffff; --ink-2:#c9c9d3; --ink-3:#a0a0ae;
   --line:#272732; --line-strong:#575766; --link:#8a9eff; --agent-text:#b8c4ff; --mist-subtle:#1c2457; color-scheme:dark }}
@@ -35,7 +35,7 @@ html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:26px;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--blue)}
 h1,h2,h3,p,figure{margin:0}
-h1,h2{font-family:var(--f-display);font-weight:800;text-wrap:balance;letter-spacing:-.03em}
+h1,h2{font-family:var(--f-display);font-weight:800;text-wrap:balance;letter-spacing:-.03em;font-style:italic}
 a{color:var(--link)}
 :focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 .blue :focus-visible{outline-color:#fff}
@@ -73,7 +73,9 @@ a{color:var(--link)}
 /* hero */
 .hero{position:relative;overflow:hidden;isolation:isolate}
 .hero .wrap{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:space-between;gap:var(--s8);min-height:min(820px,calc(100svh - 64px));padding-block:var(--s8) var(--s7)}
-.kicker{font:400 13px/20px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.9)}
+.kicker{font:400 clamp(14px,1.25vw,18px)/1.5 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:#fff}
+.caret{display:inline-block;width:.6em;height:1.1em;margin-left:.12em;vertical-align:-.18em;background:#fff;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
 .headline{min-width:0}
 /* the integral as a giant tonal figure behind everything */
 .bg-int{position:absolute;z-index:0;left:4%;top:4%;height:92%;aspect-ratio:117/184;pointer-events:none}
@@ -81,7 +83,7 @@ a{color:var(--link)}
 .hero h1{font-weight:400;line-height:.9;letter-spacing:-.02em}
 .hl{min-width:0}
 .hero h1 .a em{font-family:var(--f-word);font-style:italic;font-weight:800;font-optical-sizing:auto;letter-spacing:-.03em}
-.hero h1 .a{display:flex;align-items:baseline;gap:.22em;font:800 clamp(44px,10.4vw,168px)/1 var(--f-display);letter-spacing:-.03em;margin-top:.08em;white-space:nowrap}
+.hero h1 .a{display:flex;align-items:baseline;gap:.22em;font:italic 800 clamp(44px,10.4vw,168px)/1 var(--f-display);letter-spacing:-.03em;margin-top:.08em;white-space:nowrap}
 .wm-inline{height:.74em;width:auto;aspect-ratio:715.391/138.354;flex:none;transform:translateY(.02em)}
 .hero h1 .b{display:block;font:400 clamp(30px,4.8vw,78px)/1 var(--f-body);letter-spacing:-.04em}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
@@ -120,11 +122,11 @@ a{color:var(--link)}
 .fact{padding:var(--s5) var(--s5) var(--s6) 0;border-right:1px solid var(--line)}
 .fact + .fact{padding-left:var(--s5)}
 .fact:last-child{border-right:0}
-.fact h3{font:800 30px/36px var(--f-display);letter-spacing:-.03em}
+.fact h3{font:italic 800 30px/36px var(--f-display);letter-spacing:-.03em}
 .fact p{color:var(--ink-2);margin-top:var(--s3);max-width:24em}
 @media (max-width:860px){.facts{grid-template-columns:1fr}.fact,.fact+.fact{padding-left:0;border-right:0;border-bottom:1px solid var(--line)}}
 .hier{margin-block:var(--s9);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);align-items:start}
-.hier h3{font:800 clamp(32px,3.4vw,44px)/1.1 var(--f-display);letter-spacing:-.03em}
+.hier h3{font:italic 800 clamp(32px,3.4vw,44px)/1.1 var(--f-display);letter-spacing:-.03em}
 .hier > div > p{color:var(--ink-2);margin-top:var(--s4);max-width:30em}
 .chain{list-style:none;margin:0;padding:0;display:grid;gap:0}
 .chain li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:var(--s4);padding:var(--s4) 0;border-top:1px solid var(--line)}
@@ -135,7 +137,7 @@ a{color:var(--link)}
 .dot.m{border:1.5px solid var(--link);color:var(--link)}
 .dot.m svg{width:14px;height:14px}
 .dot.i{width:14px;height:14px;margin:11px;border:1.5px solid var(--ink)}
-.chain b{display:block;font:800 26px/30px var(--f-display);letter-spacing:-.03em}
+.chain b{display:block;font:italic 800 26px/30px var(--f-display);letter-spacing:-.03em}
 .chain b small{font:400 12px/16px var(--f-mono);color:var(--ink-3);margin-left:8px}
 .chain span{display:block;color:var(--ink-2);margin-top:4px}
 .chain .l2{padding-left:28px}.chain .l3{padding-left:56px}
@@ -193,11 +195,11 @@ a{color:var(--link)}
 .t-word{grid-column:span 7;justify-content:space-between}
 .wm-field{background:#0538ff;color:#fff;display:grid;place-items:center;padding:clamp(24px,5vw,64px) var(--s5)}
 .wm{width:100%;max-width:560px;height:auto;aspect-ratio:715.391/138.354}
-.t-word .tag{font:800 clamp(28px,3vw,40px)/1.1 var(--f-display);letter-spacing:-.03em}
+.t-word .tag{font:italic 800 clamp(28px,3vw,40px)/1.1 var(--f-display);letter-spacing:-.03em}
 .t-color{grid-column:span 12}
 .swatches{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid var(--line)}
 .sw{min-height:180px;padding:var(--s4);display:flex;flex-direction:column;justify-content:flex-end;gap:2px;font:400 12px/18px var(--f-mono)}
-.sw b{font:800 24px/28px var(--f-display);letter-spacing:-.03em}
+.sw b{font:italic 800 24px/28px var(--f-display);letter-spacing:-.03em}
 .sw.blue{background:#0538ff;color:#fff}.sw.ink{background:#0b0b12;color:#fff}.sw.white{background:#fff;color:#0b0b12;border-left:1px solid #e1e1e8}
 .sw.mist{background:#b8c4ff;color:#0b0b12}.sw.signal{background:#ff5a1f;color:#0b0b12}
 @media (max-width:760px){.swatches{grid-template-columns:1fr 1fr}.sw{min-height:120px}}
@@ -208,7 +210,7 @@ a{color:var(--link)}
 .face .r{font:400 12px/18px var(--f-mono);color:var(--ink-3)}
 .f0{font:400 24px/1.2 var(--f-body)}
 .f0 i{font:italic 800 48px/1 var(--f-word);letter-spacing:-.03em}
-.f1{font:800 44px/1.05 var(--f-display);letter-spacing:-.03em}
+.f1{font:italic 800 44px/1.05 var(--f-display);letter-spacing:-.03em}
 .f2{font:500 22px/1.3 var(--f-body)}
 .f3{font:400 15px/1.5 var(--f-mono)}
 @media (max-width:520px){.face{grid-template-columns:1fr}}
@@ -226,7 +228,7 @@ a{color:var(--link)}
 .credit{font:400 12px/18px var(--f-mono);color:var(--ink-3)}
 .t-voice{grid-column:span 12;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s5)}
 .t-voice > h3{grid-column:1/-1}
-.v b{display:block;font:800 26px/32px var(--f-display);letter-spacing:-.03em}
+.v b{display:block;font:italic 800 26px/32px var(--f-display);letter-spacing:-.03em}
 .v p{margin-top:var(--s2)}
 .v code{display:block;margin-top:var(--s3);padding:10px 12px;background:var(--bg-subtle);border-left:2px solid var(--blue);font:400 13px/20px var(--f-mono);color:var(--ink)}
 .v code.sig{border-color:var(--signal)}
@@ -289,10 +291,10 @@ footer a{color:#fff}
   <div class="wrap">
     <div aria-hidden="true"></div>
     <div class="headline">
-      <div class="hl"><h1 id="hero-title"><span class="b">Your compute. Your agents.</span><span class="a"><em>One</em> <svg class="wm-inline" role="img" aria-label="Orchestra" viewBox="0 0 715.391 138.354"><use href="#wm"/></svg></span></h1>
+      <div class="hl"><h1 id="hero-title"><span class="b">Your compute. Your agents.</span><span class="a"><em>One Orchestra</em></span></h1>
         <div class="actions"><a class="btn btn-white btn-lg" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a><a class="btn btn-line btn-lg" href="#how">How it works</a></div></div>
     </div>
-    <div class="hero-foot"><span class="kicker">An open-source agent framework for designers</span></div>
+    <div class="hero-foot"><span class="kicker">An open-source agent framework for <span class="type" id="who" aria-live="off">designers</span><span class="caret" aria-hidden="true"></span></span></div>
   </div>
 </section>
 
@@ -444,7 +446,7 @@ footer a{color:#fff}
       <div class="tile t-type">
         <h3>Type</h3>
         <div class="faces">
-          <div class="face"><div class="s f1">Bodoni Moda, <i>in italic for the name</i></div><div class="r">headlines · wordmark</div></div>
+          <div class="face"><div class="s f1">Bodoni Moda, in heavy italic</div><div class="r">headlines · wordmark</div></div>
           <div class="face"><div class="s f2">Instrument Sans for the interface</div><div class="r">UI · labels · body</div></div>
           <div class="face"><div class="s f3">[14:02] type-agent swapped Söhne for Instrument Sans</div><div class="r">agent logs only</div></div>
         </div>
@@ -510,6 +512,21 @@ footer a{color:#fff}
   };
   document.querySelectorAll('.nav a:not(.btn), .figs button').forEach(label);
   const setLabel = (el, t) => { const l = el.querySelector('.lbl'); if (!l) return (el.textContent = t); l.dataset.t = t; l.firstChild.textContent = t; };
+
+  /* the kicker types out who Orchestra is for */
+  (() => {
+    const el = document.getElementById('who'), words = ['designers', 'developers'];
+    if (!el || reduce) return;
+    let w = 0, i = words[0].length, del = true;
+    const step = () => {
+      const word = words[w];
+      if (del) { i--; el.textContent = word.slice(0, i); if (i === 0) { del = false; w = (w + 1) % words.length; } return setTimeout(step, 45); }
+      const next = words[w]; i++; el.textContent = next.slice(0, i);
+      if (i === next.length) { del = true; return setTimeout(step, 2600); }
+      setTimeout(step, 85 + Math.random() * 60);
+    };
+    setTimeout(step, 2600);
+  })();
 
   /* the nav marks the section in view, like the app marks where you are */
   const navs = [...document.querySelectorAll('.nav a[href^="#"]')];

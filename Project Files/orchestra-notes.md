@@ -351,3 +351,28 @@ The Agents screen (build step 5) later becomes the full editor for these same fi
 - **UI:** the tree shows live statuses ("Making…" on a foundation being made, Ready when its file exists, the deliverable Ready when its Musician reports done). The agent channel marks each speaker. Stop appears whenever anything in the chat is working.
 - **Tested end to end with real sessions:** Orchestrator → Brand Copy Musician → Copywriter → `prereqs/copy.md` → reports back, in 44s. Stop mid-run ended every session.
 - **Next:** decision cards (the user answers agents' questions with buttons, and approves new agents), then the preview card, then the Agents screen with MCP connections (Figma first).
+
+## Files screen plan (Nov 2)
+
+**What the user asked for:** Files lists every project. Opening one shows its folder structure. The structure can be viewed as **files** or as a **knowledge graph**. The graph follows where you are: inside a project it shows that project, and at the top level ("all of Orchestra") it shows everything.
+
+**Account removed (Nov 2):** the sidebar is Files, Settings, Agents. Provider connections and usage go to Settings or a later screen when distribution is real.
+
+**Key decision: one graph, filtered.** Graphify builds a single graph of the whole vault (`Orchestra/`: every project plus the agent library), saved to `Orchestra/graphify-out/`. Every node records its `source_file`. A project's graph is the nodes from `projects/<id>/` plus their direct neighbours outside it (e.g. the library agents a project uses), so the links between a project and the rest of Orchestra stay visible. "All of Orchestra" shows the whole graph. One build and one incremental cache, instead of one graph per project plus a merge step.
+
+**Screens**
+1. **Files (top level):** a list of all projects (name, client, file count, last change), plus an "All of Orchestra" entry first. A **Files | Graph** toggle in the header. Graph at this level = everything.
+2. **A project:** breadcrumb `Files / <project>`. Files view: a folder tree on the left (concept.md, research.md, references/, prereqs/, exports/, audits/; `.orchestra/` shown last as "Agent workspace", collapsed), and a preview on the right: markdown as text, images and JSON shown, other files as name + size. Actions: open in its app, show in Explorer. Graph view: the project's slice of the graph.
+3. **The graph view (shared):** a force-directed canvas drawn in the app (not Graphify's own `graph.html`), so it uses Orchestra's tokens and follows the selected project without a reload. Nodes coloured by community; brand blue for the selection; search; click a node → its label, its source file (click opens it in the Files view) and its connections. Toggle the library nodes on and off.
+4. **Building the graph:** a "Build graph" / "Update graph" button with the date of the last build and "N files changed since". It runs Graphify through a headless Claude session (`/graphify` on the vault with `--update`), so it uses the user's Claude plan, not an API key. The first build costs tokens (the dev graph of 82 files took ~170k input tokens); updates only re-read changed files. Progress shows in the header; the graph reloads when it's done.
+
+**Build slices** (each one works on its own)
+1. Main: `files.ts`: list a project's tree (skipping nothing but `graphify-out/`; ids checked to stay inside the project), read one file for preview (size-capped), plus IPC and tests. Reuse `openOutput` for "open in its app".
+2. UI: Files page with the project list and a project's tree + preview. Selected row in serif italic, staggered entrance.
+3. Main: graph loading: read `Orchestra/graphify-out/graph.json` and return the whole graph or a project's slice (pure function, tested).
+4. UI: the graph canvas (`d3-force` + canvas, the only new dependency) with search and the node panel. Files | Graph toggle on both levels.
+5. Building: the Build/Update button running Graphify headless, with progress and the changed-files count from Graphify's `manifest.json`.
+
+**Open questions**
+- "Everything" = the vault (projects + library). The app's own source code keeps its separate dev graph in the repo's `graphify-out/`. Fine, or should Orchestra's code show too?
+- Should Graphify updates run automatically (e.g. after an agent finishes), or only from the button? Button only for v1, because builds cost tokens.

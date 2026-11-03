@@ -1,5 +1,6 @@
 import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { existsSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -8,7 +9,7 @@ import { Conductor, GENERAL, readChat, readLog } from './conductor'
 import { agentPrompt, orchestratorPrompt } from './prompts'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
-import { loadLibrary } from './library'
+import { agentFile, checkLibrary, loadLibrary, parseDoc, setField, type Role } from './library'
 import { listOutputs, outputPath } from './outputs'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
 import { createProject, editProject, listProjects, renameProject, type Project } from './projects'
@@ -41,6 +42,8 @@ const conductor = new Conductor({
   agentPrompt: (id, key) => agentPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, key),
   extraDirs: [join(ORCHESTRA_HOME, 'library')]
 })
+
+const MODELS = ['opus', 'sonnet', 'haiku'] // claude CLI aliases the Agents screen offers
 
 /** A project's folder, refusing ids that could point outside the vault. */
 function projectDir(id: string): string {
@@ -343,6 +346,30 @@ app.whenReady().then(async () => {
   })
   ipcMain.handle('create:save', async (_, project: string, ids: string[]) =>
     saveSelection(projectDir(project), await loadLibrary(ORCHESTRA_HOME), ids)
+  )
+
+  // The Agents screen: the whole library, raw agent files, and the fields it edits in place.
+  ipcMain.handle('agents:load', async () => {
+    const library = await loadLibrary(ORCHESTRA_HOME)
+    return { library, problems: checkLibrary(library) }
+  })
+  ipcMain.handle('agents:read', (_, role: Role, id: string) =>
+    readFile(agentFile(ORCHESTRA_HOME, role, id), 'utf8')
+  )
+  ipcMain.handle('agents:write', async (_, role: Role, id: string, text: string) => {
+    const file = agentFile(ORCHESTRA_HOME, role, id)
+    if (!existsSync(file)) throw new Error('That agent file no longer exists.')
+    if (!parseDoc(text)) throw new Error('Keep the --- front matter at the top of the file.')
+    await writeFile(file, text)
+  })
+  ipcMain.handle(
+    'agents:set',
+    async (_, role: Role, id: string, key: 'model' | 'instruments', value: string | string[]) => {
+      if (key === 'model' ? !MODELS.includes(value as string) : key !== 'instruments')
+        throw new Error(`Can't set ${key} to ${value}.`)
+      const file = agentFile(ORCHESTRA_HOME, role, id)
+      await writeFile(file, setField(await readFile(file, 'utf8'), key, value))
+    }
   )
 
   // A project's chats: General, then one per chosen deliverable, in library order. A deliverable

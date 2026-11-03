@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { Conductor, parseAgent } from './conductor.ts'
+import { Conductor, parseAgent, readChat } from './conductor.ts'
 import { startOrchestraMcp } from './orchestra-mcp.ts'
 
 const lib = {
@@ -54,8 +54,12 @@ test('each level gets only its own tools', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'orchestra-agents-'))
   try {
     const c = conductor(dir)
-    assert.deepEqual(await toolsFor(c, 'orchestrator'), ['brief_musician'])
-    assert.deepEqual(await toolsFor(c, 'website'), ['report', 'run_instrument'])
+    assert.deepEqual(await toolsFor(c, 'orchestrator'), ['brief_musician', 'propose_musician'])
+    assert.deepEqual(await toolsFor(c, 'website'), [
+      'propose_instrument',
+      'report',
+      'run_instrument'
+    ])
     assert.deepEqual(await toolsFor(c, 'website--copywriter'), [])
     assert.deepEqual(await toolsFor(c, 'not-an-agent'), [])
   } finally {
@@ -91,6 +95,35 @@ test('roles, and who each agent may start', async () => {
       musician: 'website',
       instrument: 'copywriter'
     })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a proposed Musician waits as a card; bad or repeated drafts are refused', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'orchestra-agents-'))
+  try {
+    const c = conductor(dir)
+    const draft = {
+      id: 'trailer',
+      name: 'Trailer',
+      deliverable: 'A 30 second cut.',
+      category: 'Motion',
+      prerequisites: ['brief'],
+      prompt: 'You are the Trailer Musician. '.repeat(4)
+    }
+    await assert.rejects(
+      c.proposeMusician('p', 'general', { ...draft, id: 'website' }),
+      /already exists/
+    )
+    await c.proposeMusician('p', 'general', draft)
+    const p = (await c.proposals('p'))['musician:trailer']
+    assert.equal(p.status, 'pending')
+    assert.equal(p.from, 'orchestrator')
+    const card = (await readChat(dir, 'general')).at(-1)
+    assert.deepEqual([card.role, card.ref], ['proposal', 'musician:trailer'])
+    await assert.rejects(c.proposeMusician('p', 'general', draft), /already waiting/)
+    await assert.rejects(c.decide('p', 'general', 'musician:nope', true), /no longer exists/)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

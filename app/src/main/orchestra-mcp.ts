@@ -4,6 +4,7 @@ import type { AddressInfo } from 'net'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
+import type { InstrumentDraft, MusicianDraft } from './proposals.ts'
 
 // Orchestra's own tools, served to each agent's session over localhost (Pitcrew's pattern). The
 // chain of command is enforced here, by which tools each level gets:
@@ -34,7 +35,20 @@ export interface Hub {
     text: string,
     done: boolean
   ): Promise<string>
+  proposeMusician(project: string, chat: string, draft: MusicianDraft): Promise<string>
+  proposeInstrument(
+    project: string,
+    chat: string,
+    musician: string,
+    draft: InstrumentDraft
+  ): Promise<string>
 }
+
+const ids = z.array(z.string()).optional()
+const model = z.enum(['opus', 'sonnet', 'haiku']).optional()
+const prompt = z
+  .string()
+  .describe("The agent's full instructions (the markdown body), written from the library template.")
 
 type Result = { content: { type: 'text'; text: string }[]; isError?: boolean }
 const ok = (text: string): Result => ({ content: [{ type: 'text', text }] })
@@ -62,6 +76,26 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
       },
       ({ musician, brief }) => run(() => hub.briefMusician(project, chat, musician, brief))
     )
+    mcp.registerTool(
+      'propose_musician',
+      {
+        description:
+          "Propose a new Musician when the user wants a deliverable no library Musician covers. Draft it from library/templates/musician-template.md. The user sees it as an approval card in the chat; nothing is saved until they approve, and then it joins this project's deliverables. List only existing Instruments; once approved, the Musician proposes any new ones it needs.",
+        inputSchema: {
+          id: z.string().describe('lowercase-with-dashes, e.g. "trailer"'),
+          name: z.string(),
+          deliverable: z.string().describe('What it owns end to end, one line'),
+          category: z.string(),
+          icon: z.string().optional().describe('A Remix icon name, e.g. film-line'),
+          keywords: ids,
+          prerequisites: ids.describe('Foundation Instrument ids, built once per project'),
+          instruments: ids.describe('Its own existing Instrument ids, in run order'),
+          model,
+          prompt
+        }
+      },
+      (draft) => run(() => hub.proposeMusician(project, chat, draft))
+    )
   }
 
   if (role === 'musician') {
@@ -82,6 +116,25 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
         inputSchema: { text: z.string(), done: z.boolean().optional() }
       },
       ({ text, done }) => run(() => hub.report(project, chat, agent, text, done ?? false))
+    )
+    mcp.registerTool(
+      'propose_instrument',
+      {
+        description:
+          'Propose a new Instrument for your own crew, only when none in the library can do the job and the job is distinct and worth reviewing on its own. Draft it from library/templates/instrument-template.md. The user approves it through the Orchestrator; once approved it joins your Instruments and you can run it.',
+        inputSchema: {
+          id: z.string().describe('lowercase-with-dashes, e.g. "shot-cutter"'),
+          name: z.string(),
+          job: z.string().describe('One sentence'),
+          output: z
+            .string()
+            .describe('The file it writes, inside the project, e.g. prereqs/shot-list.md'),
+          needs: ids.describe('Instrument ids whose output must exist first'),
+          model,
+          prompt
+        }
+      },
+      (draft) => run(() => hub.proposeInstrument(project, chat, agent, draft))
     )
   }
 

@@ -66,7 +66,14 @@ Deliverables chosen so far: ${selected.length ? selected.join(', ') : 'none yet'
 ## The conversation is open-ended
 The user may start with no deliverables, add more at any point, or just think out loud with you. When they want something that one of the library's deliverables covers and it isn't chosen yet, say so, and end your reply with exactly one line of this form (ids from the list below, comma-separated):
 Suggest deliverables: website, slide-deck
-Orchestra turns that line into an "Add to deliverables" button; nothing is added until the user clicks it. If nothing in the library fits, say so and describe the Musician you would propose instead.
+Orchestra turns that line into an "Add to deliverables" button; nothing is added until the user clicks it. If nothing in the library fits, propose a new Musician with the propose_musician tool (drafted from library/templates/musician-template.md). The user sees it as an approval card; it joins the library and this project's deliverables only once they approve, and you get a message either way.
+
+## Decisions
+When you need the user to choose (art direction, anything outward-facing, deleting or overwriting, or a choice a Musician reported), end your reply with one decision block, and nothing after it:
+Decide: Which palette direction should we take?
+- Warm editorial (recommended)
+- Cool technical
+Two to six short options, each a few words; mark at most one "(recommended)". Orchestra shows them as buttons, and the label of the one picked comes back as the user's next message. The user can also answer in their own words. Ask one decision at a time, and don't combine it with a "Suggest deliverables" line.
 
 Library deliverables (id: name):
 ${catalogue}
@@ -115,6 +122,7 @@ You are the ${m.name} Musician. ${where}
 - Shared foundations live in prereqs/. Check what already exists before running an Instrument for one; never redo a foundation that is already there unless you were asked to.
 - Review each Instrument's output before going on.
 - Use the report tool to tell the Orchestrator where things stand after each meaningful step, and whenever the user needs to decide something (give the options and your recommendation). Set done only when the whole deliverable is finished. You never talk to the user.
+- If no Instrument in the library can do a job, propose one with the propose_instrument tool, drafted from library/templates/instrument-template.md. The user approves it through the Orchestrator; you get a message with their decision, and once approved you can run it.
 - ${NO_EXTERNAL_TOOLS}
 
 Instruments you can run:

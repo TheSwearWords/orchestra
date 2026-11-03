@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orchestra</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Orchestra is an open-source framework for designers that turns your AI compute into an agent hierarchy, so you can research, create and refine work across mediums without the slop.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400&family=Bodoni+Moda:ital,opsz,wght@1,6..96,800&display=swap">
+<style>
+/* Layout: a blue overture with the word-built violin, then three movements of a white score — what Orchestra is, how it works, the brand — closing on a blue call to the repo. */
+:root{
+  --blue:#0538ff; --blue-hover:#0430d9; --blue-pressed:#0326b0; --mist:#b8c4ff; --signal:#ff5a1f;
+  --bg:#ffffff; --bg-subtle:#f7f7f9; --bg-muted:#efeff3;
+  --ink:#0b0b12; --ink-2:#575766; --ink-3:#767685;
+  --line:#e1e1e8; --line-strong:#a0a0ae; --link:#0538ff; --agent-text:#0326b0; --mist-subtle:#dde3ff;
+  --f-display:"Bodoni Moda","Didot","Bodoni 72","Iowan Old Style",Georgia,serif;
+  --f-body:"Instrument Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-word:"Bodoni Moda","Didot","Bodoni 72",var(--f-display);
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px; --s9:96px; --s10:128px;
+  --max:1240px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b0b12; --bg-subtle:#121219; --bg-muted:#1a1a23; --ink:#ffffff; --ink-2:#c9c9d3; --ink-3:#a0a0ae;
+  --line:#272732; --line-strong:#575766; --link:#8a9eff; --agent-text:#b8c4ff; --mist-subtle:#1c2457; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0b0b12; --bg-subtle:#121219; --bg-muted:#1a1a23; --ink:#ffffff; --ink-2:#c9c9d3; --ink-3:#a0a0ae;
+  --line:#272732; --line-strong:#575766; --link:#8a9eff; --agent-text:#b8c4ff; --mist-subtle:#1c2457; color-scheme:dark }
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:26px;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--blue)}
+h1,h2,h3,p,figure{margin:0}
+h1,h2{font-family:var(--f-display);font-weight:800;text-wrap:balance;letter-spacing:-.03em;font-style:italic}
+a{color:var(--link)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.blue :focus-visible{outline-color:#fff}
+.wrap{max-width:var(--max);margin:0 auto;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
+@media (max-width:520px){.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.eyebrow{font:500 12px/16px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.blue{background:var(--blue);color:#fff}
+.blue .eyebrow{color:rgba(255,255,255,.75)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;font:500 16px/20px var(--f-body);text-decoration:none;border:1px solid transparent;cursor:pointer;background:none;color:inherit;white-space:nowrap}
+.btn svg{width:18px;height:18px;flex:none}
+.btn-white{background:#fff;color:#0538ff}
+.btn-white:hover{background:#dde3ff;color:#0326b0}
+.btn-line{border-color:rgba(255,255,255,.7);color:#fff}
+.btn-line:hover{background:rgba(255,255,255,.12)}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-blue:hover{background:var(--blue-hover)}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--blue);color:#fff}
+.top .wrap{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:var(--s5);height:72px}
+.top .brand{justify-self:start}
+.top-cta{justify-self:end;padding:10px 18px;font-size:15px}
+.brand{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}
+.brand svg{width:30px;height:30px;flex:none}
+.mark-swap{position:relative}
+.mark-swap .m-reg,.mark-swap .m-bold{width:40px;height:40px;flex:none}
+.mark-swap.sm .m-reg,.mark-swap.sm .m-bold{width:28px;height:28px}
+.mark-swap .m-bold{display:none}
+.mark-swap:is(:hover,:focus-visible,:active,[aria-current="page"]) .m-reg{display:none}
+.mark-swap:is(:hover,:focus-visible,:active,[aria-current="page"]) .m-bold{display:block}
+.brand span{font:italic 800 28px/36px var(--f-display);letter-spacing:-.03em}
+.nav{display:flex;gap:var(--s6);align-items:center}
+.nav a{color:inherit;text-decoration:none;font:500 16px/20px var(--f-body);opacity:.92}
+.nav a:hover{opacity:1;text-decoration:underline;text-underline-offset:4px}
+.nav .btn{opacity:1;padding:8px 14px;font-size:14px}
+.nav .btn:hover{text-decoration:none}
+.nav .btn-white{color:#0538ff}
+.nav .btn-white:hover{color:#0326b0}
+@media (max-width:760px){.nav{visibility:hidden}.nav a{display:none}}
+
+/* hero */
+.hero{position:relative;overflow:hidden;isolation:isolate}
+.hero-stage{position:relative;overflow:hidden}
+.tagline-top{font:400 13px/20px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.85)}
+.hero-stage > .wrap{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:space-between;gap:var(--s8);min-height:calc(100svh - 72px);padding-block:var(--s6) var(--s7)}
+.band{position:relative;z-index:3;background:var(--bg);color:var(--ink);border-bottom:1px solid var(--line)}
+.band .wrap{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,5fr) minmax(0,3fr);gap:var(--s7);align-items:start;padding-block:var(--s5) var(--s6)}
+.band p{font-size:17px;line-height:27px;color:var(--ink-2);max-width:30em}
+.band-go{display:flex;flex-direction:column;align-items:flex-end;gap:var(--s3)}
+.band small{font:400 13px/20px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);justify-self:end;padding-top:4px}
+@media (max-width:900px){.band .wrap{grid-template-columns:1fr;gap:var(--s4)}.band small{justify-self:start}.band-go{align-items:flex-start}}
+.kicker{font:400 clamp(14px,1.25vw,18px)/1.5 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+.caret{display:inline-block;width:.6em;height:1.1em;margin-left:.12em;vertical-align:-.18em;background:var(--link);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.headline{min-width:0;margin-block:auto;padding-bottom:var(--s6)}
+/* the integral as a giant tonal figure behind everything */
+.bg-int{position:absolute;z-index:0;left:4%;top:4%;height:92%;aspect-ratio:117/184;pointer-events:none}
+.bg-int canvas{position:absolute;inset:0;width:100%;height:100%}
+.hero h1{font-weight:400;line-height:.9;letter-spacing:-.02em}
+.hl{min-width:0}
+.hero h1 .a em{font-family:var(--f-word);font-style:italic;font-weight:800;font-optical-sizing:auto;letter-spacing:-.03em}
+.hero h1 .a{display:flex;align-items:baseline;gap:.22em;font:italic 800 clamp(44px,10.4vw,168px)/1 var(--f-display);letter-spacing:-.03em;margin-top:.08em;white-space:nowrap}
+.wm-inline{height:.74em;width:auto;aspect-ratio:715.391/138.354;flex:none;transform:translateY(.02em)}
+.hero h1 .b{display:block;font:400 clamp(30px,4.8vw,78px)/1 var(--f-body);letter-spacing:-.04em}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
+.hero .actions{margin-top:var(--s6)}
+.hero .btn-white{border-color:#fff}
+.btn-lg{padding:16px 26px;font-size:18px}
+.btn-lg svg{width:20px;height:20px}
+.hero-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--s4);flex-wrap:wrap;font:400 12px/20px var(--f-mono);color:rgba(255,255,255,.8)}
+.score-canvas{position:absolute;z-index:1;top:0;right:0;bottom:0;left:0;pointer-events:none}
+.score-canvas{overflow:hidden}
+.score-canvas canvas{position:absolute;top:0;right:0}
+@media (max-width:900px){
+  .hero-stage > .wrap{min-height:0;padding-block:var(--s6) var(--s7)}
+  .bg-int{left:-12%;top:4%;height:92%}
+  .score-canvas{opacity:.45}
+}
+
+/* section frame */
+.sec{border-bottom:1px solid var(--line)}
+.sec-head{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);padding-block:var(--s9) var(--s7);align-items:end}
+.sec-head .num{font:italic 800 20px/24px var(--f-display);color:var(--link);display:block;margin-bottom:var(--s3);letter-spacing:-.03em}
+.sec-head h2{font-size:clamp(40px,5vw,68px);line-height:1.04;letter-spacing:-.03em}
+.sec-head p{font-size:19px;line-height:30px;color:var(--ink-2);max-width:34em}
+.sec-head p + p{margin-top:var(--s4)}
+@media (max-width:900px){.sec-head{grid-template-columns:1fr;gap:var(--s5);padding-block:var(--s8) var(--s6)}}
+
+/* 1 · what */
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--ink)}
+.fact{padding:var(--s5) var(--s5) var(--s6) 0;border-right:1px solid var(--line)}
+.fact + .fact{padding-left:var(--s5)}
+.fact:last-child{border-right:0}
+.fact h3{font:italic 800 30px/36px var(--f-display);letter-spacing:-.03em}
+.fact p{color:var(--ink-2);margin-top:var(--s3);max-width:24em}
+@media (max-width:860px){.facts{grid-template-columns:1fr}.fact,.fact+.fact{padding-left:0;border-right:0;border-bottom:1px solid var(--line)}}
+.hier{margin-top:var(--s9);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s7);align-items:end}
+.hier h3{font:italic 800 clamp(32px,3.4vw,44px)/1.1 var(--f-display);letter-spacing:-.03em}
+.hier > p{color:var(--ink-2);max-width:34em;font-size:17px;line-height:28px}
+.diagram{margin:var(--s6) 0 var(--s9);border:1px solid var(--line);background:var(--bg-subtle)}
+.dg-scroll{overflow-x:auto}
+.dg{display:block;width:100%;min-width:880px;height:auto}
+.diagram figcaption{padding:12px 16px;border-top:1px solid var(--line);font:400 12px/18px var(--f-mono);color:var(--ink-3);background:var(--bg)}
+.dg text{font-family:var(--f-body)}
+.dg-tier{font:400 11px var(--f-mono);letter-spacing:.08em;fill:var(--ink-3)}
+.dg-band-g{fill:var(--mist-subtle)}
+.dg-n{font:italic 800 15px var(--f-display);fill:var(--link)}
+.dg-chip{fill:var(--bg);stroke:var(--ink);stroke-width:1.2}
+.dg-chip-t{font:400 14px var(--f-mono);fill:var(--ink)}
+.dg-box{fill:var(--bg);stroke:var(--ink);stroke-width:1.4}
+.dg-box-t{font:italic 800 26px var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.dg-file{fill:var(--bg);stroke:var(--ink);stroke-width:1.2}
+.dg-file-t{font:italic 800 17px var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.dg-band-s{font-size:14px;fill:var(--ink-2)}
+.dg-feed{stroke:var(--line-strong);stroke-dasharray:3 4}
+.dg-link{fill:none;stroke:var(--ink-3);stroke-width:1.2}
+.dg-thin{stroke-width:1;opacity:.6}
+.dg-share{fill:none;stroke:var(--link);stroke-width:1.2;stroke-dasharray:5 5}
+.dg-flow{stroke:var(--link);stroke-width:1.6;stroke-dasharray:6 6;animation:dgflow 1.4s linear infinite}
+@keyframes dgflow{to{stroke-dashoffset:-24}}
+.dg-talk{stroke:var(--ink);stroke-width:1.4}
+.dg-ah{fill:var(--ink)}
+.dg-note{font:400 12px var(--f-mono);fill:var(--link)}
+.dg-you{fill:var(--bg);stroke:var(--ink);stroke-width:1.4}
+.dg-you-t{font:italic 800 24px var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.dg-orc{fill:#0538ff}
+.dg-orc-i{color:#fff}
+.dg-mus{fill:var(--bg);stroke:var(--link);stroke-width:1.6}
+.dg-mus-i{color:var(--link)}
+.dg-name{font:italic 800 20px var(--f-display);letter-spacing:-.03em;fill:var(--ink)}
+.dg-name-s{font-size:17px}
+.dg-sub{font-size:12px;fill:var(--ink-3)}
+.dg-ins{fill:var(--bg);stroke:var(--ink);stroke-width:1.4}
+.dg-ins-t{font-size:14px;fill:var(--ink)}
+.dg-tools{fill:var(--bg);stroke:var(--ink);stroke-width:1.2}
+.dg-tool{font:400 14px var(--f-mono);fill:var(--ink)}
+@media (max-width:900px){.hier{grid-template-columns:1fr;gap:var(--s4);margin-top:var(--s8)}}
+
+
+/* screenshots */
+.shot{border:1px solid var(--line);background:var(--bg-subtle);overflow:hidden;max-width:100%}
+.shot-bar{display:flex;align-items:center;gap:var(--s3);padding:9px 12px;border-bottom:1px solid var(--line);font:400 12px/16px var(--f-mono);color:var(--ink-3)}
+.shot-bar i{display:flex;gap:6px}.shot-bar i b{width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
+.shot-bar span{margin-left:auto}
+.shot img{display:block;width:100%;height:auto;aspect-ratio:16/10}
+.shot figcaption{padding:10px 12px;font:400 12px/18px var(--f-mono);color:var(--ink-3);border-top:1px solid var(--line);background:var(--bg)}
+
+/* 2 · how */
+.mv{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:var(--s7);padding-block:var(--s8);border-top:1px solid var(--line);align-items:start}
+.mv:first-of-type{border-top:1px solid var(--ink)}
+.mv-text{position:sticky;top:96px;min-width:0;isolation:isolate}
+
+.mv .n{font:italic 800 56px/56px var(--f-display);color:var(--link);letter-spacing:-.03em}
+.mv h3{font:600 26px/32px var(--f-body);letter-spacing:-.5px;margin-top:var(--s3)}
+.mv p{color:var(--ink-2);margin-top:var(--s3);font-size:17px;line-height:28px}
+.mv ul{list-style:none;padding:0;margin:var(--s5) 0 0;display:grid;gap:var(--s2)}
+.mv li{display:flex;gap:var(--s3);font-size:15px;line-height:22px}
+.mv li::before{content:"";flex:none;width:6px;height:6px;margin-top:8px;background:var(--blue)}
+.tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:var(--s5)}
+.tools span{font:400 12px/16px var(--f-mono);padding:6px 9px;border:1px solid var(--line);color:var(--ink-2)}
+.mv-media{display:grid;gap:var(--s4);min-width:0}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4)}
+@media (max-width:960px){.mv{grid-template-columns:1fr;gap:var(--s5);padding-block:var(--s7)}.mv-text{position:static}.pair{grid-template-columns:1fr}}
+.graph{position:relative;aspect-ratio:16/10;max-width:100%;border:1px solid var(--line);background:var(--bg-subtle)}
+.graph canvas{position:absolute;inset:0;width:100%;height:100%}
+.graph figcaption{position:absolute;left:12px;bottom:10px;font:400 11px/16px var(--f-mono);color:var(--ink-3)}
+.how-end{padding-bottom:var(--s9)}
+/* How it works: on wide screens the section pins and the four steps slide in from the right */
+.hs-bar{width:100%;display:flex;align-items:center;gap:var(--s5);flex-wrap:wrap;position:relative;padding-block:var(--s4);border-top:1px solid var(--ink)}
+.hs-bar button{display:inline-flex;align-items:baseline;gap:8px;border:0;background:none;padding:6px 0;cursor:pointer;color:var(--ink-3);font:500 15px/20px var(--f-body)}
+.hs-bar button b{font:italic 800 18px/20px var(--f-display);letter-spacing:-.03em;color:var(--link)}
+.hs-bar button:hover,.hs-bar button[aria-selected="true"]{color:var(--ink)}
+.hs-prog{position:absolute;left:max(24px,env(safe-area-inset-left,0px));right:max(24px,env(safe-area-inset-right,0px));top:-1px;height:3px;pointer-events:none}
+.hs-prog i{display:block;height:100%;width:0;background:var(--blue)}
+.shot-switch .stack{position:relative;aspect-ratio:16/10}
+.shot-switch .stack img{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .35s}
+.shot-switch .stack img.on{opacity:1}
+.views{display:flex;gap:4px;margin-left:var(--s3)}
+.views button{border:1px solid var(--line);background:var(--bg);color:var(--ink-2);font:500 12px/16px var(--f-body);padding:4px 9px;cursor:pointer}
+.views button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+@media (min-width:961px){
+  .hs.on{position:relative}
+  .hs.on .hs-pin{position:sticky;top:72px;height:calc(100svh - 72px);overflow:hidden;display:flex;flex-direction:column}
+  .hs.on .hs-track{display:flex;flex:1;min-height:0;will-change:transform}
+  .hs.on .mv{flex:0 0 100%;max-width:none;margin:0;padding-inline:max(24px,calc((100% - var(--max)) / 2 + 24px));border:0;align-items:start;padding-block:var(--s5) var(--s7)}
+  .hs.on .mv-text{position:relative}
+  .hs.on .mv .n{font-size:44px;line-height:44px}
+  .hs.on .mv h3{font-size:24px;line-height:30px;margin-top:var(--s2)}
+  .hs.on .mv p{font-size:16px;line-height:26px}
+  .hs.on .mv ul{margin-top:var(--s4)}
+  .hs.on .tools{margin-top:var(--s4)}
+  .hs.on .mv .shot,.hs.on .mv .graph{max-height:calc(100svh - 72px - 150px);aspect-ratio:auto}
+  .hs.on .mv .shot img{max-height:calc(100svh - 72px - 260px);width:100%;object-fit:cover;object-position:top}
+  .hs.on .shot-switch .stack{aspect-ratio:auto;height:calc(100svh - 72px - 260px)}
+  .hs.on .mv .graph{height:calc(100svh - 72px - 220px)}
+  .hs.on .how-end{padding-bottom:var(--s6)}
+}
+@media (max-width:960px){.hs-bar{display:none}}
+/* shorter screens: tighten the pinned steps so the text always clears the bottom */
+@media (min-width:961px) and (max-height:820px){
+  .hs.on .mv{padding-block:var(--s3) var(--s6)}
+  .hs.on .mv .n{font-size:34px;line-height:34px}
+  .hs.on .mv h3{font-size:21px;line-height:26px}
+  .hs.on .mv p{font-size:15px;line-height:23px;margin-top:var(--s2)}
+  .hs.on .mv ul{margin-top:var(--s3);gap:4px}
+  .hs.on .mv li{font-size:14px;line-height:20px}
+  .hs.on .tools{display:none}
+  .hs-bar{padding-block:var(--s3)}
+}
+
+/* 3 · brand */
+.b-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--s4)}
+.tile{border:1px solid var(--line);padding:var(--s5);min-width:0;display:flex;flex-direction:column;gap:var(--s4)}
+.tile h3{font:500 12px/16px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.tile p{color:var(--ink-2);font-size:15px;line-height:24px}
+.t-con{grid-column:span 12;padding:0;background:#0538ff;border-color:#0538ff;margin:0}
+.t-con img{display:block;width:100%;height:auto}
+.t-con figcaption{padding:var(--s4) var(--s5) var(--s5);color:rgba(255,255,255,.9);font-size:15px;line-height:24px;max-width:60em}
+.t-con figcaption b{font-weight:600;color:#fff}
+.t-marks{grid-column:span 5}
+.t-idea,.t-names{grid-column:span 12;padding:var(--s6) var(--s5);gap:var(--s4)}
+.t-idea h3,.t-names h3{font:italic 800 clamp(30px,3.6vw,52px)/1.05 var(--f-display);letter-spacing:-.03em;text-transform:none;color:var(--ink);max-width:18em;text-wrap:balance}
+.idea-cols{display:grid;grid-template-columns:1fr 1fr;gap:var(--s6);margin-top:var(--s3)}
+.idea-cols p{font-size:17px;line-height:28px}
+.names{list-style:none;margin:var(--s4) 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--ink)}
+.names li{display:flex;flex-direction:column;gap:var(--s3);padding:var(--s5) var(--s5) 0 0;border-right:1px solid var(--line)}
+.names li + li{padding-left:var(--s5)}
+.names li:last-child{border-right:0}
+.names b{display:block;font:italic 800 28px/1.1 var(--f-display);letter-spacing:-.03em}
+.names small{display:block;margin-top:4px;font:400 12px/16px var(--f-mono);color:var(--ink-3)}
+.names p{margin-top:var(--s3);font-size:15px;line-height:24px}
+.nm-ic{width:52px;height:52px;border-radius:50%;display:grid;place-items:center}
+.nm-ic svg{height:56%;width:auto}
+.nm-ic.o{background:#0538ff;color:#fff}
+.nm-ic.m{border:1.6px solid var(--link);color:var(--link)}
+.nm-ic.m svg{height:42%}
+.nm-ic.i{width:20px;height:20px;margin:16px;border-radius:0;border:1.6px solid var(--ink)}
+.nm-ic.s{border-radius:0;width:52px;height:36px;margin-block:8px;background:repeating-linear-gradient(to bottom,transparent 0 6px,var(--ink-3) 6px 7px)}
+@media (max-width:1000px){.names{grid-template-columns:1fr 1fr}.names li:nth-child(2){border-right:0}.names li:nth-child(3){padding-left:0}.names li:nth-child(n+3){padding-top:var(--s6)}.idea-cols{grid-template-columns:1fr}}
+@media (max-width:640px){.names{grid-template-columns:1fr}.names li,.names li + li{padding-left:0;border-right:0}}
+.t-read{grid-column:span 12;padding:var(--s6) var(--s5);gap:var(--s6)}
+.read-head{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:var(--s6);align-items:end}
+.read-head h3{font:italic 800 clamp(30px,3.2vw,44px)/1.05 var(--f-display);letter-spacing:-.03em;text-transform:none;color:var(--ink)}
+.read-head p{font-size:17px;line-height:28px;max-width:34em}
+.readings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--ink)}
+.reading{padding:var(--s5) var(--s5) 0 0;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:var(--s3)}
+.reading + .reading{padding-left:var(--s5)}
+.reading:last-child{border-right:0}
+.rd-art{background:var(--bg-subtle);border:1px solid var(--line);aspect-ratio:3/2;max-width:100%}
+.rd-art svg{display:block;width:100%;height:100%}
+.rd-k{font:400 12px/16px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--link);margin-top:var(--s2)}
+.reading h4{margin:0;font:italic 800 22px/1.15 var(--f-display);letter-spacing:-.03em;text-wrap:balance}
+.reading p{font-size:16px;line-height:26px;max-width:34em}
+.rd-art{max-width:520px}
+.rd-axis{fill:none;stroke:var(--line-strong);stroke-width:1}
+.rd-dash{stroke-dasharray:3 4}
+.rd-curve{fill:none;stroke:var(--ink);stroke-width:2}
+.rd-bar{fill:var(--mist);stroke:var(--bg-subtle);stroke-width:.6}
+.rd-body{fill:none;stroke:var(--ink);stroke-width:1.4}
+.rd-ink{color:var(--link)}
+.rd-c{fill:var(--ink)}
+.rd-ah{fill:var(--line-strong)}
+.rd-ring{fill:none;stroke:var(--ink);stroke-width:2}
+.rd-dot{fill:var(--mist)}
+.rd-mono{font:400 11px var(--f-mono);fill:var(--ink-3)}
+.rd-spin{transform-box:view-box;transform-origin:120px 68px;animation:rdspin 5s cubic-bezier(.7,0,.3,1) infinite}
+@keyframes rdspin{0%,30%{transform:rotate(0)}50%,80%{transform:rotate(180deg)}100%{transform:rotate(360deg)}}
+@media (max-width:640px){.read-head{grid-template-columns:1fr}.readings{grid-template-columns:1fr}.reading,.reading + .reading{padding-left:0;border-right:0;padding-top:var(--s5)}}
+.mk-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border:1px solid var(--line)}
+.mk{aspect-ratio:1;display:grid;place-items:center}
+.mk svg{width:56%;height:auto;aspect-ratio:1}
+.mk.on{background:#0538ff;color:#fff}.mk.light{background:#fff;color:#0b0b12}.mk.ink{background:#0b0b12;color:#fff}
+.t-mark{grid-column:span 5;background:var(--blue);border-color:var(--blue);color:#fff}
+.t-mark h3{color:rgba(255,255,255,.75)}
+.t-mark p{color:rgba(255,255,255,.88)}
+.t-mark .big{display:grid;place-items:center;padding-block:var(--s6)}
+.t-mark .big svg{width:min(260px,70%);height:auto;aspect-ratio:1}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font:400 12px/18px var(--f-mono);color:rgba(255,255,255,.85);border-top:1px solid rgba(255,255,255,.35);padding-top:var(--s3)}
+.spec dt{color:rgba(255,255,255,.62)}.spec dd{margin:0}
+.t-word{grid-column:span 7;justify-content:space-between}
+.wm-field{background:#0538ff;color:#fff;display:grid;place-items:center;padding:clamp(24px,5vw,64px) var(--s5)}
+.wm{width:100%;max-width:560px;height:auto;aspect-ratio:715.391/138.354}
+.t-word .tag{font:italic 800 clamp(28px,3vw,40px)/1.1 var(--f-display);letter-spacing:-.03em}
+.t-color{grid-column:span 12}
+.swatches{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid var(--line)}
+.sw{min-height:180px;padding:var(--s4);display:flex;flex-direction:column;justify-content:flex-end;gap:2px;font:400 12px/18px var(--f-mono)}
+.sw b{font:italic 800 24px/28px var(--f-display);letter-spacing:-.03em}
+.sw.blue{background:#0538ff;color:#fff}.sw.ink{background:#0b0b12;color:#fff}.sw.white{background:#fff;color:#0b0b12;border-left:1px solid #e1e1e8}
+.sw.mist{background:#b8c4ff;color:#0b0b12}.sw.signal{background:#ff5a1f;color:#0b0b12}
+@media (max-width:760px){.swatches{grid-template-columns:1fr 1fr}.sw{min-height:120px}}
+.t-type{grid-column:span 7}
+.faces{display:grid;gap:0}
+.face{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:var(--s4);align-items:baseline;padding-block:var(--s4);border-top:1px solid var(--line)}
+.face .s{min-width:0;overflow-wrap:anywhere}
+.face .r{font:400 12px/18px var(--f-mono);color:var(--ink-3)}
+.f0{font:400 24px/1.2 var(--f-body)}
+.f0 i{font:italic 800 48px/1 var(--f-word);letter-spacing:-.03em}
+.f1{font:italic 800 44px/1.05 var(--f-display);letter-spacing:-.03em}
+.f2{font:500 22px/1.3 var(--f-body)}
+.f3{font:400 15px/1.5 var(--f-mono)}
+@media (max-width:520px){.face{grid-template-columns:1fr}}
+.scale{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;margin:0;border-top:1px solid var(--line);padding-top:var(--s4)}
+.scale dt{font:500 12px/16px var(--f-body);color:var(--ink-3);grid-row:1}
+.scale dd{margin:4px 0 0;font:400 13px/18px var(--f-mono);font-variant-numeric:tabular-nums;grid-row:2}
+@media (max-width:640px){.scale{grid-template-columns:auto 1fr;column-gap:16px}.scale dt,.scale dd{grid-row:auto;margin:0}}
+.t-img{grid-column:span 5;padding:0;overflow:hidden}
+.t-img .pane{position:relative;height:360px;background:var(--bg-subtle);container-type:size;overflow:hidden}
+.t-img .ascii{color:var(--ink);font-size:calc(100cqh / 100);right:0;bottom:0}
+.t-img .cap{padding:var(--s5);display:flex;flex-direction:column;gap:var(--s3)}
+.figs{display:flex;gap:6px;flex-wrap:wrap}
+.figs button{font:500 12px/16px var(--f-body);padding:6px 10px;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);cursor:pointer}
+.figs button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+.credit{font:400 12px/18px var(--f-mono);color:var(--ink-3)}
+.t-voice{grid-column:span 12;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s5)}
+.t-voice > h3{grid-column:1/-1}
+.v b{display:block;font:italic 800 26px/32px var(--f-display);letter-spacing:-.03em}
+.v p{margin-top:var(--s2)}
+.v code{display:block;margin-top:var(--s3);padding:10px 12px;background:var(--bg-subtle);border-left:2px solid var(--blue);font:400 13px/20px var(--f-mono);color:var(--ink)}
+.v code.sig{border-color:var(--signal)}
+@media (max-width:960px){.t-mark,.t-marks,.t-word,.t-type,.t-img{grid-column:span 12}.t-voice{grid-template-columns:1fr}}
+.brand-end{padding-bottom:var(--s9)}
+
+/* cta */
+.cta > .wrap{padding-block:var(--s9)}
+.cta-grid > *{min-width:0}
+.cta-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:var(--s7);align-items:end}
+.cta h2{font-size:clamp(48px,7.2vw,104px);line-height:1;letter-spacing:-.03em}
+.cta p{font-size:19px;line-height:30px;color:rgba(255,255,255,.9);max-width:28em}
+.clone{display:flex;align-items:stretch;margin-top:var(--s5);border:1px solid rgba(255,255,255,.5);max-width:100%}
+.clone code{flex:1;min-width:0;padding:12px 14px;font:400 13px/20px var(--f-mono);overflow-x:auto;white-space:nowrap}
+.clone button{flex:none;border:0;border-left:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;font:500 13px/18px var(--f-body);padding:0 14px;cursor:pointer}
+.clone button:hover{background:rgba(255,255,255,.12)}
+@media (max-width:860px){.cta-grid{grid-template-columns:1fr}}
+footer{border-top:1px solid rgba(255,255,255,.35)}
+footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:var(--s4);flex-wrap:wrap;padding-block:var(--s5);font:400 12px/18px var(--f-mono);color:rgba(255,255,255,.8)}
+footer a{color:#fff}
+
+/* "You are here", as in the app: hover, focus or selection switches a control's label to the
+   display serif italic, a step up in size so it reads at the same weight. Both widths are
+   reserved, so nothing shifts. */
+.lbl{display:inline-grid;place-items:center;line-height:1.15}
+.lbl > span,.lbl::after{grid-area:1/1;text-align:center}
+.lbl::after{content:attr(data-t);visibility:hidden;font-family:var(--f-display);font-style:italic;font-weight:800;font-size:1.2em;letter-spacing:-.03em}
+.cur{font-family:var(--f-display);font-style:italic;font-weight:800;font-size:1.2em;letter-spacing:-.03em}
+:is(.nav a,.figs button):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl > span{font-family:var(--f-display);font-style:italic;font-weight:800;font-size:1.2em;letter-spacing:-.03em}
+:is(.nav a,.figs button):is(:hover,:focus-visible,[aria-pressed="true"],[aria-current="true"]) .lbl::after{font-family:inherit;font-style:normal;font-weight:inherit;font-size:1em}
+.nav a:hover{text-decoration:none}
+.nav a[aria-current="true"]{opacity:1}
+/* page changes: an ASCII wipe in Orchestra blue; content then rises in with a brief stagger */
+.wipe{position:fixed;inset:0;z-index:90;width:100%;height:100%;pointer-events:none;display:none}
+main{transition:opacity .18s ease}
+main.leaving{opacity:0}
+.wipe.on{display:block}
+.rise{animation:rise .55s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0) * 55ms + 120ms)}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="int" viewBox="0 0 117 184"><path fill="currentColor" d="M50.4918 92C54.1458 48.6789 57.1354 0 93.0112 0C104.97 0 117 10.0025 117 19.8448C117 35.6265 95.076 35.6265 95.076 19.8448C95.076 14.3369 100.319 11.3362 96.6652 7.6686C88.3606 -0.666835 79.0595 13.6701 75.0733 29.3407C71.0871 45.0113 68.5013 68.3505 66.5082 92C62.8542 135.321 59.8646 184 23.9888 184C12.0303 184 0 173.997 0 164.155C0 148.374 21.9241 148.374 21.9241 164.155C21.9241 169.663 16.6808 172.664 20.3348 176.331C28.6394 184.667 37.9405 170.33 41.9267 154.659C45.9129 138.989 48.4987 115.649 50.4918 92Z"/></symbol>
+  <symbol id="mark" viewBox="0 0 300 300"><circle cx="150" cy="150" r="147.5" fill="none" stroke="currentColor" stroke-width="5"/><use href="#int" x="91.5" y="58" width="117" height="184"/></symbol>
+  <symbol id="wm" viewBox="0 0 715.391 138.354"><path d="M46.1779 138.354C31.6238 138.354 20.274 134.072 12.1284 125.507C4.04281 116.942 0 105.353 0 90.7387C0 80.4969 1.4075 70.8241 4.22249 61.7203C7.09738 52.5566 11.0204 44.2314 15.9916 36.7447C20.9627 29.1981 26.6826 22.6996 33.1511 17.2493C39.6795 11.7391 46.6571 7.48669 54.0838 4.49202C61.5106 1.49734 69.0572 0 76.7236 0C85.8274 0 93.8232 1.94654 100.711 5.83962C107.659 9.67281 113.079 15.1531 116.972 22.2804C120.925 29.4077 122.901 37.8527 122.901 47.6153C122.901 60.4326 120.805 72.3514 116.613 83.3718C112.48 94.3323 106.79 103.945 99.543 112.211C92.3558 120.416 84.1504 126.825 74.9268 131.436C65.7631 136.048 56.1801 138.354 46.1779 138.354ZM46.1779 137.995C51.4485 137.995 56.3598 136.407 60.9117 133.233C65.5235 130.059 69.746 125.746 73.5792 120.296C77.4124 114.786 80.8263 108.527 83.821 101.52C86.8156 94.4521 89.3312 86.9953 91.3676 79.1493C93.4638 71.3032 95.051 63.4871 96.1291 55.701C97.2072 47.9148 97.7462 40.5479 97.7462 33.6003C97.7462 29.7671 97.3869 25.9039 96.6681 22.0109C96.0093 18.1178 94.8713 14.5541 93.2542 11.3199C91.6371 8.02573 89.4809 5.39041 86.7857 3.41393C84.0905 1.37755 80.7365 0.359367 76.7236 0.359367C71.7524 0.359367 67.0208 1.94654 62.5288 5.1209C58.0967 8.29525 53.9341 12.6375 50.041 18.1477C46.2078 23.598 42.764 29.8569 39.7094 36.9244C36.7147 43.9319 34.1094 51.3587 31.8933 59.2047C29.7371 67.0508 28.0601 74.8669 26.8622 82.6531C25.7243 90.4392 25.1553 97.8061 25.1553 104.754C25.1553 111.043 25.7842 116.703 27.0419 121.734C28.3596 126.705 30.5457 130.658 33.6003 133.592C36.6548 136.527 40.8474 137.995 46.1779 137.995Z" fill="currentColor"/><path d="M116.398 136.557L137.151 54.2635H122.777V53.9042H156.017L135.983 136.557H116.398ZM142.541 107.629C143.56 103.316 144.787 98.6746 146.225 93.7034C147.722 88.6724 149.429 83.7311 151.346 78.8798C153.322 73.9685 155.538 69.5064 157.994 65.4936C160.509 61.4807 163.324 58.2764 166.439 55.8807C169.553 53.425 173.027 52.1972 176.86 52.1972C181.352 52.1972 184.946 53.4849 187.641 56.0603C190.396 58.5759 191.774 61.7502 191.774 65.5834C191.774 69.177 190.696 72.2316 188.54 74.7471C186.383 77.2626 183.479 78.5204 179.825 78.5204C176.291 78.5204 173.387 77.3824 171.111 75.1065C168.835 72.7706 167.697 69.8957 167.697 66.4818C167.697 63.2476 168.805 60.6122 171.021 58.5759C173.297 56.5395 176.261 55.5213 179.915 55.5213C183.029 55.5213 185.755 56.4197 188.09 58.2165C190.426 60.0133 191.594 62.4689 191.594 65.5834H191.415C191.415 61.87 190.097 58.7855 187.462 56.3299C184.886 53.8143 181.352 52.5566 176.86 52.5566C173.087 52.5566 169.643 53.7844 166.529 56.24C163.474 58.6358 160.719 61.8401 158.263 65.8529C155.808 69.8059 153.622 74.2081 151.705 79.0594C149.789 83.9108 148.082 88.8221 146.584 93.7933C145.147 98.7644 143.919 103.376 142.901 107.629H142.541Z" fill="currentColor"/><path d="M213.326 138.354C204.282 138.354 197.304 135.779 192.393 130.628C187.482 125.417 185.026 118.499 185.026 109.875C185.026 102.987 186.374 96.1291 189.069 89.3012C191.824 82.4734 195.597 76.2744 200.389 70.7043C205.18 65.0743 210.66 60.5823 216.829 57.2283C222.999 53.8143 229.527 52.1074 236.415 52.1074C241.566 52.1074 246.028 53.0657 249.801 54.9823C253.634 56.8988 256.599 59.2946 258.695 62.1695C260.791 65.0444 261.839 67.9192 261.839 70.7941C261.839 74.5075 260.702 77.5022 258.426 79.7782C256.21 82.0541 253.454 83.1921 250.16 83.1921C247.285 83.1921 244.68 82.3236 242.344 80.5867C240.008 78.8498 238.84 76.1546 238.84 72.5011C238.84 69.3267 239.918 66.6615 242.075 64.5053C244.231 62.2893 246.866 61.1812 249.981 61.1812C251.957 61.1812 253.844 61.5106 255.641 62.1695C257.437 62.8283 258.875 63.8764 259.953 65.3139C261.091 66.6914 261.66 68.5182 261.66 70.7941H261.48C261.48 67.9192 260.492 65.1342 258.515 62.439C256.599 59.7438 253.993 57.5277 250.699 55.7908C247.465 53.994 243.871 53.0956 239.918 53.0956C235.606 53.0956 231.563 54.6828 227.79 57.8571C224.017 60.9716 220.633 65.1342 217.638 70.3449C214.703 75.4958 212.158 81.0958 210.002 87.1451C207.905 93.1344 206.288 99.0639 205.15 104.933C204.072 110.803 203.533 115.954 203.533 120.386C203.533 125.477 204.551 129.58 206.588 132.694C208.684 135.809 211.858 137.366 216.111 137.366C221.501 137.366 226.472 136.228 231.024 133.952C235.636 131.676 239.769 128.711 243.422 125.058C247.076 121.344 250.19 117.391 252.766 113.199L253.035 113.289C250.4 117.601 247.196 121.674 243.422 125.507C239.649 129.34 235.247 132.455 230.216 134.85C225.245 137.186 219.615 138.354 213.326 138.354Z" fill="currentColor"/><path d="M256.074 136.557L292.1 2.15617H277.726V1.7968H312.224L276.288 136.557H256.074ZM322.556 138.354C318.064 138.354 314.5 137.216 311.865 134.94C309.23 132.604 307.912 129.52 307.912 125.687C307.912 124.608 308.062 123.381 308.361 122.003C308.661 120.566 309.02 119.098 309.439 117.601L320.31 80.1375C321.747 75.1065 322.736 70.7941 323.275 67.2005C323.814 63.6069 323.694 60.8818 322.915 59.0251C322.197 57.1684 320.55 56.24 317.974 56.24C315.519 56.24 312.674 57.7673 309.439 60.8219C306.265 63.8165 303.001 67.9492 299.647 73.2198C296.293 78.4306 293.118 84.4199 290.124 91.1879C287.129 97.9558 284.613 105.113 282.577 112.66H282.308C283.565 107.868 285.242 102.717 287.339 97.2072C289.495 91.6371 291.95 86.2167 294.706 80.9461C297.521 75.6156 300.575 70.7941 303.869 66.4818C307.163 62.1096 310.637 58.6358 314.291 56.0603C317.944 53.4849 321.688 52.1972 325.521 52.1972C330.552 52.1972 334.415 53.425 337.11 55.8807C339.805 58.2764 341.423 61.5106 341.962 65.5834C342.501 69.5963 342.051 74.1182 340.614 79.1493L326.24 129.19C326.12 129.61 326 130.149 325.88 130.807C325.82 131.406 325.79 131.945 325.79 132.425C325.79 134.641 326.809 135.749 328.845 135.749C333.097 135.749 337.14 133.563 340.973 129.19C344.866 124.758 348.7 117.811 352.473 108.347L352.742 108.437C349.927 115.505 347.023 121.254 344.028 125.687C341.093 130.059 337.889 133.263 334.415 135.299C330.941 137.336 326.988 138.354 322.556 138.354Z" fill="currentColor"/><path d="M380.82 138.354C374.591 138.354 369.381 137.126 365.188 134.671C361.055 132.155 357.911 128.741 355.755 124.429C353.659 120.057 352.61 115.115 352.61 109.605C352.61 102.418 353.928 95.4104 356.563 88.5825C359.199 81.7547 362.882 75.5856 367.614 70.0754C372.405 64.5652 377.975 60.193 384.324 56.9587C390.673 53.7245 397.501 52.1074 404.808 52.1074C412.534 52.1074 418.523 53.8742 422.776 57.4079C427.028 60.8818 429.154 65.1941 429.154 70.3449C429.154 74.8968 427.657 78.9696 424.662 82.5632C421.728 86.1568 417.595 89.2413 412.264 91.8168C406.994 94.3323 400.915 96.3387 394.027 97.8361C387.139 99.3334 379.742 100.322 371.836 100.801V100.531C376.628 100.232 381.09 99.3035 385.222 97.7462C389.415 96.189 393.158 94.1526 396.452 91.6371C399.807 89.1216 402.651 86.2766 404.987 83.1023C407.323 79.9279 409.12 76.5439 410.378 72.9503C411.635 69.2968 412.264 65.6133 412.264 61.9C412.264 59.5641 411.815 57.4379 410.917 55.5213C410.078 53.5448 408.431 52.5566 405.976 52.5566C402.981 52.5566 400.046 53.7245 397.171 56.0603C394.296 58.3363 391.541 61.4208 388.906 65.3139C386.33 69.207 383.935 73.5792 381.719 78.4306C379.563 83.2819 377.676 88.313 376.059 93.5237C374.442 98.7345 373.184 103.795 372.285 108.707C371.447 113.618 371.028 118.05 371.028 122.003C371.028 127.992 372.166 132.095 374.442 134.311C376.718 136.527 379.682 137.635 383.336 137.635C388.247 137.635 392.919 136.617 397.351 134.581C401.843 132.484 406.035 129.64 409.929 126.046C413.822 122.392 417.265 118.11 420.26 113.199L420.53 113.378C417.894 117.691 414.69 121.764 410.917 125.597C407.143 129.37 402.771 132.455 397.8 134.85C392.829 137.186 387.169 138.354 380.82 138.354Z" fill="currentColor"/><path d="M458.804 138.354C452.935 138.354 447.604 137.516 442.813 135.839C438.021 134.102 434.158 131.646 431.223 128.472C428.349 125.297 426.911 121.494 426.911 117.062C426.911 113.828 427.929 111.043 429.966 108.707C432.062 106.371 434.847 105.203 438.321 105.203C441.435 105.203 444.011 106.221 446.047 108.258C448.084 110.294 449.102 112.989 449.102 116.343C449.102 119.757 447.994 122.362 445.778 124.159C443.621 125.896 441.076 126.765 438.141 126.765C436.105 126.765 434.248 126.405 432.571 125.687C430.894 124.968 429.546 123.89 428.528 122.452C427.57 121.015 427.091 119.218 427.091 117.062H427.271C427.271 121.554 428.708 125.357 431.583 128.472C434.518 131.586 438.291 133.952 442.903 135.569C447.574 137.126 452.486 137.905 457.637 137.905C460.871 137.905 464.135 137.276 467.429 136.018C470.723 134.701 473.478 132.814 475.694 130.358C477.97 127.903 479.108 124.908 479.108 121.374C479.108 118.14 478.12 115.265 476.144 112.75C474.227 110.234 471.712 107.928 468.597 105.832C465.542 103.676 462.248 101.609 458.715 99.6329C455.241 97.5965 451.947 95.4403 448.832 93.1644C445.778 90.8884 443.262 88.3729 441.286 85.6178C439.369 82.8028 438.411 79.5685 438.411 75.915C438.411 71.3631 439.758 67.2904 442.454 63.6968C445.209 60.1031 449.012 57.2582 453.863 55.1619C458.775 53.0657 464.494 52.0175 471.023 52.0175C477.192 52.0175 482.283 52.9159 486.296 54.7127C490.308 56.4496 493.303 58.6657 495.28 61.3609C497.256 63.9962 498.244 66.6615 498.244 69.3567C498.244 72.9503 497.196 75.6755 495.1 77.5322C493.004 79.329 490.638 80.2274 488.003 80.2274C485.128 80.2274 482.552 79.299 480.276 77.4423C478 75.5856 476.862 72.9204 476.862 69.4465C476.862 66.6315 477.851 64.2657 479.827 62.3492C481.804 60.3727 484.349 59.3844 487.464 59.3844C490.578 59.3844 493.123 60.3128 495.1 62.1695C497.076 64.0262 498.065 66.4219 498.065 69.3567H497.885C497.885 66.5417 496.867 63.8465 494.83 61.2711C492.794 58.6956 489.889 56.5994 486.116 54.9823C482.343 53.3651 477.761 52.5566 472.37 52.5566C469.196 52.5566 466.111 53.1256 463.117 54.2635C460.122 55.4015 457.637 57.0486 455.66 59.2047C453.743 61.301 452.785 63.9064 452.785 67.0208C452.785 70.0754 453.773 72.7706 455.75 75.1065C457.726 77.3824 460.242 79.5086 463.296 81.4851C466.411 83.4616 469.705 85.4381 473.179 87.4146C476.713 89.3911 480.037 91.5772 483.151 93.9729C486.266 96.3088 488.811 99.004 490.788 102.059C492.764 105.053 493.752 108.647 493.752 112.839C493.752 118.11 492.135 122.662 488.901 126.495C485.727 130.268 481.474 133.203 476.144 135.299C470.873 137.336 465.093 138.354 458.804 138.354Z" fill="currentColor"/><path d="M518.488 138.354C514.235 138.354 510.821 137.755 508.246 136.557C505.671 135.299 503.814 133.682 502.676 131.706C501.598 129.729 501.059 127.693 501.059 125.597C501.059 124.339 501.239 122.782 501.598 120.925C502.017 119.068 502.466 117.242 502.945 115.445L524.238 35.9361H544.003L518.398 129.729C518.218 130.388 518.039 131.107 517.859 131.886C517.679 132.664 517.589 133.473 517.589 134.311C517.589 136.288 519.087 137.276 522.081 137.276C524.477 137.276 526.933 136.737 529.448 135.659C531.964 134.581 534.45 132.874 536.905 130.538C539.421 128.202 541.876 125.118 544.272 121.284C546.668 117.451 548.974 112.75 551.19 107.179L551.549 107.269C548.794 114.037 545.829 119.757 542.655 124.429C539.54 129.041 536.007 132.514 532.054 134.85C528.101 137.186 523.579 138.354 518.488 138.354ZM501.598 54.2635V53.9042H555.502V54.2635H501.598Z" fill="currentColor"/><path d="M547.491 136.557L568.244 54.2635H553.869V53.9042H587.11L567.076 136.557H547.491ZM573.634 107.629C574.653 103.316 575.88 98.6746 577.318 93.7034C578.815 88.6724 580.522 83.7311 582.439 78.8798C584.415 73.9685 586.631 69.5064 589.087 65.4936C591.602 61.4807 594.417 58.2764 597.532 55.8807C600.646 53.425 604.12 52.1972 607.953 52.1972C612.445 52.1972 616.039 53.4849 618.734 56.0603C621.489 58.5759 622.867 61.7502 622.867 65.5834C622.867 69.177 621.789 72.2316 619.633 74.7471C617.476 77.2626 614.572 78.5204 610.918 78.5204C607.384 78.5204 604.48 77.3824 602.204 75.1065C599.928 72.7706 598.79 69.8957 598.79 66.4818C598.79 63.2476 599.898 60.6122 602.114 58.5759C604.39 56.5395 607.354 55.5213 611.008 55.5213C614.122 55.5213 616.848 56.4197 619.183 58.2165C621.519 60.0133 622.687 62.4689 622.687 65.5834H622.507C622.507 61.87 621.19 58.7855 618.555 56.3299C615.979 53.8143 612.445 52.5566 607.953 52.5566C604.18 52.5566 600.736 53.7844 597.622 56.24C594.567 58.6358 591.812 61.8401 589.356 65.8529C586.901 69.8059 584.715 74.2081 582.798 79.0594C580.881 83.9108 579.174 88.8221 577.677 93.7933C576.24 98.7644 575.012 103.376 573.994 107.629H573.634Z" fill="currentColor"/><path d="M646.484 138.354C638.278 138.354 632.379 135.779 628.785 130.628C625.191 125.417 623.395 118.26 623.395 109.156C623.395 102.268 624.652 95.4703 627.168 88.7622C629.683 81.9942 633.067 75.8551 637.32 70.3449C641.632 64.8347 646.424 60.4326 651.694 57.1384C656.965 53.7844 662.295 52.1074 667.686 52.1074C671.699 52.1074 674.753 53.2453 676.85 55.5213C678.946 57.7373 680.353 60.6422 681.072 64.2358C681.791 67.7695 682.15 71.5428 682.15 75.5557C682.15 78.8498 681.791 82.683 681.072 87.0552C680.353 91.4275 679.275 95.9794 677.838 100.711C676.46 105.443 674.753 110.024 672.717 114.457C670.681 118.889 668.345 122.931 665.709 126.585C663.074 130.179 660.139 133.053 656.905 135.21C653.731 137.306 650.257 138.354 646.484 138.354ZM652.413 134.581C655.408 134.581 658.313 133.293 661.128 130.718C664.002 128.142 666.668 124.698 669.123 120.386C671.639 116.074 673.825 111.312 675.682 106.101C677.598 100.831 679.096 95.5302 680.174 90.1996C681.252 84.8691 681.791 79.9279 681.791 75.376C681.791 71.6027 681.491 68.2187 680.892 65.224C680.353 62.2294 679.365 59.8636 677.928 58.1267C676.49 56.3897 674.514 55.5213 671.998 55.5213C669.303 55.5213 666.548 56.9587 663.733 59.8336C660.978 62.6486 658.342 66.362 655.827 70.9738C653.371 75.5856 651.155 80.6766 649.179 86.2467C647.202 91.7569 645.645 97.2671 644.507 102.777C643.369 108.228 642.8 113.139 642.8 117.511C642.8 123.261 643.669 127.543 645.405 130.358C647.142 133.173 649.478 134.581 652.413 134.581ZM686.552 138.354C681.761 138.354 678.257 137.126 676.041 134.671C673.825 132.215 672.717 129.041 672.717 125.148C672.717 124.01 672.747 123.021 672.807 122.183C672.927 121.284 673.046 120.536 673.166 119.937L675.502 107.808L679.635 94.0628L681.791 80.8563L688.349 53.9042H708.923L688.439 130.897C688.199 131.796 688.08 132.724 688.08 133.682C688.08 134.521 688.319 135.21 688.798 135.749C689.277 136.288 690.026 136.557 691.044 136.557C693.62 136.557 696.165 135.749 698.681 134.132C701.256 132.455 703.891 129.58 706.587 125.507C709.342 121.374 712.187 115.654 715.122 108.347L715.391 108.437C712.696 115.145 709.971 120.715 707.216 125.148C704.46 129.58 701.436 132.904 698.142 135.12C694.848 137.276 690.984 138.354 686.552 138.354Z" fill="currentColor"/></symbol>
+  <symbol id="gh" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></symbol>
+</svg>
+
+<canvas class="wipe" id="wipe" aria-hidden="true"></canvas>
+<header class="top">
+  <div class="wrap">
+    <a class="brand mark-swap" href="#top" aria-label="Orchestra home"><svg class="m-reg" aria-hidden="true"><use href="#mark"/></svg><img class="m-bold" src="assets/logo-bold.png" alt="" width="40" height="40"></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#what">What is Orchestra</a>
+      <a href="#how">How it works</a>
+      <a href="#brand">The brand</a>
+    </nav>
+    <a class="btn btn-white top-cta" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a>
+  </div>
+</header>
+
+<main id="top">
+<section class="blue hero" data-view="home" aria-labelledby="hero-title">
+  <div class="hero-stage">
+    <div class="bg-int" aria-hidden="true"><canvas id="intc"></canvas></div>
+    <div class="score-canvas" aria-hidden="true"><canvas id="score"></canvas></div>
+    <div class="wrap">
+      <div class="tagline-top">Many hands. One score.</div>
+      <div class="headline">
+        <div class="hl"><h1 id="hero-title"><span class="b">Your compute. Your agents.</span><span class="a"><em>One Orchestra</em></span></h1>
+          <div class="actions"><a class="btn btn-white btn-lg" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a><a class="btn btn-line btn-lg" href="#how">How it works</a></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="band">
+    <div class="wrap">
+      <div class="kicker">An open-source agent framework for <span class="type" id="who" aria-live="off">designers</span><span class="caret" aria-hidden="true"></span></div>
+      <p>Orchestra is an open-source framework that turns your AI into a studio of agents. Bring your references and a concept; the agents research, build and refine your work with you, in the tools you already use.</p>
+      <div class="band-go"><a class="btn btn-blue" href="#what">What is Orchestra</a><small>From references to system.</small></div>
+    </div>
+  </div>
+</section>
+
+<section id="what" class="sec page" data-view="what" aria-labelledby="what-title" hidden>
+  <div class="wrap">
+    <div class="sec-head">
+      <div><span class="num">I.</span><h2 id="what-title">What is Orchestra</h2></div>
+      <div>
+        <p>Orchestra is an open-source project for designers who work across mediums. It acts as a framework for your AI compute and sets up an agent hierarchy for you, so your design workflow gets faster and more efficient, and the generated work loses its sameness.</p>
+        <p>It is shaped to conform to you with use. The more assets you add and the more agents you make, the closer it pairs with how you work. And because it is open source, you can use your own agents to redesign Orchestra or add to it.</p>
+      </div>
+    </div>
+    <div class="facts">
+      <div class="fact"><h3>Open source</h3><p>Fork it, extend it, or point your own agents at it to redesign your orchestra.</p></div>
+      <div class="fact"><h3>Your compute</h3><p>Claude, ChatGPT or whatever you plug in follows the same hierarchy and the same rules.</p></div>
+      <div class="fact"><h3>Grows with you</h3><p>Deliverables, sources, audits and agents are editable files that build up over every project.</p></div>
+    </div>
+    <div class="hier">
+      <h3>Plug in, connect, save, export</h3>
+      <p>Plug in the AI you already use and Orchestra sets up the hierarchy. The agents work in your design tools over MCP, save everything they make to a knowledge graph, and export the finished deliverables. Every agent is a markdown file you can open and change.</p>
+
+    </div>
+    <figure class="diagram">
+      <div class="dg-scroll"><svg class="dg" viewBox="0 0 1240 640" role="img" aria-labelledby="dg-t dg-d"><title id="dg-t">How Orchestra works, end to end</title><desc id="dg-d">1. Plug in your AI compute: Claude, ChatGPT or any model. 2. Orchestra sets up the hierarchy: one Orchestrator per project, the only agent that talks to you, briefs one Musician per deliverable, and each Musician plays Instruments, one per prerequisite. The agents connect to your tools over MCP: Figma, Blender, Fusion, ElevenLabs. 3. Everything made is saved to a knowledge graph that agents query instead of rereading files. 4. Deliverables are exported: a brand kit, slide deck, website and 3D renders.</desc><defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" class="dg-ah"/></marker></defs><text x="30" y="140" class="dg-tier" text-anchor="start"><tspan class="dg-n">1</tspan>  PLUG IN YOUR COMPUTE</text><rect x="30" y="200" width="170" height="44" class="dg-chip"/><text x="48" y="228" class="dg-chip-t">Claude</text><line x1="200" y1="222" x2="252" y2="222" class="dg-link dg-flow" marker-end="url(#ah)"/><rect x="30" y="264" width="170" height="44" class="dg-chip"/><text x="48" y="292" class="dg-chip-t">ChatGPT</text><line x1="200" y1="286" x2="252" y2="286" class="dg-link dg-flow" marker-end="url(#ah)"/><rect x="30" y="328" width="170" height="44" class="dg-chip"/><text x="48" y="356" class="dg-chip-t">Any model</text><line x1="200" y1="350" x2="252" y2="350" class="dg-link dg-flow" marker-end="url(#ah)"/><text x="30" y="420" class="dg-sub">mix models per agent</text><rect x="262" y="150" width="538" height="330" class="dg-box"/><text x="282" y="442" class="dg-box-t">Orchestra</text><text x="282" y="462" class="dg-sub">the hierarchy, set up for you</text><rect x="336" y="40" width="88" height="48" class="dg-you"/><text x="380" y="72" class="dg-you-t" text-anchor="middle">You</text><line x1="380" y1="88" x2="380" y2="274" class="dg-talk" marker-start="url(#ah)" marker-end="url(#ah)"/><text x="392" y="128" class="dg-note">the only conversation</text><circle cx="380" cy="320" r="42" class="dg-orc"/><use href="#int" x="366" y="298" width="28" height="44" class="dg-orc-i"/><text x="380" y="388" class="dg-name" text-anchor="middle">Orchestrator</text><path d="M422 320 C 470 320, 470 225, 516 225" class="dg-link dg-flow"/><path d="M422 320 C 470 320, 470 320, 516 320" class="dg-link dg-flow"/><path d="M422 320 C 470 320, 470 415, 516 415" class="dg-link dg-flow"/><path d="M564 225 C 600 225, 602 200, 642 200" class="dg-link"/><path d="M564 225 C 600 225, 602 246, 642 246" class="dg-link"/><path d="M564 320 C 600 320, 602 292, 642 292" class="dg-link"/><path d="M564 320 C 600 320, 602 338, 642 338" class="dg-link"/><path d="M564 415 C 600 415, 602 384, 642 384" class="dg-link"/><path d="M564 415 C 600 415, 602 430, 642 430" class="dg-link"/><path d="M564 320 C 610 320, 592 200, 642 200" class="dg-share"/><path d="M564 415 C 610 415, 592 200, 642 200" class="dg-share"/><circle cx="540" cy="225" r="24" class="dg-mus"/><use href="#int" x="533" y="214" width="14" height="22" class="dg-mus-i"/><text x="540" y="267" class="dg-name dg-name-s" text-anchor="middle">Brand Kit</text><circle cx="540" cy="320" r="24" class="dg-mus"/><use href="#int" x="533" y="309" width="14" height="22" class="dg-mus-i"/><text x="540" y="362" class="dg-name dg-name-s" text-anchor="middle">Slide Deck</text><circle cx="540" cy="415" r="24" class="dg-mus"/><use href="#int" x="533" y="404" width="14" height="22" class="dg-mus-i"/><text x="540" y="457" class="dg-name dg-name-s" text-anchor="middle">Website</text><text x="540" y="186" class="dg-sub" text-anchor="middle">Musicians</text><rect x="645" y="193" width="14" height="14" class="dg-ins"/><text x="668" y="205" class="dg-ins-t">Brand Spec</text><rect x="645" y="239" width="14" height="14" class="dg-ins"/><text x="668" y="251" class="dg-ins-t">Logo Builder</text><rect x="645" y="285" width="14" height="14" class="dg-ins"/><text x="668" y="297" class="dg-ins-t">Deck Outline</text><rect x="645" y="331" width="14" height="14" class="dg-ins"/><text x="668" y="343" class="dg-ins-t">Slide Builder</text><rect x="645" y="377" width="14" height="14" class="dg-ins"/><text x="668" y="389" class="dg-ins-t">Copywriter</text><rect x="645" y="423" width="14" height="14" class="dg-ins"/><text x="668" y="435" class="dg-ins-t">Page Designer</text><text x="645" y="186" class="dg-sub">Instruments</text><text x="645" y="462" class="dg-note">built once, shared</text><text x="880" y="140" class="dg-tier" text-anchor="start"><tspan class="dg-n">2</tspan>  CONNECT YOUR TOOLS</text><rect x="880" y="150" width="150" height="330" class="dg-tools"/><text x="896" y="180" class="dg-sub">over MCP</text><text x="896" y="226" class="dg-tool">Figma</text><text x="896" y="278" class="dg-tool">Blender</text><text x="896" y="330" class="dg-tool">Fusion</text><text x="896" y="382" class="dg-tool">ElevenLabs</text><text x="896" y="462" class="dg-sub">+ any MCP server</text><line x1="800" y1="230" x2="880" y2="230" class="dg-link dg-flow" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="800" y1="315" x2="880" y2="315" class="dg-link dg-flow" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="800" y1="400" x2="880" y2="400" class="dg-link dg-flow" marker-start="url(#ah)" marker-end="url(#ah)"/><rect x="262" y="540" width="768" height="60" class="dg-band-g"/><text x="282" y="566" class="dg-tier"><tspan class="dg-n">3</tspan>  SAVE TO THE KNOWLEDGE GRAPH</text><text x="282" y="586" class="dg-band-s">Agents query the graph instead of rereading design files: cheaper, and they understand the work</text><line x1="382" y1="480" x2="382" y2="540" class="dg-feed" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="562" y1="480" x2="562" y2="540" class="dg-feed" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="722" y1="480" x2="722" y2="540" class="dg-feed" marker-start="url(#ah)" marker-end="url(#ah)"/><line x1="955" y1="480" x2="955" y2="540" class="dg-feed" marker-start="url(#ah)" marker-end="url(#ah)"/><text x="1072" y="140" class="dg-tier" text-anchor="start"><tspan class="dg-n">4</tspan>  EXPORT DELIVERABLES</text><path d="M1072 160 h118 l20 20 v40 h-138 z" class="dg-file"/><text x="1086" y="190" class="dg-file-t">Brand kit</text><text x="1086" y="208" class="dg-sub">.fig · tokens.json</text><path d="M1072 238 h118 l20 20 v40 h-138 z" class="dg-file"/><text x="1086" y="268" class="dg-file-t">Slide deck</text><text x="1086" y="286" class="dg-sub">.pptx · PDF</text><path d="M1072 316 h118 l20 20 v40 h-138 z" class="dg-file"/><text x="1086" y="346" class="dg-file-t">Website</text><text x="1086" y="364" class="dg-sub">HTML · Figma</text><path d="M1072 394 h118 l20 20 v40 h-138 z" class="dg-file"/><text x="1086" y="424" class="dg-file-t">3D renders</text><text x="1086" y="442" class="dg-sub">.blend · PNG</text><line x1="1030" y1="315" x2="1064" y2="315" class="dg-link dg-flow" marker-end="url(#ah)"/></svg></div>
+      <figcaption>Each level gets only the tools for its job: only the Orchestrator talks to you, and only Musicians create Instruments.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="how" class="sec page" data-view="how" aria-labelledby="how-title" hidden>
+  <div class="wrap">
+    <div class="sec-head">
+      <div><span class="num">II.</span><h2 id="how-title">How it works</h2></div>
+      <p>Every project moves through three movements with the designer in the loop, and everything you make is kept in a knowledge graph your agents can read. These are screens from the app, running a project for Orchestra’s own brand.</p>
+    </div>
+  </div>
+  <div class="hs" id="hs">
+    <div class="hs-pin">
+      <div class="wrap hs-bar" role="tablist" aria-label="Steps">
+        <button type="button" role="tab" data-i="0" aria-selected="true"><b>1</b> Research</button>
+        <button type="button" role="tab" data-i="1" aria-selected="false"><b>2</b> Create</button>
+        <button type="button" role="tab" data-i="2" aria-selected="false"><b>3</b> Refine</button>
+        <button type="button" role="tab" data-i="3" aria-selected="false"><b>4</b> Knowledge graph</button>
+        <span class="hs-prog" aria-hidden="true"><i id="hs-fill"></i></span>
+      </div>
+      <div class="hs-track" id="hs-track">
+    <article class="mv">
+      <div class="mv-text">
+        <div class="n">1</div>
+        <h3>Research</h3>
+        <p>Compile all of your inspiration in one place. Open your reference sites in one click, paste links or drop in files, and note what you like about each. The Orchestrator interprets the collection into a research file that becomes the source of truth for your designs.</p>
+        <ul>
+          <li>Tag each reference as inspiration or a usable asset, so licensing never gets lost</li>
+          <li>Interpret writes research.md: what you seem to want, and what to avoid</li>
+        </ul>
+      </div>
+      <figure class="shot"><div class="shot-bar"><i><b></b><b></b><b></b></i>Orchestra Brand · Research<span>app screen</span></div><img src="assets/app-research.webp" alt="Orchestra's Research tab: reference site buttons, a table of reference links tagged inspiration or usable asset, and uploaded reference files" width="1680" height="1050"></figure>
+    </article>
+
+    <article class="mv">
+      <div class="mv-text">
+        <div class="n">2</div>
+        <h3>Create</h3>
+        <p>The part designers know best. Select which deliverables to make first, then work on them iteratively with your agents. Connect your favourite design tools over MCP and work in tandem: the agents build in the file while you keep your hands on it.</p>
+        <ul>
+          <li>Picking deliverables shows the shared foundations that get built first</li>
+          <li>Each deliverable gets its own chat with the Orchestrator and a live tree of who is working</li>
+          <li>The agent channel shows every tool call and message, read-only</li>
+        </ul>
+        <div class="tools" aria-label="Tools"><span>Figma</span><span>Blender</span><span>Fusion</span><span>ElevenLabs</span><span>any MCP server</span></div>
+      </div>
+      <figure class="shot shot-switch">
+        <div class="shot-bar"><i><b></b><b></b><b></b></i><span class="views" role="group" aria-label="Create views"><button type="button" data-v="0" aria-pressed="true">Chat</button><button type="button" data-v="1" aria-pressed="false">Deliverables</button><button type="button" data-v="2" aria-pressed="false">Agent channel</button></span><span>app screen</span></div>
+        <div class="stack">
+          <img class="on" src="assets/app-chat.webp" alt="A Brand Kit chat with the Orchestrator, beside a live tree of agents and work: foundations ready, the Brand Kit Musician and Kit Builder Instrument working, and a list of created files" width="1680" height="1050" loading="lazy">
+          <img src="assets/app-picker.webp" alt="The deliverable picker with Brand Kit, Logo, Slide Deck and Website selected and seven foundations listed to build first" width="1680" height="1050" loading="lazy">
+          <img src="assets/app-channel.webp" alt="The agent channel: a read-only log of each agent's tool calls and messages in IBM Plex Mono on Orchestra blue" width="1680" height="1050" loading="lazy">
+        </div>
+      </figure>
+    </article>
+
+    <article class="mv">
+      <div class="mv-text">
+        <div class="n">3</div>
+        <h3>Refine</h3>
+        <p>Periodically, audit what was generated: for usability, for compliance with your brand kit, and for the hallmarks of AI-generated work. Unslop it, one pass at a time, with you deciding which fixes go back to Create.</p>
+        <ul>
+          <li>Usability: contrast, spacing, grid, type scale and edge-case stress tests</li>
+          <li>Brand compliance: every frame checked against your tokens and type styles</li>
+          <li>Unslop: generic fonts, stock gradients and templated layouts flagged with fixes</li>
+        </ul>
+      </div>
+      <figure class="shot"><div class="shot-bar"><i><b></b><b></b><b></b></i>Refine · test runner<span>Figma design</span></div><img src="assets/refine.webp" alt="The Refine test runner design: six audits with three passed, two warnings and one failed, and findings to send back to Create" width="1200" height="1431" style="aspect-ratio:16/10;object-fit:cover;object-position:top"><figcaption>Refine is designed in Figma and next on the build plan</figcaption></figure>
+    </article>
+
+    <article class="mv how-end">
+      <div class="mv-text">
+        <div class="n">4</div>
+        <h3>The knowledge graph</h3>
+        <p>As you create, your work is saved and structured into a knowledge graph. Agents query the graph instead of rereading design files, which is faster and cheaper, and lets them understand your designs natively.</p>
+        <ul>
+          <li>A query returns the few nodes an agent needs, not a whole design file</li>
+          <li>Palettes, type, references and decisions stay linked across projects</li>
+          <li>Stored as a plain Markdown vault you can open in Obsidian</li>
+        </ul>
+      </div>
+      <figure class="graph"><canvas id="graph" role="img" aria-label="An illustrative knowledge graph linking three projects through shared fonts, colours and references"></canvas><figcaption>illustration · three projects, shared nodes in blue</figcaption></figure>
+    </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="brand" class="sec page" data-view="brand" aria-labelledby="brand-title" hidden>
+  <div class="wrap">
+    <div class="sec-head">
+      <div><span class="num">III.</span><h2 id="brand-title">The brand</h2></div>
+      <p>Orchestra is named for what it is: many players, one conductor, one score. The brand keeps to three ideas: the orchestra, the integral that signs it, and the names its agents go by.</p>
+    </div>
+    <div class="b-grid">
+      <section class="tile t-idea" aria-labelledby="idea-title">
+        <span class="rd-k">The idea</span>
+        <h3 id="idea-title">An orchestra is many specialists playing one piece</h3>
+        <div class="idea-cols">
+          <p>No single player can perform a symphony. Strings, winds, brass and percussion each master their own part, a conductor holds the whole in mind, and everyone reads from the same score. What the audience hears is one piece of music.</p>
+          <p>Design work across mediums is the same. A brand kit, a deck, a website and a set of renders each need their own expertise, but they have to sound like one voice. Orchestra gives your AI that structure: specialists for every part, a conductor who talks to you, and one score every agent plays from.</p>
+        </div>
+      </section>
+      <figure class="tile t-con">
+        <img src="assets/construction.webp" alt="Orchestra logo construction sheet: the integral mark drawn on a 25 u grid inside a 300 u ring, with its 12 anchors, centre of rotation C, 33.4° terminal axis, 16 u stem and clear-space rules" width="1600" height="1240" loading="lazy">
+        <figcaption><b>The logo is the integral sign.</b> One closed outline of 12 anchors with 180° rotational symmetry, set inside a ring.</figcaption>
+      </figure>
+      <section class="tile t-read" aria-labelledby="read-title">
+        <div class="read-head">
+          <h3 id="read-title">Reading the mark</h3>
+          <p>One stroke, two readings. Each is a way of saying what Orchestra does: many agents, working on small parts, heard as one piece of work.</p>
+        </div>
+        <div class="readings">
+          <article class="reading">
+            <div class="rd-art"><svg viewBox="0 0 240 160" role="img" aria-label="A curve with rectangles beneath it that grow narrower and more numerous until they fill the area under the curve">
+              <path d="M10 140 H230" class="rd-axis"/>
+              <g id="riemann"></g>
+              <path d="M20 128 C 70 120, 90 40, 130 44 S 200 96, 220 70" class="rd-curve"/>
+              <text x="12" y="20" class="rd-mono" id="riemann-n">n = 4</text>
+            </svg></div>
+            <span class="rd-k">I. The integral</span>
+            <h4>Many small parts, summed into one whole</h4>
+            <p>In calculus, ∫ adds up infinitely many thin slices to give one exact area. Orchestra works the same way: every Instrument builds one small piece, a palette, a type scale, a page, and the Orchestrator sums them into a single deliverable.</p>
+          </article>
+          <article class="reading">
+            <div class="rd-art"><svg viewBox="0 0 240 160" role="img" aria-label="The top of a violin drawn in outline, with the mark and its mirror image placed as the two f-holes">
+              <path d="M120 10 C 92 10, 70 22, 72 44 C 74 62, 92 66, 92 80 C 92 94, 66 100, 66 124 C 66 146, 92 154, 120 154 C 148 154, 174 146, 174 124 C 174 100, 148 94, 148 80 C 148 66, 166 62, 168 44 C 170 22, 148 10, 120 10 Z" class="rd-body"/>
+              <path d="M120 22 V 150" class="rd-axis rd-dash"/>
+              <use href="#int" x="88" y="58" width="18" height="28" class="rd-ink"/>
+              <g transform="translate(240 0) scale(-1 1)"><use href="#int" x="88" y="58" width="18" height="28" class="rd-ink"/></g>
+            </svg></div>
+            <span class="rd-k">II. The f-hole</span>
+            <h4>The opening the whole instrument sounds through</h4>
+            <p>A violin’s f-holes are where its vibrations leave the body, every string heard through one shape. In Orchestra that opening is the Orchestrator: the one agent that talks to you, so a crowd of agents reaches you as a single voice.</p>
+          </article>
+        </div>
+      </section>
+      <section class="tile t-names" aria-labelledby="names-title">
+        <span class="rd-k">The names</span>
+        <h3 id="names-title">Every agent is named for its place in the orchestra</h3>
+        <ol class="names">
+          <li><span class="nm-ic o"><svg viewBox="0 0 117 184" aria-hidden="true"><use href="#int"/></svg></span><div><b>Orchestrator</b><small>the conductor · one per project</small><p>Holds the whole piece in mind. It reads your research, plans the work, cues each Musician, and is the only agent that faces you.</p></div></li>
+          <li><span class="nm-ic m"><svg viewBox="0 0 117 184" aria-hidden="true"><use href="#int"/></svg></span><div><b>Musicians</b><small>the sections · one per deliverable</small><p>Each Musician owns one part of the performance: the Brand Kit, the Slide Deck, the Website. It knows its deliverable and the tools it needs.</p></div></li>
+          <li><span class="nm-ic i" aria-hidden="true"></span><div><b>Instruments</b><small>what they play · one per prerequisite</small><p>A Musician plays Instruments to make its part: Brand Spec, Logo Builder, Copywriter. Shared Instruments are tuned once and played by every Musician that needs them.</p></div></li>
+          <li><span class="nm-ic s" aria-hidden="true"></span><div><b>The score</b><small>the project</small><p>Your research, brand kit and knowledge graph: the one source every agent reads from, so the whole performance stays in key.</p></div></li>
+        </ol>
+      </section>
+    </div>
+    <div class="brand-end"></div>
+  </div>
+</section>
+
+<section class="blue cta" data-view="what how brand" aria-labelledby="cta-title" hidden>
+  <div class="wrap">
+    <div class="cta-grid">
+      <h2 id="cta-title">Make it your orchestra.</h2>
+      <div>
+        <p>Orchestra is open source and in active development as a desktop app. Clone it, plug in your compute and start with your own brand.</p>
+        <div class="clone"><code id="cmd">git clone https://github.com/TheSwearWords/orchestra</code><button type="button" id="copy">Copy</button></div>
+        <div class="actions"><a class="btn btn-white" href="https://github.com/TheSwearWords/orchestra"><svg aria-hidden="true"><use href="#gh"/></svg>Get started on GitHub</a></div>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <div class="wrap">
+      <a class="brand mark-swap sm" href="#top" style="color:#fff" aria-label="Orchestra"><svg class="m-reg" aria-hidden="true"><use href="#mark"/></svg><img class="m-bold" src="assets/logo-bold.png" alt="" width="28" height="28"><svg aria-hidden="true" style="width:130px;height:26px"><use href="#wm"/></svg></a>
+      <span>Many hands. One score.</span>
+    </div>
+  </footer>
+</section>
+</main>
+
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* wrap each control's label so hover and selection can swap it to the serif italic */
+  const label = (el) => {
+    [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).forEach(n => {
+      const t = n.textContent.trim(), w = document.createElement('span');
+      w.className = 'lbl'; w.dataset.t = t; w.innerHTML = '<span></span>'; w.firstChild.textContent = t;
+      n.replaceWith(w);
+    });
+  };
+  document.querySelectorAll('.nav a:not(.btn)').forEach(label);
+  const setLabel = (el, t) => { const l = el.querySelector('.lbl'); if (!l) return (el.textContent = t); l.dataset.t = t; l.firstChild.textContent = t; };
+
+  /* the kicker types out who Orchestra is for */
+  (() => {
+    const el = document.getElementById('who'), words = ['designers', 'developers'];
+    if (!el || reduce) return;
+    let w = 0, i = words[0].length, del = true;
+    const step = () => {
+      const word = words[w];
+      if (del) { i--; el.textContent = word.slice(0, i); if (i === 0) { del = false; w = (w + 1) % words.length; } return setTimeout(step, 45); }
+      const next = words[w]; i++; el.textContent = next.slice(0, i);
+      if (i === next.length) { del = true; return setTimeout(step, 2600); }
+      setTimeout(step, 85 + Math.random() * 60);
+    };
+    setTimeout(step, 2600);
+  })();
+
+  /* the nav marks the section in view, like the app marks where you are */
+  const navs = [...document.querySelectorAll('.nav a[href^="#"]')];
+  /* each section is its own page, addressed by the hash: #what, #how, #brand; anything else is the landing */
+  const home = document.querySelector('.top .brand'), views = [...document.querySelectorAll('[data-view]')];
+  const TITLES = { home: 'Orchestra', what: 'What is Orchestra · Orchestra', how: 'How it works · Orchestra', brand: 'The brand · Orchestra' };
+  function route() {
+    const h = location.hash.slice(1), v = h in TITLES ? h : 'home';
+    views.forEach(el => { el.hidden = !el.dataset.view.split(' ').includes(v); });
+    home.setAttribute('aria-current', v === 'home' ? 'page' : 'false');
+    navs.forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#' + v ? 'true' : 'false'));
+    document.title = TITLES[v];
+    scrollTo(0, 0);
+    dispatchEvent(new Event('resize')); // canvases and the pinned scroll re-measure in their new page
+  }
+  /* brief stagger: the page's blocks rise in, in reading order */
+  const RISE = {
+    home: '.tagline-top, .hero h1 > span, .hero .actions, .band .wrap > *',
+    what: '#what .sec-head > *, #what .fact, #what .hier > *, #what .diagram',
+    how: '#how .sec-head > *, #how .hs-bar, #how .mv:first-child .mv-text > *, #how .mv:first-child figure',
+    brand: '#brand .sec-head > *, #brand .b-grid > *'
+  };
+  function stagger(v) {
+    document.querySelectorAll('.rise').forEach(el => { el.classList.remove('rise'); el.style.removeProperty('--i'); });
+    if (reduce) return;
+    void document.body.offsetWidth;
+    [...document.querySelectorAll(RISE[v])].slice(0, 14).forEach((el, i) => { el.style.setProperty('--i', i); el.classList.add('rise'); });
+  }
+
+  /* the transition: the page fades out, the next fades in while a light scatter of agent-log characters settles over it */
+  const wipe = document.getElementById('wipe'), wctx = wipe.getContext('2d'), main = document.querySelector('main');
+  const WORDS = 'orchestrator.brief..musician.brand-kit..instrument.typography..figma.use_figma..tokens.json..#0538FF..many.hands.one.score..refine.unslop..research.md..';
+  let wiping = false;
+  function dust(ms) {
+    return new Promise(done => {
+      const d = devicePixelRatio || 1, W = innerWidth, H = innerHeight, cell = 14, cw = cell * .6;
+      const cols = Math.ceil(W / cw), rows = Math.ceil(H / cell);
+      wipe.width = W * d; wipe.height = H * d; wctx.setTransform(d, 0, 0, d, 0, 0);
+      wctx.font = `${cell}px "IBM Plex Mono", ui-monospace, monospace`; wctx.textBaseline = 'top';
+      const ink = getComputedStyle(document.documentElement).getPropertyValue('--col-ink').trim() || '#9fb0ff';
+      // a sparse field: about one cell in six, each lighting up once and fading, earliest near the top
+      const motes = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const h = Math.sin(r * 12.9898 + c * 78.233) * 43758.5453, rnd = h - Math.floor(h);
+        if (rnd < .16) motes.push({ x: c * cw, y: r * cell, ch: WORDS[(c * 7 + r * 13) % WORDS.length], at: (r / rows) * .45 + rnd * 2.4 * .25 });
+      }
+      const t0 = performance.now(); wipe.classList.add('on');
+      (function tick(now) {
+        const p = (now - t0) / ms;
+        wctx.clearRect(0, 0, W, H); wctx.fillStyle = ink;
+        for (const m of motes) {
+          const k = (p - m.at) / .35; if (k <= 0 || k >= 1) continue;
+          wctx.globalAlpha = Math.sin(k * Math.PI) * .85; wctx.fillText(m.ch, m.x, m.y);
+        }
+        wctx.globalAlpha = 1;
+        if (p < 1.2) requestAnimationFrame(tick); else { wipe.classList.remove('on'); done(); }
+      })(t0);
+    });
+  }
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const TYPE = {
+    home: '.tagline-top, .hero h1 > span',
+    what: '#what .num, #what h2, #what .fact h3, #what .hier h3',
+    how: '#how .num, #how h2, #how .hs-bar button, #how .mv h3',
+    brand: '#brand .num, #brand h2, #brand .tile h3'
+  };
+  const GLYPHS = '.:-=+*#/\\|_01';
+  function typeIn(el, delay) {
+    const nodes = [], walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    while (walk.nextNode()) if (walk.currentNode.textContent.trim()) nodes.push(walk.currentNode);
+    if (!nodes.length || el.dataset.typing) return;
+    const orig = nodes.map(n => n.textContent), total = orig.reduce((a, t) => a + t.length, 0);
+    el.dataset.typing = '1'; el.setAttribute('aria-label', el.textContent.trim());
+    el.style.minHeight = el.offsetHeight + 'px';
+    const ms = Math.min(900, 260 + total * 22), TAIL = 5;
+    nodes.forEach(n => n.textContent = '');
+    const t0 = performance.now() + delay;
+    (function tick(now) {
+      const p = Math.max(0, (now - t0) / ms), shown = Math.floor(p * (total + TAIL));
+      let k = 0;
+      nodes.forEach((n, j) => {
+        const t = orig[j]; let out = '';
+        for (let i = 0; i < t.length; i++, k++) {
+          if (k < shown - TAIL || t[i] === ' ') out += k < shown ? t[i] : '';
+          else if (k < shown) out += GLYPHS[(k * 7 + Math.floor(now / 45)) % GLYPHS.length];
+        }
+        n.textContent = out;
+      });
+      if (p < 1) requestAnimationFrame(tick);
+      else { nodes.forEach((n, j) => n.textContent = orig[j]); el.style.minHeight = ''; el.removeAttribute('aria-label'); delete el.dataset.typing; }
+    })(performance.now());
+  }
+  function typeAll(v) {
+    if (reduce) return;
+    [...document.querySelectorAll(TYPE[v])].forEach((el, i) => typeIn(el, 80 + i * 90));
+  }
+  async function go() {
+    if (reduce) { route(); return stagger(viewOf()); }
+    if (wiping) return; wiping = true;
+    main.classList.add('leaving');
+    await wait(180);
+    route(); stagger(viewOf()); typeAll(viewOf());
+    main.classList.remove('leaving');
+    await wait(300);
+    wiping = false;
+  }
+  const viewOf = () => { const h = location.hash.slice(1); return h in TITLES ? h : 'home'; };
+  addEventListener('hashchange', go);
+  route();
+  stagger(viewOf());
+  typeAll(viewOf());
+
+  /* hero: the violin, redrawn every tick from a stream of agent-log words */
+  (() => {
+    const MASK = "0000000000000000000000000000000000000000000000001010000010011011011011111273296676693794999976922721145101159101101101101001111011019303003030\n0000000000000000000000000000000000000000000000004123224013023132133141121112211112313643644753532231412433411224413313412312213011239820123033\n0000000000000000000000000000000000000000000000003212011123121011012261112112155555655575565753445531334235521135312201432111111212229722120022\n0000000000000000000000000000000000000000000000003451122012022032032031121231396667968966995789999933765346303349743303953112113112128412010011\n0000000000000000000000000000000000000000000000001010001101001010021021111111157857997697663858955686577831211225742201542211111112129501103033\n0000000000000000000000000000000000000000000000015213211123123122133021122112210110124723776675845711100022212311013312623112113122139822143030\n0000000000000000000000000000000000000000000000015310212123123122021031116773266666696596755552645676666741347336742337713111112011029723011001\n0000000000000000000000000000000000000000000000112001011011021012032021121121276676667994757995633656932776247236777777992112112122139712022002\n0000000000000000000000000000000000000000000001430004232112005120001011132132112333434575653643745634532621721744446666973111113111029713033033\n0000000000000000000000000000000000000000000001220210002123120023121011112130122333234733873753645533531121122222221112993111213011029720003003\n0000000000000000000000000000000000000000000027103227777773023132032021122141278967994694760776678966876642743249667643683112313122139722120000\n0000000000000000000000000000000000000000000001126761461477402001021001111273276676675999995899964757999677632779777237951111112011029600003033\n0000000000000000000000000000000000000000000002110002001000123375013021123112233333465557963961645622554123323344223412993313313122139712120033\n0000000000000000000000000000000000000000000001320000000000123251121022111132144444675568974950634544755444432445444444982211213011029622125000\n0000000000000000000000000000000000000000000000000000000000000035322021122231224667965999976996636997746666733679966667797312213122126112111022\n0000000000000000000000000000000000000000000000000341000000000002372010011111014777973787999980744766859965732979965567961111111011017301000003\n0000000000000000000000000000000000000000000000000122000000000000032033121132240000133678998971855621734111112201411110892211213011212222123120\n0000000000000000000000000000000000000000000000000212210000001001005411121132114676696558999974976676735666877877000000880000000000006300000000\n0000000000000000000000000000000000000000000000000011010000002001002392121131221267965995767980633677769989977202303201760000000000017300000000\n0000000000000000000000000000000000000000000000000100100000000000030043100016623475472552875983999643858854466534301011880110000000017300000000\n0000000000000000000000000000000000000000000000000000000000000000003121122130131214644664545973987822723235211222312313990000000000001000000000\n0000000000000000000000000000000000000000000000000000000000000000002027722121235797888888889974953677758989677677413202782000000000017300000000\n0000000000000000000000000000000000000000000000000000000000000000000023401101115768999995876984997777826989977679202100850002110120006300000000\n0000000000000000000000000000000000000000000000000000000000000000000011121140122354555456976984997643735545511322425213892110003120122100000000\n0000000000000000000000000000000000000000000000000000000000000000000002121112122454555456975973998643734545532444324201992112210122124202000000\n0000000000000000000000000000000000000000000000000000000000000000000001122121224696699999970760699677769989666966777743673112212000016310000000\n0000000000000000000000000000000000000000000000000000000000000000000001163220113677797774879990747954857989966766777742860110000000019332000000\n0000000000000000000000000000000000000000000000000000000000000000000001351031241231443661778972944745966521111012000013894114313212225200143000\n0000000000000000000000000000000000000000000000000000000000000000000001253110125883462450599974942625975556666668667742781211113212015324010021\n0000000000000000000000000000000000000000000000000000000000000000000001492131376698964999977985999677769966666766777777992112113012029411010011\n0000000000000000000000000000000000000000000000000000000000000000000000152000113455596552770799953743858578854125754557961211111100105300003033\n0000000000000000000000000000000000000000000000000000000000000000000000273132131255843882761595843655723522211311011210993213113213227422143030\n0000000000000000000000000000000000000000000000000000000000000000000000273131134693673560763772843565657679966966766437992213112112127322000013\n0000000000000000000000000000000000000000000000000000000000000000000000292011124663799994876980779977766689979666656656992112112002029421011022\n0000000000000000000000000000000000000000000000000000000000000000000000052021263224657952861753100043000001223633433433993213212212225323115001\n0000000000000000000000000000000000000000000000000000000000000000000000154230133334556953730443222043000021333433333333992112211011215321143121\n0000000000000000000000000000000000000000000000000000000000000000000001492032135998998994788710099999988000047666777667993313654223239872000122\n0000000000000000000000000000000000000000000000000000000000000000000001171201277797988898810004966889931000000979766766991111112111028661033000\n0000000000000000000000000000000000000000000000000000000000000000000001120031211352453553120031743523321000000101112111964114113222123111001123\n0000000000000000000000000000000000000000000000000000000000000000000002253130124752442553200020422424720000000135666655972112211212227552123123\n0000000000000000000000000000000000000000000000000000000000000000000006531121376698999963000063999999932000000966777779993113113123139661012032\n0000000000000000000000000000000000000000000000000000000000000000000004321010275593655500000353645578578578545445777779702112213112129552101001\n0000000000000000000000000000000000000000000000000000000000000000000001112142201250696400001373657723732421431221000014522113213223221122124133\n0000000000000000000000000000000000000000000000000000000000000000000005422122267860699700003760635688678666677666766667643653237413026782122023\n0000000000000000000000000000000000000000000000000000000000000000000007700021268870794000000760736999976679977677766747862112112122127791011011\n0000000000000000000000000000000000000000000000000000000000000000000035322022255663562000004965765546655356555555555538457213127312025333112112\n0000000000000000000000000000000000000000000000000000000000000000000134302112122354331000003854332323433333222222222217442212212212012331123122\n0000000000000000000000000000000000000000000000000000000000000000000163122145798997973000004998998977989666666677743647852313314222124492123122\n0000000000000000000000000000000000000000000000000000000000000000000161031115798994710000003998998966966666677777137269841111111011467790010000\n0000000000000000000000000000000000000000000000000000000000000000002382111131132344610000022554343111111111111222412459312213213222012232123122\n0000000000000000000000000000000000000000000000000000000000000000004692011133565665600000002555655555555555532555325579632431111011015562123122\n0000000000000000000000000000000000000000000000000000000000000000009520021136999993600000023965666976689677633303303379503112113122123492012022\n0000000000000000000000000000000000000000000000000000000000000000158410011123456574900000013997955955955755555211102179302111001000002481101104\n0000000000000000000000000000000000000000000000000000000000000000124630022113556862100000030120143111111012212202401279502112314222222242123150\n0000000000000000000000000000000000000000000000000000000000000000492002122376669965600000087797766733777741301301237389501113112012011352123003\n0000000000000000000000000000000000000000000000000000000000000006993011116668994697600000088765698665676212202202202248669212112122122581022011\n0000000000000000000000000000000000000000000000000000000000000006474041131146774452000000062644744766621741312566622369741641112111001053010144\n0000000000000000000000000000000000000000000000000000000000000003132001112222332352000000031222322322221221212322332579412111112011211061013000\n0000000000000000000000000000000000000000000000000000000000000366300026776678998967700000088996665665666642777779989649779777214122122064474377\n0000000000000000000000000000000000000000000000000000000000007971000015567798876997620200073996665665666765147999999997997447348279667899678088\n0000000000000000000000000000000000000000000000000000000000139983152022332254453441100030352221221222433311589999999999879976356567655346334133\n0000000000000000000000000000000000000000000000000000000000249720002024444455565663221200074444444444644431499999999999769984347565556446444345\n0000000000000000000000000000000000000000000000000000000000391012023276566568998998720220262665677765666777777303741689201000001002112472012011\n0000000000000000000000000000000000000000000000000000000019930001022275677657977995510120256775576556776101101201100039100000000001103011034033\n0000000000000000000000000000000000000000000000000000001269400122032011100111244411120231311001101111000401112202313002002112000000120023033000\n0000000000000000000000000000000000000100000000000000002791013121016526777667886567721213965676665677776147777101101239301111213212012011011000\n0000000000000000000000000000000000037200000000000002467302011032032026776698999977777774767777777775312732202202303126201111111011012021012000\n0000000000000000000000000000034300003000100111111577120023003122122286542147755566664410843464455666887686256112202114300110205101001002020000\n0000000000000000000000000000035000300212203116212245003030123123022011222221266611112230323212244111111111301212302312202112210215212120036030\n0000000000000000000000000000202412212212202216654000210003122133135566566668988763024796666766743775457776312312202326302112213210213120000000\n0000000000000000000000000001002000037237777212000120122012012021025411116778999800000298777776677721211101101101202102100000110000121000003030\n0000000000000000000000000002000002303203200110003000000022021122010033133222223300000121133321332154632632313202201325303312013222006212110003\n0000000000000000000000000021202000300200205322213212212011030000000022123444444300000043234431443234431431212212112224301112213012214322123022\n0000000000000000000000000000300012202202000002212122112023000000000002376668998600003666777777776633776313743302303203652212212112116312122000\n0000000000000000000000000000001000102000002000112011112011000000000006516667772000002677777722722722776211101201101102102100101000019300001033\n0000000000000000000000000000002000601212202215123122122023000000000010030151200000001110000030021031101422402202403403302212213212212142126033\n0000000000000000000000000000001300212012200210211012011011000000000025776454772000076632677777777731321221212201101101641212213212238314120001\n0000000000000000000000000000001300101101101111123122121023020000393026668976524604777777777776621211312212202202303103532111111011029311011011\n0000000000000000000000000000012303014111101112111212012121013000001016787500022477774577777774122831321221212201112741750212101101018300134143\n0000000000000000000000000000002400300212302111212213023122120010002010010002131210001110100100221121321322312202202113203112213212213225003033\n0000000000000000000000000000049000312312202212112213222472127430000006500002132234777731364367731223741322302202202202852112213212227421001001\n0000000000000000000000000000102001101201000112112112022027427772379777897673124777767777777722723721211201202202202202860000001001129412002002\n0000000000000000000000000000723314212012203212112123223124554446444313313314562144444442142153122431532322212202202202433202202212004343003000\n0000000000000000000000000000522000312212201111211212212123333333333222222232332133333332222222221332331121212101101101631212213212233102023030\n0000000000000000000000000011200312312212202112113222463137774377433032136545635634777743743740331321412322302202303212602212213212003120000002\n0000000000000000000000000059300300000000001111111111011011017777425316511125777610173120164110111111201001101101101000700110000000001030033033\n0000000000000000000000000000202012313212402112113124224134131111131141143241111142311341311340431431412422213202301212602112213335004025020000\n0000000000000000000000000022202312301212101111213012012126426666425425422264264123620131221220221221301121101101112212602212213110221002003124\n0000000000000000000000000001101202203202102112113123123023023377433036531131373230234730330320221311312112302201303102601111112011012011000001\n0000000000000000000000000012000100100012201111213112112123123016427526522131278621220131221210121111101211201110000111631101321004120132000000\n0000000000000000000000000000012312313201202212212122223124124120130030032132210131231240230230311311222212201112312212642212006330125002000003\n0000000000000000000000000022212312302212202112213213223123372377436536532374132131231221330220211211311201212212312212642112211012011121123120\n0000000000000000000000000002101102102101201112112122022022022373022026521121220220220220220220211211211202201101101101951111112110122022010000\n0000000000000000000000000000411201201211102213213213023124123253133021132132122231231220220220321311211202111211211211532004123123120000110000\n0000000000000000000000000021012312312212202111111212012123121123122022122132120121221210110110121111101101212212315515322322123003120000140030\n0000000000000000000000000021212312303203202112113224222133133133033023132132241220241330320320211211321221212212300000652000000000000000000000\n0000000000000000000000000000000003101000100111111011011011011011011011111110110110110110110110111111001001000000000000100000000000120000000000\n0000000000000000000000000021212300103312102111123122122134134133032021141231222220221330320320211211301201212000003000202000000000000000000000\n0000000000000000000000000021212312301114202212111212012011011012011011111130110110110110110110111121321221212400000000102000000112210002000020\n0000000000000000000000000011201201203201202112113122122022023032032021121131221220220220320320211211211211201102303203202112112011120001000010\n0000000000000000000000000012110110101203001110111011011012011011001000011110110100110120110100121010110110113300010000001101101000010000000000\n0000000000000000000000000000212312302103201113111122012023021132122023121121221220120210120120111221321221203303000000003000000000010000000003\n0000000000000000000000000021212312302201202111213011211012013021121021111121110121210131211320221221321321200101000000001000000000000000000000\n0000000000000000000000000001101101101102101002001002022022022022012011121121120210120220110210100100100201101202000000000000000000000000000000".split('\n'), R = MASK.length, C = MASK[0].length;
+    const LOG = ('orchestrator.read.research.md..brand-spec.write.prereqs/tokens.json..#0538FF..'
+      + 'type.instrument.serif..logo-builder.figma.use_figma..kit-builder.foundations/color..'
+      + 'needs.you:canela.is.paid..swap.for.instrument.serif..many.hands.one.score..'
+      + 'copywriter.draft.voice-guide..refine.contrast.4.5:1..unslop..spacing.8px..grid.12..'
+      + 'musician.brand-kit.working..instrument.typography.done..references.scanned..');
+    const DOTS = ' .·:', MID = '-=-+-', box = document.getElementById('score'), wrap = box.parentElement;
+    const ctx = box.getContext('2d');
+    let vx = 1, vw = 0, cell = 8, start = performance.now(), last = 0, raf = 0, visible = true;
+    const speed = Array.from({ length: R }, (_, r) => ((r * 7919) % 5 + 1) * (r % 2 ? 1 : -1));
+    function size() {
+      const d = devicePixelRatio || 1, wide = innerWidth > 900;
+      // the figure fills about half the hero (its left columns are empty); the bottom crops
+      cell = Math.max(wrap.clientHeight / R, wide ? (innerWidth * 0.6) / (C * 0.6) : 0);
+      const w = Math.ceil(C * cell * 0.6), h = Math.ceil(R * cell);
+      box.style.width = w + 'px'; box.style.height = h + 'px';
+      // lift the figure so its body, not just the scroll, sits in view above the band
+      box.style.top = -Math.round(Math.max(0, Math.min(h - wrap.clientHeight, h * 0.16))) + 'px'; box.width = w * d; box.height = h * d;
+      ctx.setTransform(d, 0, 0, d, 0, 0);
+      ctx.font = `${cell}px "IBM Plex Mono", ui-monospace, monospace`;
+      ctx.textBaseline = 'top'; ctx.textAlign = 'right';
+      vx = (cell * 0.6) / (ctx.measureText('0').width || cell * 0.6); vw = w;
+    }
+    function frame(now) {
+      const t = (now - start) / 1000;
+      ctx.clearRect(0, 0, box.width, box.height);
+      const shown = reduce ? R : Math.min(R, Math.floor(t * 70)); // scan in, top to bottom
+      const band = reduce ? -99 : ((t * 22) % (R + C)) - C * .3;  // a slow diagonal pulse
+      const tick = Math.floor(t * 8);
+      for (let r = 0; r < shown; r++) {
+        const row = MASK[r], off = reduce ? r * 37 : Math.floor(t * speed[r] * 3) + r * 37;
+        let line = '';
+        for (let c = 0; c < C; c++) {
+          let v = row.charCodeAt(c) - 48;
+          const near = Math.abs(c * .6 + r - band) < 6;
+          if (near && v > 0) v = Math.min(9, v + 3);
+          if (v === 0) { line += ' '; continue; }
+          const k = ((c + off) % LOG.length + LOG.length) % LOG.length;
+          if (v >= 6) line += LOG[k];
+          else if (v >= 3) line += MID[(c * 13 + r * 7 + (tick >> 2)) % MID.length];
+          else line += v === 2 && ((c * 31 + r * 17 + tick) % 4) === 0 ? DOTS[1 + ((c + r) % 3)] : (v === 1 && ((c * 31 + r * 17 + tick) % 9) === 0 ? '.' : ' ');
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.save(); ctx.translate(vw, 0); ctx.scale(vx, 1); ctx.fillText(line, 0, r * cell); ctx.restore();
+      }
+    }
+    /* the integral behind the headline, filled with the same words, in a quieter tone */
+    const ib = document.getElementById('intc'), ic = ib.getContext('2d');
+    const INT = new Path2D(document.querySelector('#int path').getAttribute('d'));
+    let IM = [], IR = 0, ICOL = 0, icell = 10, ix = 1;
+    function isize() {
+      const box = ib.parentElement, W = box.clientWidth, H = box.clientHeight, d = devicePixelRatio || 1;
+      if (!W || !H) return;
+      icell = Math.max(9, Math.min(14, H / 110));
+      IR = Math.ceil(H / icell); ICOL = Math.ceil(W / (icell * 0.6));
+      ib.width = W * d; ib.height = H * d; ic.setTransform(d, 0, 0, d, 0, 0);
+      ic.font = `${icell}px "IBM Plex Mono", ui-monospace, monospace`; ic.textBaseline = 'top';
+      ix = (icell * 0.6) / (ic.measureText('0').width || icell * 0.6);
+      const off = document.createElement('canvas'); off.width = ICOL; off.height = IR;
+      const o = off.getContext('2d'); o.scale(ICOL / 117, IR / 184); o.fill(INT);
+      const px = o.getImageData(0, 0, ICOL, IR).data, inside = (c, r) => c >= 0 && r >= 0 && c < ICOL && r < IR && px[(r * ICOL + c) * 4 + 3] > 110;
+      IM = [];
+      for (let r = 0; r < IR; r++) { const row = []; for (let c = 0; c < ICOL; c++) {
+        row.push(!inside(c, r) ? 0 : (inside(c - 1, r) && inside(c + 1, r) && inside(c, r - 1) && inside(c, r + 1) ? 1 : 2)); } IM.push(row); }
+    }
+    function iframe(now) {
+      const t = (now - start) / 1000;
+      ic.clearRect(0, 0, ib.width, ib.height);
+      for (let r = 0; r < IR; r++) {
+        const off = reduce ? r * 23 : Math.floor(t * speed[r % R] * 1.5) + r * 23;
+        let body = '', edge = '';
+        for (let c = 0; c < ICOL; c++) {
+          const v = IM[r][c], ch = LOG[((c + off) % LOG.length + LOG.length) % LOG.length];
+          body += v === 1 ? ch : ' ';
+          edge += v === 2 ? (ch === '.' ? ':' : ch) : ' ';
+        }
+        ic.save(); ic.scale(ix, 1);
+        ic.fillStyle = 'rgba(255,255,255,.2)'; ic.fillText(body, 0, r * icell);
+        ic.fillStyle = 'rgba(255,255,255,.42)'; ic.fillText(edge, 0, r * icell);
+        ic.restore();
+      }
+    }
+    function loop(now) {
+      if (visible && now - last > 110) { frame(now); iframe(now); last = now; }
+      raf = requestAnimationFrame(loop);
+    }
+    size(); isize(); frame(performance.now()); iframe(performance.now());
+    if (!reduce) raf = requestAnimationFrame(loop);
+    new IntersectionObserver(e => { visible = e[0].isIntersecting; }).observe(wrap);
+    const redraw = () => { size(); isize(); frame(performance.now()); iframe(performance.now()); };
+    addEventListener('resize', redraw);
+    if (document.fonts) document.fonts.ready.then(redraw);
+  })();
+  const CREDITS = {
+    hand: 'Albrecht Dürer, Study of a Hand and a Pillow, 1493 · CC0',
+    apollo: 'Asher Brown Durand, Apollo Belvedere, 1825 · CC0',
+    concert: 'Mechanisch concert, 1769, Rijksmuseum · CC0'
+  };
+
+
+  const copy = document.getElementById('copy'), cmd = document.getElementById('cmd');
+  copy.addEventListener('click', () => {
+    const done = () => { setLabel(copy, 'Copied'); setTimeout(() => setLabel(copy, 'Copy'), 1600); };
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents(cmd); const s = getSelection(); s.removeAllRanges(); s.addRange(r); setLabel(copy, 'Selected'); };
+    try { navigator.clipboard.writeText(cmd.textContent).then(done, fallback); } catch { fallback(); }
+  });
+
+  /* Create: switch the framed screen between its three views */
+  document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => {
+    const i = +b.dataset.v, fig = b.closest('.shot-switch');
+    fig.querySelectorAll('.views button').forEach((x, k) => x.setAttribute('aria-pressed', k === i));
+    fig.querySelectorAll('.stack img').forEach((im, k) => im.classList.toggle('on', k === i));
+  }));
+
+  /* How it works: pin the section and slide the steps in from the right as you scroll */
+  (() => {
+    const hs = document.getElementById('hs'), track = document.getElementById('hs-track'), fill = document.getElementById('hs-fill');
+    const tabs = [...hs.querySelectorAll('.hs-bar button')], N = tabs.length, wide = matchMedia('(min-width: 961px)');
+    const STEP = 0.75; // screen-heights of scrolling per slide
+    let active = -1;
+    const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    function layout() {
+      const on = wide.matches && !reduce;
+      hs.classList.toggle('on', on);
+      hs.style.height = on ? `calc(100svh - 72px + ${(N - 1) * STEP * 100}svh)` : '';
+      if (!on) { track.style.transform = ''; }
+      update();
+    }
+    function update() {
+      if (!hs.classList.contains('on')) return;
+      const r = hs.getBoundingClientRect(), travel = hs.offsetHeight - (innerHeight - 72);
+      const p = Math.min(1, Math.max(0, (72 - r.top) / Math.max(1, travel)));
+      const seg = p * (N - 1), i = Math.min(N - 2, Math.floor(seg)), f = seg - i;
+      // each slide holds, then moves: the middle 70% of every segment carries the swipe
+      const t = ease(Math.min(1, Math.max(0, (f - .15) / .7)));
+      track.style.transform = `translate3d(${-(i + t) * 100}%,0,0)`;
+      fill.style.width = (p * 100) + '%';
+      const now = Math.round(i + t);
+      if (now !== active) { active = now; tabs.forEach((b, k) => b.setAttribute('aria-selected', k === now)); }
+    }
+    tabs.forEach((b, k) => b.addEventListener('click', () => {
+      if (!hs.classList.contains('on')) return document.querySelectorAll('#hs .mv')[k].scrollIntoView({ behavior: 'smooth' });
+      const travel = hs.offsetHeight - (innerHeight - 72), y = hs.getBoundingClientRect().top + scrollY - 72;
+      scrollTo({ top: y + travel * (k / (N - 1)) + (k ? 1 : 0), behavior: 'smooth' });
+    }));
+    addEventListener('scroll', update, { passive: true });
+    addEventListener('resize', layout);
+    wide.addEventListener('change', layout);
+    layout();
+  })();
+
+  /* the brand's readings of the mark: a Riemann sum that fills in, and agents held inside the ring */
+  (() => {
+    const g = document.getElementById('riemann'), label = document.getElementById('riemann-n');
+    if (!g) return;
+    const curve = g.parentNode.querySelector('.rd-curve'), L = curve.getTotalLength(), pts = [];
+    for (let i = 0; i <= 400; i++) { const q = curve.getPointAtLength(L * i / 400); pts.push(q); }
+    const f = x => { let best = pts[0]; for (const q of pts) if (Math.abs(q.x - x) < Math.abs(best.x - x)) best = q; return best.y; };
+    const ns = [4, 8, 16, 32]; let k = 0;
+    const show = n => {
+      const w = 200 / n; let out = '';
+      for (let i = 0; i < n; i++) { const x = 20 + i * w, y = Math.min(138, f(x + w / 2)); out += `<rect class="rd-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(2)}" height="${(140 - y).toFixed(1)}"/>`; }
+      g.innerHTML = out; label.textContent = `n = ${n}`;
+    };
+    show(reduce ? 32 : 4);
+    if (!reduce) setInterval(() => { k = (k + 1) % ns.length; show(ns[k]); }, 1400);
+  })();
+
+  /* knowledge graph illustration */
+  const cv = document.getElementById('graph');
+  const rand = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(7);
+  const P = [{ n: 'Orchestra Brand', x: .2, y: .3 }, { n: 'Forma Editorial', x: .76, y: .26 }, { n: 'Still House', x: .5, y: .8 }];
+  const S = [{ n: 'Bodoni Moda', x: .47, y: .28 }, { n: '#0538FF', x: .33, y: .58 }, { n: 'modular grid', x: .65, y: .55 }];
+  const L = []; P.forEach((p, i) => { for (let k = 0; k < 10; k++) { const a = rand() * 6.283, r = .07 + rand() * .1; L.push({ p: i, x: p.x + Math.cos(a) * r * .8, y: p.y + Math.sin(a) * r }); } });
+  let vis = true;
+  function draw(t) {
+    const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; if (!r.width) return;
+    if (cv.width !== Math.round(r.width * d)) { cv.width = r.width * d; cv.height = r.height * d; }
+    const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); c.clearRect(0, 0, r.width, r.height);
+    const cs = getComputedStyle(document.documentElement), tok = k => cs.getPropertyValue(k).trim();
+    const W = r.width, H = r.height, at = o => [o.x * W, o.y * H], pulse = reduce ? 0 : (Math.sin(t / 900) + 1) / 2;
+    c.lineWidth = 1;
+    c.strokeStyle = tok('--line-strong'); c.globalAlpha = .7;
+    L.forEach(l => { const [x, y] = at(l), [a, b] = at(P[l.p]); c.beginPath(); c.moveTo(a, b); c.lineTo(x, y); c.stroke(); });
+    c.strokeStyle = tok('--link'); c.globalAlpha = .55;
+    S.forEach(s => P.forEach(p => { const [x, y] = at(s), [a, b] = at(p); c.beginPath(); c.moveTo(a, b); c.lineTo(x, y); c.stroke(); }));
+    c.globalAlpha = 1;
+    c.fillStyle = tok('--ink-3'); L.forEach(l => { const [x, y] = at(l); c.beginPath(); c.arc(x, y, 2.2, 0, 7); c.fill(); });
+    S.forEach(s => { const [x, y] = at(s); c.fillStyle = tok('--link'); c.beginPath(); c.arc(x, y, 5 + pulse * 1.5, 0, 7); c.fill(); c.font = '11px "IBM Plex Mono", monospace'; c.fillText(s.n, x + 9, y + 4); });
+    P.forEach(p => { const [x, y] = at(p); c.fillStyle = tok('--ink'); c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); c.font = 'italic 800 16px "Bodoni Moda", Didot, Georgia, serif'; c.fillText(p.n, x + 10, y - 8); });
+  }
+  new IntersectionObserver(e => { vis = e[0].isIntersecting; }).observe(cv);
+  const loop = t => { if (vis) draw(t); if (!reduce) requestAnimationFrame(loop); };
+  draw(0); requestAnimationFrame(loop);
+  addEventListener('resize', () => draw(performance.now()));
+  if (document.fonts) document.fonts.ready.then(() => draw(performance.now()));
+})();
+</script>
+</body>
+</html>

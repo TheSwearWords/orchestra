@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ChatInfo, Project } from '../../preload'
+import { Agents } from './components/Agents'
 import { Ascii, type AsciiName } from './components/Ascii'
 import { Create } from './components/Create'
 import { Icon } from './components/Icon'
@@ -262,7 +263,15 @@ function App(): React.JSX.Element {
             )}
             {page && (
               <div key={page} className="stagger">
-                <WorkspaceHeader title={PAGE_TITLES[page]} context="Next on the build plan." />
+                <WorkspaceHeader
+                  title={PAGE_TITLES[page]}
+                  context={
+                    page === 'agents'
+                      ? 'Every agent is a markdown file in the library. Changes apply to every project.'
+                      : 'Next on the build plan.'
+                  }
+                />
+                {page === 'agents' && <Agents />}
               </div>
             )}
           </div>

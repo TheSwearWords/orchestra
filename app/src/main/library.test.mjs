@@ -4,7 +4,7 @@ import { existsSync } from 'fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { checkLibrary, loadLibrary, parseDoc } from './library.ts'
+import { agentFile, checkLibrary, loadLibrary, parseDoc, setField } from './library.ts'
 
 test('parseDoc reads strings and lists', () => {
   const doc = parseDoc('---\nname: Brand Kit\nneeds: [a, b ,]\nempty: []\n---\n\nYou are…')
@@ -52,4 +52,19 @@ test('the vault library is consistent', { skip: !existsSync(join(vault, 'library
   const lib = await loadLibrary(vault)
   assert.deepEqual(checkLibrary(lib), [])
   assert.ok(lib.musicians.length > 0)
+})
+
+test('setField replaces or adds one front-matter line and keeps the body', () => {
+  const md = '---\nname: Kit\nmodel: sonnet\n---\n\nmodel: not this one'
+  assert.equal(
+    setField(md, 'model', 'opus'),
+    '---\nname: Kit\nmodel: opus\n---\n\nmodel: not this one'
+  )
+  assert.deepEqual(parseDoc(setField(md, 'instruments', ['a', 'b'])).fields.instruments, ['a', 'b'])
+  assert.throws(() => setField('no front matter', 'model', 'opus'))
+})
+
+test('agentFile only accepts plain ids', () => {
+  assert.ok(agentFile('h', 'musician', 'brand-kit').endsWith(join('musicians', 'brand-kit.md')))
+  assert.throws(() => agentFile('h', 'instrument', '../secrets'))
 })

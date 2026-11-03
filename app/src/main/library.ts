@@ -131,3 +131,24 @@ export function checkLibrary(lib: Library): string[] {
   for (const i of lib.instruments) visit(i.id, [])
   return problems
 }
+
+export type Role = 'orchestrator' | 'musician' | 'instrument'
+
+/** An agent's file in the library. Ids come from the renderer, so only plain slugs are allowed. */
+export function agentFile(home: string, role: Role, id: string): string {
+  if (role === 'orchestrator') return join(home, 'library', 'orchestrator.md')
+  if (!/^[\w-]+$/.test(id)) throw new Error(`Not an agent id: ${id}`)
+  return join(home, 'library', role === 'musician' ? 'musicians' : 'instruments', `${id}.md`)
+}
+
+/** Sets one front-matter field, adding the line if it's missing; the rest of the file is untouched. */
+export function setField(md: string, key: string, value: string | string[]): string {
+  const doc = /^(\uFEFF?---\r?\n)([\s\S]*?)(\r?\n---)/.exec(md)
+  if (!doc) throw new Error('The file has no front matter.')
+  const line = `${key}: ${Array.isArray(value) ? `[${value.join(', ')}]` : value}`
+  const lines = doc[2].split(/\r?\n/)
+  const at = lines.findIndex((l) => l.startsWith(`${key}:`))
+  if (at >= 0) lines[at] = line
+  else lines.push(line)
+  return doc[1] + lines.join('\n') + md.slice(doc[1].length + doc[2].length)
+}

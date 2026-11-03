@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Project } from '../main/projects'
 import type { AgentState, ChatEvent, ChatMessage, LogEntry } from '../main/conductor'
-import type { Instrument, Musician } from '../main/library'
+import type { Instrument, Library, Musician, Role } from '../main/library'
 import type { Output } from '../main/outputs'
 import type { Reference, Site, Tag } from '../main/research'
 
@@ -11,11 +11,13 @@ export type {
   ChatEvent,
   ChatMessage,
   Instrument,
+  Library,
   LogEntry,
   Musician,
   Output,
   Project,
   Reference,
+  Role,
   Site,
   Tag
 }
@@ -131,6 +133,16 @@ const api = {
     ipcRenderer.on('chat:event', listener)
     return () => ipcRenderer.removeListener('chat:event', listener)
   },
+  loadAgents: (): Promise<{ library: Library; problems: string[] }> =>
+    ipcRenderer.invoke('agents:load'),
+  readAgent: (role: Role, id: string): Promise<string> =>
+    ipcRenderer.invoke('agents:read', role, id),
+  writeAgent: (role: Role, id: string, text: string): Promise<void> =>
+    ipcRenderer.invoke('agents:write', role, id, text),
+  setAgentModel: (role: Role, id: string, model: string): Promise<void> =>
+    ipcRenderer.invoke('agents:set', role, id, 'model', model),
+  setCrew: (musician: string, instruments: string[]): Promise<void> =>
+    ipcRenderer.invoke('agents:set', 'musician', musician, 'instruments', instruments),
   listOutputs: (project: string): Promise<Output[]> =>
     ipcRenderer.invoke('create:outputs', project),
   openOutput: (project: string, path: string): Promise<void> =>

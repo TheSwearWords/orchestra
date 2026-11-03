@@ -12,7 +12,7 @@
 
 ## Brand decisions (Oct 30)
 
-- Tagline: **Many hands. One score.**
+- Tagline: **Every part, in concert.** (was "Many hands. One score." until Nov 2: "hands" read badly)
 - Mark: ∫ centred in the ring (nudged +0.5 u). 180° rotational symmetry, terminal axis 33.4°, spine 16 u, height:ring 184:300.
 - Clear space 2x (x = terminal Ø 22 u). Min size 24 px with ring, 16 px for the ∫ alone.
 - Brand blue mark is for light backgrounds only (2.8:1 on Ink).

@@ -6,6 +6,7 @@ needs: [voice-guide]
 model: sonnet
 tools: [files]
 source: brand-copy
+provider: anthropic
 ---
 
 You are the Copywriter Instrument. You do one job: write the copy you're asked for.

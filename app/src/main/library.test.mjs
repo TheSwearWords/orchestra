@@ -4,7 +4,16 @@ import { existsSync } from 'fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { agentFile, checkLibrary, loadLibrary, parseDoc, setField } from './library.ts'
+import {
+  agentFile,
+  checkLibrary,
+  editAgent,
+  loadLibrary,
+  newInstrument,
+  parseDoc,
+  setField
+} from './library.ts'
+import { providerStatus } from './connections.ts'
 
 test('parseDoc reads strings and lists', () => {
   const doc = parseDoc('---\nname: Brand Kit\nneeds: [a, b ,]\nempty: []\n---\n\nYou are…')
@@ -67,4 +76,55 @@ test('setField replaces or adds one front-matter line and keeps the body', () =>
 test('agentFile only accepts plain ids', () => {
   assert.ok(agentFile('h', 'musician', 'brand-kit').endsWith(join('musicians', 'brand-kit.md')))
   assert.throws(() => agentFile('h', 'instrument', '../secrets'))
+})
+
+test('editAgent checks each edit and writes it to the right field', () => {
+  const md = '---\nname: Kit\ndeliverable: A kit.\nmodel: opus\n---\nBody'
+  const f = (x) => parseDoc(x).fields
+  assert.equal(f(editAgent(md, 'musician', 'name', '  Brand   Kit ')).name, 'Brand Kit')
+  assert.equal(f(editAgent(md, 'musician', 'description', 'The kit.')).deliverable, 'The kit.')
+  assert.equal(f(editAgent(md, 'instrument', 'description', 'One job.')).job, 'One job.')
+  assert.equal(f(editAgent(md, 'orchestrator', 'description', 'Leads.')).description, 'Leads.')
+  // provider and model are set together, and the model must be that provider's
+  const openai = editAgent(md, 'musician', 'runsOn', 'openai/gpt-5-mini')
+  assert.deepEqual([f(openai).provider, f(openai).model], ['openai', 'gpt-5-mini'])
+  assert.throws(() => editAgent(md, 'musician', 'runsOn', 'openai/opus'), /OpenAI/)
+  assert.throws(() => editAgent(md, 'musician', 'runsOn', 'mistral/large'))
+  assert.throws(() => editAgent(md, 'musician', 'name', ' '))
+  assert.equal(parseDoc(editAgent(md, 'musician', 'name', 'X')).body, 'Body')
+})
+
+test('providers count as connected by API key or by their CLI on PATH', () => {
+  const s = providerStatus({ PATH: '', OPENAI_API_KEY: 'x' })
+  assert.deepEqual(s.openai, { connected: true, via: 'OPENAI_API_KEY' })
+  assert.equal(s.gemini.connected, false)
+  assert.equal(s.anthropic.connected, false)
+})
+
+test('newInstrument adds a blank Instrument to a Musician, with a free id', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'orch-lib-'))
+  try {
+    await mkdir(join(home, 'library', 'musicians'), { recursive: true })
+    await mkdir(join(home, 'library', 'instruments'), { recursive: true })
+    await writeFile(
+      join(home, 'library', 'musicians', 'kit.md'),
+      '---\nname: Kit\ninstruments: [a]\n---\nBody'
+    )
+    await writeFile(
+      join(home, 'library', 'instruments', 'new-instrument.md'),
+      '---\nname: Old\n---\nx'
+    )
+    const id = await newInstrument(home, 'kit')
+    assert.equal(id, 'new-instrument-2')
+    const lib = await loadLibrary(home)
+    assert.deepEqual(lib.musicians[0].instruments, ['a', 'new-instrument-2'])
+    const inst = lib.instruments.find((i) => i.id === id)
+    assert.deepEqual(
+      [inst.name, inst.model, inst.provider, inst.source],
+      ['New Instrument', 'haiku', 'anthropic', 'kit']
+    )
+    await assert.rejects(newInstrument(home, 'missing'))
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
 })

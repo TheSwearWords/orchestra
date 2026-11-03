@@ -1,5 +1,6 @@
-import { readdir, readFile } from 'fs/promises'
+import { readdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
+import { provider, PROVIDERS } from './providers.ts'
 
 // The agent library (ORCHESTRA_HOME/library): plain markdown the user, the Orchestrator and
 // Musicians all edit. orchestrator.md, musicians/<id>.md (one per deliverable) and
@@ -11,6 +12,8 @@ export interface AgentDoc {
   prompt: string
   tools: string[]
   model: string // opus | sonnet | haiku; defaults by tier: Orchestrator opus, Musician sonnet, Instrument haiku
+  provider: string // anthropic (default) | openai | gemini
+  description: string // the Orchestrator's one line; Musicians use deliverable, Instruments job
   source: string // mine | starter | orchestrator | <musician id>
 }
 
@@ -60,12 +63,16 @@ const str = (f: Fields, k: string): string => (typeof f[k] === 'string' ? (f[k] 
 const list = (f: Fields, k: string): string[] => (Array.isArray(f[k]) ? (f[k] as string[]) : [])
 
 function agent(id: string, f: Fields, body: string, tierModel: string): AgentDoc {
+  const p = provider(str(f, 'provider')) ?? PROVIDERS[0]
   return {
     id,
     name: str(f, 'name') || id,
     prompt: body,
     tools: list(f, 'tools'),
-    model: str(f, 'model') || tierModel,
+    // the tier default is an Anthropic model; other providers default to their middle model
+    model: str(f, 'model') || (p.id === 'anthropic' ? tierModel : p.models[1].id),
+    provider: p.id,
+    description: str(f, 'description'),
     source: str(f, 'source')
   }
 }
@@ -151,4 +158,75 @@ export function setField(md: string, key: string, value: string | string[]): str
   if (at >= 0) lines[at] = line
   else lines.push(line)
   return doc[1] + lines.join('\n') + md.slice(doc[1].length + doc[2].length)
+}
+
+export type EditKey = 'name' | 'description' | 'runsOn'
+
+/** One edit from the Agents screen, checked, applied to an agent file's front matter. The
+ * description lives in a role's own field; runsOn is "<provider>/<model>", set together. */
+export function editAgent(md: string, role: Role, key: EditKey, value: string): string {
+  const v = String(value).replace(/\s+/g, ' ').trim()
+  switch (key) {
+    case 'name':
+      if (!v || v.length > 60) throw new Error('Give it a name of 1 to 60 characters.')
+      return setField(md, 'name', v)
+    case 'description':
+      if (v.length > 300) throw new Error('Keep the description to one line, under 300 characters.')
+      return setField(
+        md,
+        role === 'musician' ? 'deliverable' : role === 'instrument' ? 'job' : 'description',
+        v
+      )
+    case 'runsOn': {
+      const [pid, model] = v.split('/')
+      const p = provider(pid)
+      if (!p) throw new Error(`Orchestra supports ${PROVIDERS.map((x) => x.name).join(', ')}.`)
+      if (!p.models.some((m) => m.id === model))
+        throw new Error(`${model} isn't one of ${p.name}'s models.`)
+      return setField(setField(md, 'provider', p.id), 'model', model)
+    }
+  }
+  throw new Error(`Can't edit ${key}.`)
+}
+
+/** A new, blank Instrument in a Musician's crew, from the library's template, ready to be
+ * named and described on the Agents screen. Returns its id. */
+export async function newInstrument(home: string, musician: string): Promise<string> {
+  const crewFile = agentFile(home, 'musician', musician)
+  const md = await readFile(crewFile, 'utf8') // the Musician must exist
+  const taken = new Set(
+    (await readdir(join(home, 'library', 'instruments')).catch(() => [] as string[])).map((n) =>
+      n.replace(/\.md$/, '')
+    )
+  )
+  let id = 'new-instrument'
+  for (let n = 2; taken.has(id); n++) id = `new-instrument-${n}`
+  const template = await readFile(
+    join(home, 'library', 'templates', 'instrument-template.md'),
+    'utf8'
+  )
+    .then((t) => parseDoc(t)?.body ?? '')
+    .catch(() => '')
+  const body = (template || 'You are the <Job> Instrument. You do one job: <job>.')
+    .replace(/<Job>/g, 'New')
+    .replace(/<job>/g, 'describe it on the Agents screen')
+  const file = [
+    '---',
+    'name: New Instrument',
+    'job: ',
+    `output: prereqs/${id}.md`,
+    'needs: []',
+    'model: haiku',
+    'provider: anthropic',
+    'tools: []',
+    `source: ${musician}`,
+    '---',
+    '',
+    body,
+    ''
+  ].join('\n')
+  await writeFile(agentFile(home, 'instrument', id), file, { flag: 'wx' })
+  const crew = parseDoc(md)?.fields.instruments
+  await writeFile(crewFile, setField(md, 'instruments', [...(Array.isArray(crew) ? crew : []), id]))
+  return id
 }

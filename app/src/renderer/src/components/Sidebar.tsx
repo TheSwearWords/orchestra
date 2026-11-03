@@ -3,12 +3,11 @@ import type { ChatInfo, Project } from '../../../preload'
 import { Ascii, type AsciiName } from './Ascii'
 import { Icon, type IconName } from './Icon'
 
-export type Page = 'files' | 'settings' | 'account' | 'agents'
+export type Page = 'files' | 'settings' | 'agents'
 
 const UTILITY: { page: Page; label: string; icon: IconName }[] = [
   { page: 'files', label: 'Files', icon: 'folder-line' },
   { page: 'settings', label: 'Settings', icon: 'settings-3-line' },
-  { page: 'account', label: 'Account', icon: 'user-line' },
   { page: 'agents', label: 'Agents', icon: 'team-line' }
 ]
 

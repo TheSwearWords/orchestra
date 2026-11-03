@@ -25,7 +25,6 @@ import {
 const PAGE_TITLES: Record<Page, string> = {
   files: 'Files',
   settings: 'Settings',
-  account: 'Account',
   agents: 'Agents'
 }
 
@@ -70,7 +69,9 @@ function startingState(): { tabs: Tabs; mode: Mode } {
   const legacy = remembered('selected')
   if (remembered('tabs') === null && legacy && legacy !== 'new' && !(legacy in PAGE_TITLES))
     return { tabs: openTab(EMPTY, legacy), mode: 'projects' }
-  const mode = (remembered('mode') as Mode | null) ?? 'projects'
+  const saved = remembered('mode')
+  // a remembered page can be one that no longer exists (Account was removed)
+  const mode = (saved === 'new' || (saved && saved in PAGE_TITLES) ? saved : 'projects') as Mode
   return { tabs: rememberedJson<Tabs>('tabs', EMPTY), mode }
 }
 

@@ -2,13 +2,16 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Project } from '../main/projects'
 import type { AgentState, ChatEvent, ChatMessage, LogEntry } from '../main/conductor'
-import type { Instrument, Library, Musician, Role } from '../main/library'
+import type { EditKey, Instrument, Library, Musician, Role } from '../main/library'
+import type { ProviderStatus } from '../main/providers'
 import type { Output } from '../main/outputs'
 import type { Proposal } from '../main/proposals'
 import type { Reference, Site, Tag } from '../main/research'
 
 export type {
   AgentState,
+  EditKey,
+  ProviderStatus,
   ChatEvent,
   ChatMessage,
   Instrument,
@@ -146,8 +149,13 @@ const api = {
     ipcRenderer.invoke('agents:read', role, id),
   writeAgent: (role: Role, id: string, text: string): Promise<void> =>
     ipcRenderer.invoke('agents:write', role, id, text),
-  setAgentModel: (role: Role, id: string, model: string): Promise<void> =>
-    ipcRenderer.invoke('agents:set', role, id, 'model', model),
+  // name, description, provider or model; checked and written in main (library.ts editAgent)
+  editAgent: (role: Role, id: string, key: EditKey, value: string): Promise<void> =>
+    ipcRenderer.invoke('agents:set', role, id, key, value),
+  providerStatus: (): Promise<ProviderStatus> => ipcRenderer.invoke('providers:status'),
+  // a blank Instrument in a Musician's crew; returns its id
+  newInstrument: (musician: string): Promise<string> =>
+    ipcRenderer.invoke('agents:newInstrument', musician),
   setCrew: (musician: string, instruments: string[]): Promise<void> =>
     ipcRenderer.invoke('agents:set', 'musician', musician, 'instruments', instruments),
   listOutputs: (project: string): Promise<Output[]> =>

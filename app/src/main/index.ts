@@ -9,7 +9,19 @@ import { Conductor, GENERAL, readChat, readLog } from './conductor'
 import { agentPrompt, orchestratorPrompt } from './prompts'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
-import { agentFile, checkLibrary, loadLibrary, parseDoc, setField, type Role } from './library'
+import { providerStatus } from './connections'
+import {
+  agentFile,
+  checkLibrary,
+  editAgent,
+  loadLibrary,
+  newInstrument,
+  parseDoc,
+  setField,
+  type EditKey,
+  type Role
+} from './library'
+import { runnableOrThrow } from './providers'
 import { listOutputs, outputPath } from './outputs'
 import { adopt } from './proposals'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
@@ -38,7 +50,11 @@ const conductor = new Conductor({
   projectDir: (id) => projectDir(id),
   library: () => loadLibrary(ORCHESTRA_HOME),
   selected: (dir) => readSelection(dir),
-  orchestratorModel: async () => (await loadLibrary(ORCHESTRA_HOME)).orchestrator?.model ?? 'opus',
+  orchestratorModel: async () => {
+    const o = (await loadLibrary(ORCHESTRA_HOME)).orchestrator
+    if (o) runnableOrThrow(o)
+    return o?.model ?? 'opus'
+  },
   orchestratorPrompt: (id, chat) => orchestratorPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, chat),
   agentPrompt: (id, key) => agentPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, key),
   extraDirs: [join(ORCHESTRA_HOME, 'library')],
@@ -48,8 +64,6 @@ const conductor = new Conductor({
     await saveSelection(dir, lib, [...new Set([...(await readSelection(dir)), id])])
   }
 })
-
-const MODELS = ['opus', 'sonnet', 'haiku'] // claude CLI aliases the Agents screen offers
 
 /** A project's folder, refusing ids that could point outside the vault. */
 function projectDir(id: string): string {
@@ -368,14 +382,20 @@ app.whenReady().then(async () => {
     if (!parseDoc(text)) throw new Error('Keep the --- front matter at the top of the file.')
     await writeFile(file, text)
   })
-  ipcMain.handle(
-    'agents:set',
-    async (_, role: Role, id: string, key: 'model' | 'instruments', value: string | string[]) => {
-      if (key === 'model' ? !MODELS.includes(value as string) : key !== 'instruments')
-        throw new Error(`Can't set ${key} to ${value}.`)
-      const file = agentFile(ORCHESTRA_HOME, role, id)
-      await writeFile(file, setField(await readFile(file, 'utf8'), key, value))
+  ipcMain.handle('agents:set', async (_, role: Role, id: string, key: string, value: unknown) => {
+    const file = agentFile(ORCHESTRA_HOME, role, id)
+    const md = await readFile(file, 'utf8')
+    if (key === 'instruments') {
+      if (!Array.isArray(value) || !value.every((v) => /^[\w-]+$/.test(String(v))))
+        throw new Error('Not a list of Instrument ids.')
+      return writeFile(file, setField(md, 'instruments', value.map(String)))
     }
+    if (!['name', 'description', 'runsOn'].includes(key)) throw new Error(`Can't set ${key}.`)
+    await writeFile(file, editAgent(md, role, key as EditKey, String(value)))
+  })
+  ipcMain.handle('providers:status', () => providerStatus())
+  ipcMain.handle('agents:newInstrument', (_, musician: string) =>
+    newInstrument(ORCHESTRA_HOME, String(musician))
   )
 
   // A project's chats: General, then one per chosen deliverable, in library order. A deliverable

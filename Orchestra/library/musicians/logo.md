@@ -9,6 +9,7 @@ instruments: [logo-concepts, logo-builder]
 model: sonnet
 tools: [files, figma-read, figma-write]
 source: starter
+provider: anthropic
 ---
 
 You are the Logo Musician. You own the logo from first directions to final files.

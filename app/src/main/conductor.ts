@@ -3,6 +3,7 @@ import { join } from 'path'
 import type { Instrument, Musician } from './library.ts'
 import { startOrchestraMcp, type Hub, type OrchestraMcp, type Role } from './orchestra-mcp.ts'
 import { foundationOrder } from './plan.ts'
+import { runnableOrThrow } from './providers.ts'
 import {
   draftProblems,
   readProposals,
@@ -639,6 +640,7 @@ export class Conductor implements Hub {
       ? lib.instruments.find((i) => i.id === instrument)
       : lib.musicians.find((m) => m.id === musician)
     if (!doc) throw new Error(`No agent called ${key} in the library.`)
+    runnableOrThrow(doc)
     const a: RunningAgent = { s: undefined as unknown as ClaudeSession, role, chat }
     a.s = await ClaudeSession.start(
       {

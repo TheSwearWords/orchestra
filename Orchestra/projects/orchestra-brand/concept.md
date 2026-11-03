@@ -21,6 +21,13 @@
 - Icons: 48 Remix icons carried over from Pitcrew.
 - Tokens: `prereqs/tokens.json` (exported from Figma).
 
+## Brand sync (Nov 2)
+
+- Tried Montserrat for body/UI, reverted the same day: Instrument Sans stays.
+- App icon: round Blue disc, ring and ∫ thickened from Mark Bold for small sizes (Brand > Logo/App icon round).
+- Dark mode unchanged: the site's navy dark mode is not adopted.
+- Added to Foundations > Motion, states & additions: selected-state type, motion curves and timings, Navy / Ink 3 / box blue, space/32, grain, agent and phase icons, site patterns. Site-only items marked.
+
 ## References
 
 <!-- one line per reference: file - what I like about it -->

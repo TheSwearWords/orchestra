@@ -3,6 +3,14 @@ import { join } from 'path'
 import type { Instrument, Musician } from './library.ts'
 import { startOrchestraMcp, type Hub, type OrchestraMcp, type Role } from './orchestra-mcp.ts'
 import { foundationOrder } from './plan.ts'
+import {
+  draftProblems,
+  readProposals,
+  saveProposal,
+  type InstrumentDraft,
+  type MusicianDraft,
+  type Proposal
+} from './proposals.ts'
 import { ClaudeSession, type ToolUse } from './session.ts'
 
 // Create's agents. A project has several chats: "general" for the whole project and one per
@@ -14,8 +22,10 @@ import { ClaudeSession, type ToolUse } from './session.ts'
 
 export interface ChatMessage {
   t: string // ISO time
-  role: 'user' | 'orchestrator' | 'note' // a note is the app's own line: a hand-over, a stop, a report
+  // a note is the app's own line (a hand-over, a stop, a report); a proposal is an approval card
+  role: 'user' | 'orchestrator' | 'note' | 'proposal'
   text: string
+  ref?: string // a proposal's id
 }
 
 /** One line of the agent channel: what an agent did or said, for oversight. */
@@ -105,7 +115,7 @@ async function readLines<T>(path: string, keep: (x: T) => boolean): Promise<T[]>
 export async function readChat(project: string, chat: string): Promise<ChatMessage[]> {
   await migrate(project)
   return readLines<ChatMessage>(chatFile(project, chat, 'chat.jsonl'), (m) =>
-    ['user', 'orchestrator', 'note'].includes(m.role)
+    ['user', 'orchestrator', 'note', 'proposal'].includes(m.role)
   )
 }
 
@@ -165,6 +175,10 @@ export interface ConductorOptions {
   agentPrompt: (project: string, key: string) => Promise<string>
   /** Folders outside the project agents may read (the agent library). */
   extraDirs: string[]
+  /** Writes an approved proposal into the library. */
+  adopt: (p: Proposal) => Promise<void>
+  /** Adds a newly approved Musician to the project's deliverables. */
+  addDeliverable: (projectDir: string, id: string) => Promise<void>
 }
 
 interface Orchestrator {
@@ -452,6 +466,129 @@ export class Conductor implements Hub {
       `[Report from the ${name} Musician${done ? ', finished' : ''}]\n${text}`
     )
     return 'Reported to the Orchestrator.'
+  }
+
+  // ---- new agents, approved by the user ----
+
+  /** The Orchestrator proposes a Musician for a deliverable the library doesn't cover. */
+  async proposeMusician(project: string, chat: string, draft: MusicianDraft): Promise<string> {
+    await this.propose(project, chat, 'orchestrator', 'musician', draft)
+    return `The user now sees an approval card for the ${draft.name} Musician. In this same reply, say in a sentence or two why it's needed, then stop and wait: you'll get a message when they decide.`
+  }
+
+  /** A Musician proposes an Instrument for its own crew. The card goes to the user in the chat
+   * the Musician was briefed from, and the Orchestrator is told so it can explain it. */
+  async proposeInstrument(
+    project: string,
+    chat: string,
+    musician: string,
+    draft: InstrumentDraft
+  ): Promise<string> {
+    const { musicians } = await this.opts.library()
+    const name = musicians.find((m) => m.id === musician)?.name ?? musician
+    await this.propose(project, chat, musician, 'instrument', draft)
+    this.count(project)
+    const o = await this.orchestrator(project, chat)
+    this.turn(
+      project,
+      chat,
+      o,
+      `[Proposal from the ${name} Musician]\nIt wants a new Instrument, ${draft.name}: ${draft.job}\nThe user sees an approval card for it. Tell them in a sentence or two why the Musician needs it, then wait for their decision.`
+    )
+    return 'Sent to the user for approval, through the Orchestrator. Wait: you get a message when they decide. Carry on with anything that doesn’t need it.'
+  }
+
+  private async propose(
+    project: string,
+    chat: string,
+    from: string,
+    kind: Proposal['kind'],
+    draft: MusicianDraft | InstrumentDraft
+  ): Promise<void> {
+    const dir = this.opts.projectDir(project)
+    const problems = draftProblems(kind, draft, await this.opts.library())
+    const id = `${kind}:${draft.id}`
+    if ((await readProposals(dir))[id]?.status === 'pending')
+      problems.push(`${draft.id} is already waiting for the user's approval.`)
+    if (problems.length)
+      throw new Error(`Fix the draft and propose again:\n- ${problems.join('\n- ')}`)
+    await saveProposal(dir, { id, kind, from, chat, status: 'pending', t: now(), draft })
+    await this.log(project, chat, from, 'message', `proposed a new ${kind}: ${draft.name}`)
+    await this.say(project, chat, {
+      t: now(),
+      role: 'proposal',
+      ref: id,
+      text: `New ${kind}: ${draft.name}`
+    })
+  }
+
+  /** The user approves or declines a proposal card. Approval writes it to the library (and a
+   * new Musician joins the project's deliverables); either way its proposer hears back. */
+  async decide(project: string, chat: string, id: string, approve: boolean): Promise<void> {
+    const dir = this.opts.projectDir(project)
+    const p = (await readProposals(dir))[id]
+    if (!p) throw new Error('That proposal no longer exists.')
+    if (p.status !== 'pending') throw new Error(`Already ${p.status}.`)
+    const kind = p.kind === 'musician' ? 'Musician' : 'Instrument'
+    if (approve) {
+      // the library may have changed since it was proposed
+      const problems = draftProblems(p.kind, p.draft, await this.opts.library())
+      if (problems.length) throw new Error(`Can't add it: ${problems.join(' ')}`)
+      await this.opts.adopt(p)
+      if (p.kind === 'musician') await this.opts.addDeliverable(dir, p.draft.id)
+    }
+    await saveProposal(dir, { ...p, status: approve ? 'approved' : 'declined' })
+    const verdict = approve ? 'approved' : 'declined'
+    await this.say(project, chat, {
+      t: now(),
+      role: 'note',
+      text: approve
+        ? `You approved the ${p.draft.name} ${kind}. It's in the library${p.kind === 'musician' ? ' and your deliverables, with its own chat' : ''}.`
+        : `You declined the ${p.draft.name} ${kind}.`
+    })
+    await this.log(
+      project,
+      chat,
+      'orchestrator',
+      'turn',
+      `${p.draft.name} ${kind} ${verdict} by you`
+    )
+    if (p.kind === 'musician') {
+      const o = await this.orchestrator(project, chat)
+      this.turn(
+        project,
+        chat,
+        o,
+        approve
+          ? `[The user approved the ${p.draft.name} Musician (${p.draft.id}). It's saved to the library and added to this project's deliverables, so you can brief it now.]`
+          : `[The user declined the ${p.draft.name} Musician. Ask what they'd like instead if it isn't clear.]`
+      )
+      return
+    }
+    try {
+      await this.deliver(
+        project,
+        chat,
+        p.from,
+        'musician',
+        approve
+          ? `[The user approved your new Instrument, ${p.draft.name} (${p.draft.id}). It's in the library and in your crew: run it with run_instrument.]`
+          : `[The user declined your proposed Instrument, ${p.draft.name}. Do the job with your existing Instruments, or report to the Orchestrator what you can't do without it.]`
+      )
+    } catch (e) {
+      // the decision stands; the Musician hears it when it's next briefed
+      await this.log(
+        project,
+        chat,
+        p.from,
+        'turn',
+        `couldn't receive the decision: ${(e as Error).message}`
+      )
+    }
+  }
+
+  async proposals(project: string): Promise<Record<string, Proposal>> {
+    return readProposals(this.opts.projectDir(project))
   }
 
   /** Sends a brief or report to a Musician or Instrument, starting its session if needed. */

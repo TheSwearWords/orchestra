@@ -11,6 +11,7 @@ import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { agentFile, checkLibrary, loadLibrary, parseDoc, setField, type Role } from './library'
 import { listOutputs, outputPath } from './outputs'
+import { adopt } from './proposals'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
 import { createProject, editProject, listProjects, renameProject, type Project } from './projects'
 import {
@@ -40,7 +41,12 @@ const conductor = new Conductor({
   orchestratorModel: async () => (await loadLibrary(ORCHESTRA_HOME)).orchestrator?.model ?? 'opus',
   orchestratorPrompt: (id, chat) => orchestratorPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, chat),
   agentPrompt: (id, key) => agentPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, key),
-  extraDirs: [join(ORCHESTRA_HOME, 'library')]
+  extraDirs: [join(ORCHESTRA_HOME, 'library')],
+  adopt: (p) => adopt(ORCHESTRA_HOME, p),
+  addDeliverable: async (dir, id) => {
+    const lib = await loadLibrary(ORCHESTRA_HOME)
+    await saveSelection(dir, lib, [...new Set([...(await readSelection(dir)), id])])
+  }
 })
 
 const MODELS = ['opus', 'sonnet', 'haiku'] // claude CLI aliases the Agents screen offers
@@ -79,7 +85,7 @@ function createWindow(
     title: 'Orchestra',
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    ...(process.platform !== 'darwin' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -408,6 +414,17 @@ app.whenReady().then(async () => {
     projectDir(project)
     return conductor.stop(project, chat)
   })
+  ipcMain.handle('proposals:list', (_, project: string) => {
+    projectDir(project)
+    return conductor.proposals(project)
+  })
+  ipcMain.handle(
+    'proposal:decide',
+    (_, project: string, chat: string, id: string, approve: boolean) => {
+      projectDir(project)
+      return conductor.decide(project, chat, String(id), approve === true)
+    }
+  )
   ipcMain.handle('agents:states', (_, project: string) => {
     projectDir(project)
     return conductor.agentStates(project)

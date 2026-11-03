@@ -4,6 +4,7 @@ import type { Project } from '../main/projects'
 import type { AgentState, ChatEvent, ChatMessage, LogEntry } from '../main/conductor'
 import type { Instrument, Library, Musician, Role } from '../main/library'
 import type { Output } from '../main/outputs'
+import type { Proposal } from '../main/proposals'
 import type { Reference, Site, Tag } from '../main/research'
 
 export type {
@@ -16,6 +17,7 @@ export type {
   Musician,
   Output,
   Project,
+  Proposal,
   Reference,
   Role,
   Site,
@@ -127,6 +129,11 @@ const api = {
   // every Musician's and Instrument's status in a project, keyed "musician" or "musician--instrument"
   agentStates: (project: string): Promise<Record<string, AgentState>> =>
     ipcRenderer.invoke('agents:states', project),
+  // new agents proposed in a project's chats, keyed "<kind>:<id>"
+  listProposals: (project: string): Promise<Record<string, Proposal>> =>
+    ipcRenderer.invoke('proposals:list', project),
+  decideProposal: (project: string, chat: string, id: string, approve: boolean): Promise<void> =>
+    ipcRenderer.invoke('proposal:decide', project, chat, id, approve),
   // every project's Orchestrator events; callers filter by project
   onChatEvent: (cb: (e: ChatEvent) => void): (() => void) => {
     const listener = (_: unknown, e: ChatEvent): void => cb(e)

@@ -7,9 +7,11 @@ import type {
   LogEntry,
   Musician,
   Output,
-  Project
+  Project,
+  Proposal
 } from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
+import { splitDecision, type Decision } from '../decide'
 import { splitSuggestion } from '../suggest'
 import { Deliverables } from './Deliverables'
 import { Icon } from './Icon'
@@ -96,7 +98,10 @@ export function Create({
       plan={plan}
       onBack={() => onChat(null)}
       onSelected={(ids) => {
-        setPlan({ ...plan, selected: ids })
+        // a Musician approved in the chat is new to the library too, so reload it
+        if (ids.every((id) => plan.musicians.some((m) => m.id === id)))
+          setPlan({ ...plan, selected: ids })
+        else void window.api.loadCreate(project).then(setPlan)
         onChatsChanged()
       }}
     />
@@ -319,6 +324,7 @@ function ChatView({
   const [outputs, setOutputs] = useState<Output[]>([])
   const [channel, setChannel] = useState(false) // the agent channel instead of the conversation
   const [agents, setAgents] = useState<Record<string, AgentState>>({})
+  const [proposals, setProposals] = useState<Record<string, Proposal>>({})
 
   useEffect(() => {
     window.api.loadChat(project, chat).then((c) => {
@@ -326,6 +332,8 @@ function ChatView({
       setLog(c.log)
       setBusy(c.busy)
     })
+    const loadProposals = (): void => void window.api.listProposals(project).then(setProposals)
+    loadProposals()
     const loadOutputs = (): void => void window.api.listOutputs(project).then(setOutputs)
     loadOutputs()
     const loadAgents = (): void => void window.api.agentStates(project).then(setAgents)
@@ -341,6 +349,7 @@ function ChatView({
       if (e.kind === 'message') {
         setMessages((m) => [...m, e.message])
         if (e.message.role === 'orchestrator') setLive('')
+        if (e.message.role !== 'orchestrator') loadProposals() // a new card, or a decision
       }
       if (e.kind === 'busy') {
         setBusy(e.busy)
@@ -369,6 +378,18 @@ function ChatView({
     setError('')
     try {
       onSelected(await window.api.saveDeliverables(project, [...plan.selected, ...ids]))
+    } catch (e) {
+      setError(reason(e))
+    }
+  }
+
+  async function decide(id: string, approve: boolean): Promise<void> {
+    setError('')
+    try {
+      await window.api.decideProposal(project, chat, id, approve)
+      // an approved Musician joins the deliverables, with its own chat
+      if (approve && id.startsWith('musician:'))
+        onSelected((await window.api.loadCreate(project)).selected)
     } catch (e) {
       setError(reason(e))
     }
@@ -436,7 +457,10 @@ function ChatView({
               live={live}
               musicians={plan.musicians}
               selected={plan.selected}
+              proposals={proposals}
               onAdd={add}
+              onAnswer={send}
+              onDecide={decide}
             />
             {error && (
               <p
@@ -478,14 +502,20 @@ function Conversation({
   live,
   musicians,
   selected,
-  onAdd
+  proposals,
+  onAdd,
+  onAnswer,
+  onDecide
 }: {
   messages: ChatMessage[]
   busy: boolean
   live: string
   musicians: Musician[]
   selected: string[]
+  proposals: Record<string, Proposal>
   onAdd: (ids: string[]) => Promise<void>
+  onAnswer: (text: string) => Promise<boolean>
+  onDecide: (id: string, approve: boolean) => Promise<void>
 }): React.JSX.Element {
   const end = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -523,10 +553,28 @@ function Conversation({
               <span className="mt-1 type-caption text-fg-2">{time(m.t)}</span>
             </div>
           )
-        const { body, ids } = splitSuggestion(m.text, known)
+        if (m.role === 'proposal') {
+          const p = m.ref ? proposals[m.ref] : undefined
+          return p ? (
+            <Approval key={i} p={p} musicians={musicians} onDecide={(yes) => onDecide(p.id, yes)} />
+          ) : null
+        }
+        const split = splitSuggestion(m.text, known)
+        const { body, decision } = splitDecision(split.body)
+        const ids = split.ids
+        // answered by the next thing the user said, if anything
+        const reply = messages.slice(i + 1).find((x) => x.role === 'user')
         return (
           <OrchestratorSays key={i} t={m.t}>
             <Markdown text={body} className="[&>*:first-child]:mt-1" />
+            {decision && (
+              <DecisionCard
+                decision={decision}
+                answer={reply?.text}
+                disabled={busy}
+                onPick={onAnswer}
+              />
+            )}
             {ids.length > 0 && (
               <Suggestion
                 items={musicians.filter((x) => ids.includes(x.id))}
@@ -540,7 +588,10 @@ function Conversation({
       {busy && (
         <OrchestratorSays>
           {live ? (
-            <Markdown text={splitSuggestion(live, known).body} className="[&>*:first-child]:mt-1" />
+            <Markdown
+              text={splitDecision(splitSuggestion(live, known).body).body}
+              className="[&>*:first-child]:mt-1"
+            />
           ) : (
             <p className="mt-1 type-body-s text-fg-2">Reading the project…</p>
           )}
@@ -611,6 +662,164 @@ function Suggestion({
           {adding ? 'Adding…' : 'Add to deliverables'}
         </button>
       )}
+    </div>
+  )
+}
+
+/** A question the Orchestrator needs answered: one button per option. Picking one sends it as
+ * your reply; typing an answer instead works too. Signal marks it while it waits on you. */
+function DecisionCard({
+  decision,
+  answer,
+  disabled,
+  onPick
+}: {
+  decision: Decision
+  answer?: string // what you replied next, once you have
+  disabled: boolean
+  onPick: (text: string) => Promise<boolean>
+}): React.JSX.Element {
+  const [sending, setSending] = useState('')
+  const answered = answer !== undefined
+  return (
+    <div
+      className={`mt-3 border-l-2 px-4 py-3 ${answered ? 'border-line-strong bg-subtle' : 'border-signal bg-signal-subtle'}`}
+    >
+      <p className="flex items-center gap-2 type-label-m">
+        {!answered && <span className="type-caption text-signal-fg">Needs you</span>}
+        {decision.question}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {decision.options.map((o) => {
+          const chosen = answered && answer.trim().toLowerCase() === o.label.toLowerCase()
+          if (answered)
+            return (
+              <span
+                key={o.label}
+                className={`flex h-9 items-center gap-1.5 border px-4 ${chosen ? 'border-fg type-current-s' : 'border-line type-label-m text-fg-disabled'}`}
+              >
+                {chosen && <Icon name="check-line" size={14} />}
+                {o.label}
+              </span>
+            )
+          return (
+            <button
+              key={o.label}
+              disabled={disabled || !!sending}
+              onClick={async () => {
+                setSending(o.label)
+                if (!(await onPick(o.label))) setSending('')
+              }}
+              className={o.recommended ? solidButton : outlineButton}
+            >
+              {sending === o.label ? 'Sending…' : o.label}
+              {o.recommended && sending !== o.label && (
+                <span className="ml-2 type-caption opacity-80">Recommended</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      {answered &&
+        !decision.options.some((o) => o.label.toLowerCase() === answer.trim().toLowerCase()) && (
+          <p className="mt-2 type-caption text-fg-2">You answered in your own words.</p>
+        )}
+    </div>
+  )
+}
+
+/** A new agent waiting for your approval: what it would own, how it runs, and its full
+ * instructions behind a disclosure. Nothing is saved to the library until you approve. */
+function Approval({
+  p,
+  musicians,
+  onDecide
+}: {
+  p: Proposal
+  musicians: Musician[]
+  onDecide: (approve: boolean) => Promise<void>
+}): React.JSX.Element {
+  const [working, setWorking] = useState<'approve' | 'decline' | ''>('')
+  const d = p.draft as Proposal['draft'] & Record<string, unknown>
+  const isMusician = p.kind === 'musician'
+  const by = isMusician
+    ? 'the Orchestrator'
+    : `the ${musicians.find((m) => m.id === p.from)?.name ?? p.from} Musician`
+  const list = (k: string): string[] => (Array.isArray(d[k]) ? (d[k] as string[]) : [])
+  const facts: [string, string][] = isMusician
+    ? [
+        ['Owns', String(d.deliverable ?? '')],
+        ['Category', String(d.category ?? '')],
+        ['Foundations', list('prerequisites').join(', ') || 'none'],
+        ['Instruments', list('instruments').join(', ') || 'none yet: it proposes its own'],
+        ['Model', String(d.model ?? 'sonnet')]
+      ]
+    : [
+        ['Job', String(d.job ?? '')],
+        ['Writes', String(d.output ?? '')],
+        ['Needs', list('needs').join(', ') || 'nothing'],
+        ['Model', String(d.model ?? 'haiku')]
+      ]
+  const pending = p.status === 'pending'
+
+  async function decide(approve: boolean): Promise<void> {
+    setWorking(approve ? 'approve' : 'decline')
+    await onDecide(approve)
+    setWorking('')
+  }
+
+  return (
+    <div
+      className={`border-l-2 py-3 pr-4 pl-4 ${pending ? 'border-signal bg-signal-subtle' : 'border-line-strong bg-subtle'}`}
+    >
+      <p className="type-caption text-fg-2">
+        {pending && <span className="mr-2 text-signal-fg">Needs you</span>}
+        New {isMusician ? 'Musician' : 'Instrument'}, proposed by {by}
+      </p>
+      <p className="mt-1 flex items-center gap-2">
+        <Icon
+          name={isMusician ? String(d.icon || 'shapes-line') : 'box-3-line'}
+          className="text-link"
+        />
+        <span className="type-heading-xs">{d.name}</span>
+      </p>
+      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 type-body-s">
+        {facts.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-fg-2">{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <details className="mt-3 group">
+        <summary className="cursor-pointer type-label-s text-link hover:underline">
+          Read its instructions
+        </summary>
+        <div className="mt-2 max-h-72 overflow-y-auto border border-line bg-canvas px-4 py-2">
+          <Markdown text={String(d.prompt ?? '')} />
+        </div>
+      </details>
+      <div className="mt-4 flex items-center gap-2">
+        {pending ? (
+          <>
+            <button disabled={!!working} onClick={() => void decide(true)} className={solidButton}>
+              {working === 'approve' ? 'Adding…' : `Approve and add to the library`}
+            </button>
+            <button
+              disabled={!!working}
+              onClick={() => void decide(false)}
+              className={outlineButton}
+            >
+              {working === 'decline' ? 'Declining…' : 'Decline'}
+            </button>
+          </>
+        ) : (
+          <span className="flex items-center gap-1.5 type-label-s text-fg-2">
+            <Icon name={p.status === 'approved' ? 'check-line' : 'close-line'} />
+            {p.status === 'approved' ? 'Approved: in the library' : 'Declined'}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

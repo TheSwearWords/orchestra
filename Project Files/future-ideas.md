@@ -27,7 +27,7 @@ Already customizable today:
   - How self-updating could work: the project points at the app's own source. In dev mode, renderer changes (styling, layout, palette) reload live; main-process changes need a restart. Every change goes on a git commit so a broken edit can be rolled back, ideally with a "revert last change" button outside the part being edited, so a broken UI can't lock you out.
 - Principle: **architect the whole app so other users can change and customize it however they like.**
 
-**Groundwork before release: audit the architecture for changeability**
+**Groundwork before release: audit the architecture for changeability** (full plan: `extensibility-plan.md`, Nov 2)
 1. **Map it.** Document how the app is put together today: main process (session, conductor, orchestra-mcp tool server), renderer screens, the library and vault on disk, and how they talk (IPC, files, the `claude` CLI). Output: an architecture overview someone new could read.
 2. **Audit it.** Go through the repo asking "how hard is it for an outsider to change X?" for the things people will want to change: palette/tokens, logo, layout, screens, agents, deliverable types, compute provider. Flag hard-coded values, tangled modules, and anything that only works on this machine (e.g. the data path in `paths.ts`).
 3. **Plan approaches.** For each pain point, pick how to open it up: config or data files instead of code, clear extension points (agents, deliverables, sites, providers), a theme layer driven by tokens, docs or a contributor guide, and the Advanced mode / self-editing flow above.

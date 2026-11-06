@@ -104,7 +104,9 @@ body {
 /* Labels swap to the serif on hover, focus and when current (brand spec §3.2). Keep a
    min-height on the element so nothing jumps. */
 @utility serif-on {
-  transition: color 200ms var(--ease), background-color 200ms var(--ease);
+  transition:
+    color 200ms var(--ease),
+    background-color 200ms var(--ease);
   &:hover,
   &:focus-visible,
   &[aria-current]:not([aria-current='false']) {
@@ -169,5 +171,21 @@ body {
   :focus-visible {
     outline: 2px solid var(--color-border-focus);
     outline-offset: 2px;
+  }
+}
+
+/* Page or area change (brand spec §6): the next view zooms in from 1.045 with a fade.
+   Reduced motion keeps only the fade. */
+@keyframes area-in {
+  from {
+    opacity: 0;
+    scale: 1.045;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes area-in {
+    from {
+      opacity: 0;
+    }
   }
 }

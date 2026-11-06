@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { reducedMotion } from './board'
+import { reducedMotion } from './shared'
 import { ease, lerpCamera, type Camera } from './camera'
 
 /** A camera you can set directly (pan, zoom) or fly (eased, 550ms by default). */

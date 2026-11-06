@@ -62,8 +62,15 @@ export function Canvas({
     const el = ref.current
     if (!el) return
     const wheel = (e: WheelEvent): void => {
-      const t = e.target as HTMLElement
-      if (!e.ctrlKey && scrollable && t.closest(scrollable)) return
+      // over something that can still scroll that way, the wheel scrolls it; otherwise it zooms
+      if (!e.ctrlKey && scrollable) {
+        for (let n = e.target as HTMLElement | null; n && n !== el; n = n.parentElement) {
+          if (!n.matches(scrollable)) continue
+          const room =
+            e.deltaY < 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1
+          if (n.scrollHeight > n.clientHeight && room) return
+        }
+      }
       e.preventDefault()
       const box = el.getBoundingClientRect()
       // pinch and ctrl+wheel send small deltas; a mouse wheel sends ~100 a notch

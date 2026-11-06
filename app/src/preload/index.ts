@@ -34,6 +34,12 @@ export interface StudioLayout {
   labels: { x: number; y: number; text: string }[]
 }
 
+/** A board's cards (projects/<id>/boards/<board>.json): place, size, collapsed. */
+export type BoardLayout = Record<
+  string,
+  { x: number; y: number; w: number; h?: number; collapsed?: boolean }
+>
+
 export interface ChatInfo {
   id: string
   title: string
@@ -96,6 +102,10 @@ const api = {
     ipcRenderer.invoke('projects:menu', id, name),
   loadStudio: (): Promise<StudioLayout> => ipcRenderer.invoke('studio:load'),
   saveStudio: (layout: StudioLayout): Promise<void> => ipcRenderer.invoke('studio:save', layout),
+  loadBoard: (project: string, board: string): Promise<BoardLayout> =>
+    ipcRenderer.invoke('board:load', project, board),
+  saveBoard: (project: string, board: string, layout: BoardLayout): Promise<void> =>
+    ipcRenderer.invoke('board:save', project, board, layout),
   createProject: (input: Omit<Project, 'id'>): Promise<Project> =>
     ipcRenderer.invoke('projects:create', input),
 

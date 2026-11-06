@@ -1,14 +1,12 @@
 // Floating chrome (brand spec §5.2): sharp white chips that sit above the board.
 import { Icon } from '../components/Icon'
-import { AREAS, chip, type Area } from './board'
+import { AREAS, chip, type Area } from './shared'
 import { clampZoom, type Camera, type Rect } from './camera'
 
+export type Step = { label: string; onClick?: () => void }
+
 /** Where you are, as steps; clicking an earlier step zooms back out to it. */
-export function Breadcrumb({
-  steps
-}: {
-  steps: { label: string; onClick?: () => void }[]
-}): React.JSX.Element {
+export function Breadcrumb({ steps }: { steps: Step[] }): React.JSX.Element {
   return (
     <nav aria-label="Where you are" className={`${chip} gap-3 pr-5 pl-2`}>
       <span className="flex size-8 items-center justify-center rounded-full bg-brand text-on-brand">

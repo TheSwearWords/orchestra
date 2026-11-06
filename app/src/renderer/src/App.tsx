@@ -3,8 +3,9 @@ import type { Project, StudioLayout } from '../../preload'
 import { Agents } from './components/Agents'
 import { Create } from './components/Create'
 import { Research } from './components/Research'
-import { Book } from './canvas/Book'
-import { coverInfo, type Area } from './canvas/board'
+import { Board } from './canvas/Board'
+import { Book, type Frame } from './canvas/Book'
+import { coverInfo, type Area } from './canvas/shared'
 import { Breadcrumb } from './canvas/Chrome'
 import { CoverEditor } from './canvas/CoverEditor'
 import { Opening } from './canvas/Opening'
@@ -136,29 +137,43 @@ function App(): React.JSX.Element {
   ) as Record<string, Area>
   const project = (id: string | null): Project | undefined => projects.find((p) => p.id === id)
 
-  function area(p: Project, a: Area): React.ReactNode {
-    if (a === 'research')
-      return (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <Research key={p.id} project={p.id} />
-        </div>
-      )
+  function area(p: Project, a: Area, frame: Frame): React.ReactNode {
+    if (a === 'research') return <Research key={p.id} project={p.id} frame={frame} />
     if (a === 'create')
       return (
         <Create
           key={p.id}
           project={p.id}
-          info={p}
-          onInfoSaved={refresh}
+          frame={frame}
           chat={openChats[p.id] ?? null}
           onChat={(c) => setOpenChats((all) => ({ ...all, [p.id]: c }))}
-          onChatsChanged={() => {}}
         />
       )
     return (
-      <section className="px-10 py-8">
-        <p className="type-body-m text-dim">III Refine is next on the build plan.</p>
-      </section>
+      <Board
+        key={p.id}
+        project={p.id}
+        board="refine"
+        label="III · Refine"
+        crumbs={frame.crumbs}
+        aside={frame.aside}
+        preview={frame.preview}
+        cards={[
+          {
+            id: 'next',
+            title: 'Audit and sign-off',
+            x: 0,
+            y: 0,
+            w: 480,
+            body: (
+              <p className="p-5 type-body-m text-dim">
+                III Refine is next on the build plan: audit pins, the scorecard, and fixes sent back
+                to their seats.
+              </p>
+            )
+          }
+        ]}
+      />
     )
   }
 
@@ -191,7 +206,7 @@ function App(): React.JSX.Element {
             area={areas[current.id] ?? null}
             onArea={(a) => setAreas((all) => ({ ...all, [current.id]: a }))}
             onStudio={() => close(current.id)}
-            render={(a) => area(current, a)}
+            render={(a, frame) => area(current, a, frame)}
           />
         </div>
       )}

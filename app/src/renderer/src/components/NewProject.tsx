@@ -89,7 +89,7 @@ export function NewProject({ onCreated }: Props): React.JSX.Element {
       </form>
 
       <aside className="stagger flex flex-col [--stagger-start:160ms]">
-        <p className="type-display-l-italic text-brand">A beginning.</p>
+        <p className="type-display-l-emphasis text-brand">A beginning.</p>
         <hr className="mt-4 border-line" />
         <p className="mt-6 type-body-s text-fg-2">
           Give your agents a little context. You can shape the rest together.

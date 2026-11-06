@@ -4,22 +4,36 @@ import { readFileSync, writeFileSync } from 'fs'
 
 const src = process.argv[2] ?? '../Orchestra/projects/orchestra-brand/prereqs/tokens.json'
 const t = JSON.parse(readFileSync(src, 'utf8'))
-const prim = (ref) => ref.split('/').reduce((o, k) => o[k], t.primitive)
+// a semantic value is a primitive path ("blue/500") or a literal colour ("#fff", "rgba(...)")
+const prim = (ref) =>
+  /^(#|rgba?\()/.test(ref) ? ref : ref.split('/').reduce((o, k) => o[k], t.primitive)
 const name = (key) => '--' + key.replaceAll('/', '-')
 
 const semantic = Object.entries(t.semantic).filter(([k]) => !k.startsWith('$'))
 const mode = (i) => semantic.map(([k, v]) => `  ${name(k)}: ${prim(v[i])};`).join('\n')
 
 const fontStack = {
-  'Instrument Serif': 'var(--font-display)',
-  'Instrument Sans': 'var(--font-sans)',
+  'Bodoni Moda': 'var(--font-display)',
+  Archivo: 'var(--font-sans)',
   'IBM Plex Mono': 'var(--font-mono)'
 }
-const weight = { Regular: 400, Italic: 400, Medium: 500, SemiBold: 600, Bold: 700 }
-const styles = Object.entries(t.textStyles).map(([k, [family, style, size, line, track]]) => {
+const weight = { Regular: 400, Medium: 500, SemiBold: 600, Bold: 700, ExtraBold: 800 }
+// [family, style, size, line (px number or "120%"), tracking "%", caps?]
+const styles = Object.entries(t.textStyles).map(([k, [family, style, size, line, track, caps]]) => {
   const util = 'type-' + k.toLowerCase().replaceAll(/[\s/]+/g, '-')
-  const italic = style === 'Italic' ? '\n  font-style: italic;' : ''
-  return `@utility ${util} {\n  font-family: ${fontStack[family]};\n  font-size: ${size}px;\n  line-height: ${line}px;\n  font-weight: ${weight[style]};\n  letter-spacing: ${parseFloat(track) / 100}em;${italic}\n}`
+  const italic = style.includes('Italic')
+  const lines = [
+    `font-family: ${fontStack[family]};`,
+    `font-size: ${size}px;`,
+    `line-height: ${typeof line === 'number' ? line + 'px' : parseFloat(line) / 100};`,
+    `font-weight: ${weight[style.replace(/\s*Italic/, '') || 'Regular']};`,
+    `letter-spacing: ${parseFloat(track) / 100}em;`,
+    italic && 'font-style: italic;',
+    caps && 'text-transform: uppercase;',
+    // caps labels are set wide in code; Figma styles can't hold the width axis
+    caps && family === 'Archivo' && 'font-stretch: 115%;'
+  ].filter(Boolean)
+  return `@utility ${util} {\n  ${lines.join('\n  ')}\n}`
 })
 
 writeFileSync(
@@ -29,6 +43,9 @@ writeFileSync(
 ${mode(0)}
 ${Object.entries(t.elevation)
   .map(([k, v]) => `  --elevation-${k}: ${v};`)
+  .join('\n')}
+${Object.entries(t.shadow ?? {})
+  .map(([k, v]) => `  --effect-${k}: ${v};`)
   .join('\n')}
 }
 

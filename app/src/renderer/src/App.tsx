@@ -1,368 +1,244 @@
-import { useEffect, useState } from 'react'
-import type { ChatInfo, Project } from '../../preload'
+import { useCallback, useEffect, useState } from 'react'
+import type { Project, StudioLayout } from '../../preload'
 import { Agents } from './components/Agents'
-import { Ascii, type AsciiName } from './components/Ascii'
 import { Create } from './components/Create'
-import { Icon } from './components/Icon'
-import { NewProject } from './components/NewProject'
 import { Research } from './components/Research'
-import { Sidebar, type Page } from './components/Sidebar'
-import { PhaseTabs, TabStrip, WorkspaceHeader, type Phase } from './components/Workspace'
-import {
-  EMPTY,
-  closeTab,
-  focused,
-  moveTab,
-  openTab,
-  openToSide,
-  pairsOf,
-  prune,
-  ungroup,
-  unsplit,
-  type Tabs
-} from './tabs'
-
-const PAGE_TITLES: Record<Page, string> = {
-  files: 'Files',
-  settings: 'Settings',
-  agents: 'Agents'
-}
-
-// Sidebar and workspace always show different figures; the narrow rail gets upright ones.
-const PHASE_ART: Record<Phase, { rail: AsciiName; workspace: AsciiName }> = {
-  research: { rail: 'hand', workspace: 'apollo' },
-  create: { rail: 'violin', workspace: 'concert' },
-  refine: { rail: 'apollo', workspace: 'hand' }
-}
+import { Book } from './canvas/Book'
+import { coverInfo, type Area } from './canvas/board'
+import { Breadcrumb } from './canvas/Chrome'
+import { CoverEditor } from './canvas/CoverEditor'
+import { Opening } from './canvas/Opening'
+import { Studio } from './canvas/Studio'
 
 // Per-viewer UI memory; storage can be unavailable, so every access is guarded.
-function remembered(key: string): string | null {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-function remember(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    // not worth surfacing: the app works the same without it
-  }
-}
 function rememberedJson<T>(key: string, fallback: T): T {
   try {
-    return (JSON.parse(remembered(key) ?? '') as T) ?? fallback
+    return (JSON.parse(localStorage.getItem(key) ?? '') as T) ?? fallback
   } catch {
     return fallback
   }
 }
-
-// What the workspace shows: the open project tabs, New project, or a utility page.
-type Mode = 'projects' | 'new' | Page
-
-/** Where a window starts: a project from the URL hash (a window opened on it), else last time. */
-function startingState(): { tabs: Tabs; mode: Mode } {
-  const fromHash = new URLSearchParams(location.hash.slice(1)).get('project')
-  if (fromHash) return { tabs: openTab(EMPTY, fromHash), mode: 'projects' }
-  // before tabs, only the last project was remembered; reopen it as the first tab
-  const legacy = remembered('selected')
-  if (remembered('tabs') === null && legacy && legacy !== 'new' && !(legacy in PAGE_TITLES))
-    return { tabs: openTab(EMPTY, legacy), mode: 'projects' }
-  const saved = remembered('mode')
-  // a remembered page can be one that no longer exists (Account was removed)
-  const mode = (saved === 'new' || (saved && saved in PAGE_TITLES) ? saved : 'projects') as Mode
-  return { tabs: rememberedJson<Tabs>('tabs', EMPTY), mode }
+function remember(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // not worth surfacing: the app works the same without it
+  }
 }
+
+// Where you are: the Studio, inside a book, a cover being made or edited, or the Ensemble.
+type View =
+  | { at: 'studio' }
+  | { at: 'book'; id: string }
+  | { at: 'cover'; id: string | null }
+  | { at: 'ensemble' }
+
+/** A window opened on a project (#project=…) starts inside that book; otherwise the Studio. */
+function startingView(): View {
+  const id = new URLSearchParams(location.hash.slice(1)).get('project')
+  return id ? { at: 'book', id } : { at: 'studio' }
+}
+
+const shelfRect = (id: string): DOMRect | undefined =>
+  document.querySelector(`[data-cover="${CSS.escape(id)}"]`)?.getBoundingClientRect()
 
 function App(): React.JSX.Element {
   const [projects, setProjects] = useState<Project[] | null>(null)
-  const [start] = useState(startingState)
-  const [tabs, setTabs] = useState<Tabs>(start.tabs)
-  const [mode, setMode] = useState<Mode>(start.mode)
-  const [phases, setPhases] = useState<Record<string, Phase>>(() => rememberedJson('phases', {}))
-  // the chat each project has open in Create (null: the overview of its chats)
+  const [layout, setLayout] = useState<StudioLayout | null>(null)
+  const [view, setView] = useState<View>(startingView)
+  // each book's area (null: the whole book) and each project's open chat in Create
+  const [areas, setAreas] = useState<Record<string, Area | null>>(() => rememberedJson('areas', {}))
   const [openChats, setOpenChats] = useState<Record<string, string | null>>(() =>
     rememberedJson('chats', {})
   )
-  const [chatList, setChatList] = useState<ChatInfo[]>([])
-  const [chatsVersion, setChatsVersion] = useState(0) // bumped when deliverables (so chats) change
-  const [collapsed, setCollapsed] = useState(() => remembered('collapsed') === '1')
-  // a tab is being dragged in another window: 'over' when it's above this window's tab strip
-  const [receiving, setReceiving] = useState<'ready' | 'over' | null>(null)
+  const [opening, setOpening] = useState<{
+    id: string
+    shelf: DOMRect
+    dir: 'open' | 'close'
+    then: View
+  } | null>(null)
 
-  // Reloads the project list; tabs of projects that are gone (deleted, maybe in another window) close.
-  const refresh = (): void =>
-    void window.api.listProjects().then((list) => {
-      setProjects(list)
-      setTabs((t) => prune(t, (id) => list.some((p) => p.id === id)))
-    })
+  const refresh = useCallback(
+    () =>
+      void window.api.listProjects().then((list) => {
+        setProjects(list)
+        // a project deleted, maybe in another window, can't stay open here
+        setView((v) =>
+          (v.at === 'book' || v.at === 'cover') && v.id && !list.some((p) => p.id === v.id)
+            ? { at: 'studio' }
+            : v
+        )
+      }),
+    []
+  )
 
   useEffect(() => {
-    const load = refresh
-    load()
+    refresh()
+    void window.api.loadStudio().then(setLayout)
     // another window may have created or deleted a project; catch up when this one comes forward
-    window.addEventListener('focus', load)
+    addEventListener('focus', refresh)
     const keys = (e: KeyboardEvent): void => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault()
         void window.api.openWindow()
       }
     }
-    window.addEventListener('keydown', keys)
-    // a tab from another window was dropped on this one's tab strip
-    const stopAdopting = window.api.onAdoptTab((id) => {
-      setTabs((t) => openTab(t, id))
-      setMode('projects')
-    })
-    const stopReceiving = window.api.onDropState(setReceiving)
+    addEventListener('keydown', keys)
     return () => {
-      window.removeEventListener('focus', load)
-      window.removeEventListener('keydown', keys)
-      stopAdopting()
-      stopReceiving()
+      removeEventListener('focus', refresh)
+      removeEventListener('keydown', keys)
     }
-  }, [])
+  }, [refresh])
 
   useEffect(() => {
-    remember('tabs', JSON.stringify(tabs))
-    remember('mode', mode)
-    remember('phases', JSON.stringify(phases))
-    remember('chats', JSON.stringify(openChats))
-  }, [tabs, mode, phases, openChats])
+    remember('areas', areas)
+    remember('chats', openChats)
+  }, [areas, openChats])
 
-  const view: Mode = mode === 'projects' && tabs.panes.length === 0 ? 'new' : mode
-  const current = view === 'projects' ? focused(tabs) : undefined
-  const currentName = projects?.find((p) => p.id === current)?.name
-
-  // the sidebar lists the current project's chats, with a mark on the ones working
+  const current = view.at === 'book' ? projects?.find((p) => p.id === view.id) : undefined
   useEffect(() => {
-    if (!current) return
-    // a remembered tab can name a project that is gone; it closes on the next refresh
-    const load = (): void =>
-      void window.api.listChats(current).then(setChatList, () => setChatList([]))
-    load()
-    return window.api.onChatEvent((e) => {
-      if (e.project === current && e.kind === 'busy') load()
-    })
-  }, [current, chatsVersion])
+    document.title = current ? `${current.name} · Orchestra` : 'Orchestra' // names each window
+  }, [current])
+
+  const toStudio = useCallback(() => setView({ at: 'studio' }), [])
+  // Esc in the Ensemble goes back to the Studio
   useEffect(() => {
-    document.title = currentName ? `${currentName} · Orchestra` : 'Orchestra' // names each window
-  }, [currentName])
+    if (view.at !== 'ensemble') return
+    const key = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[aria-modal=true]'))
+        toStudio()
+    }
+    addEventListener('keydown', key)
+    return () => removeEventListener('keydown', key)
+  }, [view.at, toStudio])
 
-  if (!projects) return <div className="h-full bg-canvas" />
+  if (!projects || !layout) return <div className="bg-dots h-full" />
 
-  const byId = new Map(projects.map((p) => [p.id, p]))
-  const phaseOf = (id: string): Phase => phases[id] ?? 'research'
-  const show = (id: string): void => {
-    setTabs((t) => openTab(t, id))
-    setMode('projects')
+  /** Plays the opening from the cover's place on the shelf into its book. */
+  function enter(id: string, from?: DOMRect): void {
+    const shelf = from ?? shelfRect(id)
+    if (!shelf) return setView({ at: 'book', id })
+    setOpening({ id, shelf, dir: 'open', then: { at: 'book', id } })
+  }
+  /** Closes the book back into its place on the shelf. */
+  function close(id: string): void {
+    const shelf = shelfRect(id)
+    if (!shelf) return toStudio()
+    setOpening({ id, shelf, dir: 'close', then: { at: 'studio' } })
   }
 
-  function toggle(): void {
-    setCollapsed(!collapsed)
-    remember('collapsed', collapsed ? '0' : '1')
+  const saveLayout = (l: StudioLayout): void => {
+    setLayout(l)
+    void window.api.saveStudio(l)
+  }
+  const movements = Object.fromEntries(
+    Object.entries(areas).flatMap(([id, a]) => (a ? [[id, a]] : []))
+  ) as Record<string, Area>
+  const project = (id: string | null): Project | undefined => projects.find((p) => p.id === id)
+
+  function area(p: Project, a: Area): React.ReactNode {
+    if (a === 'research')
+      return (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <Research key={p.id} project={p.id} />
+        </div>
+      )
+    if (a === 'create')
+      return (
+        <Create
+          key={p.id}
+          project={p.id}
+          info={p}
+          onInfoSaved={refresh}
+          chat={openChats[p.id] ?? null}
+          onChat={(c) => setOpenChats((all) => ({ ...all, [p.id]: c }))}
+          onChatsChanged={() => {}}
+        />
+      )
+    return (
+      <section className="px-10 py-8">
+        <p className="type-body-m text-dim">III Refine is next on the build plan.</p>
+      </section>
+    )
   }
 
-  const page = view !== 'projects' && view !== 'new' ? view : null
-
   return (
-    <div className="flex h-full">
-      <Sidebar
-        projects={projects}
-        selected={current ?? view}
-        collapsed={collapsed}
-        art={current ? PHASE_ART[phaseOf(current)].rail : 'violin'}
-        onSelect={(t) => {
-          if (t === 'new' || t in PAGE_TITLES) return setMode(t as Mode)
-          // a project opens on its overview: its chats, with its name and description on top
-          show(t)
-          setPhases((all) => ({ ...all, [t]: 'create' }))
-          setOpenChats((all) => ({ ...all, [t]: null }))
-        }}
-        onSide={(id) => {
-          setTabs((t) => openToSide(t, id))
-          setMode('projects')
-        }}
-        onToggle={toggle}
-        onChanged={refresh}
-        chats={current ? chatList : []}
-        activeChat={
-          current && phaseOf(current) === 'create' ? (openChats[current] ?? null) : undefined
-        }
-        onOpenChat={(chat) => {
-          if (!current) return
-          setPhases((all) => ({ ...all, [current]: 'create' }))
-          setOpenChats((all) => ({ ...all, [current]: chat }))
-        }}
-      />
-      <main className="flex min-w-0 flex-1 flex-col bg-canvas">
-        {(tabs.open.length > 0 || receiving) && (
-          <TabStrip
-            open={tabs.open.map((id) => ({ id, name: byId.get(id)?.name ?? id }))}
-            panes={tabs.panes}
-            pairs={pairsOf(tabs)}
-            focus={tabs.focus}
-            live={view === 'projects'}
-            onSelect={show}
-            onClose={(id) => setTabs((t) => closeTab(t, id))}
-            onSplitWith={(id) => setTabs((t) => openToSide(t, id))}
-            onUnsplit={(keep) => setTabs((t) => ungroup(t, keep))}
-            onReorder={(id, onto) => setTabs((t) => moveTab(t, id, onto))}
-            receiving={receiving}
-          />
-        )}
-
-        {view === 'projects' ? (
-          <div className="flex min-h-0 flex-1">
-            {tabs.panes.map((id, i) => {
-              const project = byId.get(id)
-              return (
-                project && (
-                  <ProjectPane
-                    key={i}
-                    project={project}
-                    phase={phaseOf(id)}
-                    onPhase={(ph) => setPhases((all) => ({ ...all, [id]: ph }))}
-                    chat={openChats[id] ?? null}
-                    onChat={(c) => setOpenChats((all) => ({ ...all, [id]: c }))}
-                    onChatsChanged={() => setChatsVersion((v) => v + 1)}
-                    onInfoSaved={refresh}
-                    split={tabs.panes.length === 2}
-                    side={i}
-                    focused={tabs.focus === i}
-                    onFocus={() => tabs.focus !== i && setTabs((t) => ({ ...t, focus: i }))}
-                    onClose={() => setTabs((t) => unsplit(t, 1 - i))}
-                  />
-                )
-              )
-            })}
-          </div>
-        ) : (
-          <div className="relative isolate flex min-h-0 flex-1 flex-col overflow-y-auto">
-            {/* a barely-there figure in the open space; content always reads over it */}
-            <Ascii
-              key={`art-${view}`}
-              name={view === 'new' ? 'hand' : 'concert'}
-              fit="width"
-              className="absolute top-28 right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0"
-            />
-            {view === 'new' && (
-              <div key="new" className="stagger flex flex-1 flex-col">
-                <WorkspaceHeader
-                  title="New project"
-                  context="A new space for research, creation and refinement."
-                  status={<span className="type-caption text-fg-2">Only you can see this</span>}
-                />
-                <NewProject
-                  onCreated={(p) => {
-                    setProjects([...projects, p].sort((a, b) => a.name.localeCompare(b.name)))
-                    show(p.id)
-                  }}
-                />
-              </div>
-            )}
-            {page && (
-              <div key={page} className="stagger">
-                <WorkspaceHeader
-                  title={PAGE_TITLES[page]}
-                  context={
-                    page === 'agents'
-                      ? 'Every agent is a markdown file in the library. Changes apply to every project.'
-                      : 'Next on the build plan.'
-                  }
-                />
-                {page === 'agents' && <Agents />}
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
-  )
-}
-
-/** One project: header, phase tabs and the phase's screen, scrolling on its own. Two sit side by
- * side when the workspace is split; the focused one takes tab clicks. */
-function ProjectPane({
-  project,
-  phase,
-  onPhase,
-  split,
-  side,
-  focused,
-  onFocus,
-  onClose,
-  chat,
-  onChat,
-  onChatsChanged,
-  onInfoSaved
-}: {
-  project: Project
-  phase: Phase
-  onPhase: (p: Phase) => void
-  split: boolean
-  side: number
-  focused: boolean
-  onFocus: () => void
-  onClose: () => void
-  chat: string | null
-  onChat: (chat: string | null) => void
-  onChatsChanged: () => void
-  onInfoSaved: () => void
-}): React.JSX.Element {
-  return (
-    <section
-      aria-label={project.name}
-      onMouseDownCapture={onFocus}
-      onFocusCapture={onFocus}
-      className={`@container relative isolate flex min-w-0 flex-1 flex-col overflow-hidden ${side === 1 ? 'border-l border-line' : ''}`}
-    >
-      <Ascii
-        key={phase}
-        name={PHASE_ART[phase].workspace}
-        fit="width"
-        className={`absolute ${split ? 'top-[100px]' : 'top-[66px]'} right-0 bottom-0 -z-10 w-[45%] text-line/70 transition-opacity duration-700 ease-out-strong starting:opacity-0`}
-      />
-      {/* header and phase tabs stay put; each phase scrolls its own content below them */}
-      <div key={project.id} className="stagger flex min-h-0 flex-1 flex-col">
-        {split && (
-          <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-line bg-subtle pr-1.5 pl-6">
-            <span className={`truncate type-label-s ${focused ? 'text-link' : 'text-fg-2'}`}>
-              {project.name}
-            </span>
-            <button
-              onClick={onClose}
-              aria-label="Close this side of the split"
-              title="Close this side"
-              className="flex size-7 items-center justify-center text-fg-2 transition-colors duration-150 hover:bg-muted hover:text-fg"
-            >
-              <Icon name="close-line" size={14} />
-            </button>
-          </div>
-        )}
-        <PhaseTabs active={phase} onChange={onPhase} />
-        {phase === 'research' ? (
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <Research key={project.id} project={project.id} />
-          </div>
-        ) : phase === 'create' ? (
-          <Create
-            key={project.id}
-            project={project.id}
-            info={project}
-            onInfoSaved={onInfoSaved}
-            chat={chat}
-            onChat={onChat}
-            onChatsChanged={onChatsChanged}
-          />
-        ) : (
-          <section key={phase} className="stagger min-h-0 flex-1 overflow-y-auto px-6 py-8">
-            <p className="type-body-m text-fg-2">The {phase} phase is next on the build plan.</p>
-          </section>
-        )}
+    <div className="relative h-full overflow-hidden">
+      {/* the Studio stays laid out underneath, so a closing book knows where its cover sits */}
+      <div
+        className="absolute inset-0"
+        style={{ visibility: view.at === 'studio' ? 'visible' : 'hidden' }}
+      >
+        <Studio
+          projects={projects}
+          layout={layout}
+          onLayout={saveLayout}
+          movements={movements}
+          onEnter={enter}
+          onEdit={(id) => setView({ at: 'cover', id })}
+          onNew={() => setView({ at: 'cover', id: null })}
+          onEnsemble={() => setView({ at: 'ensemble' })}
+          onChanged={refresh}
+          hidden={opening?.id}
+        />
       </div>
-    </section>
+
+      {current && (
+        <div className="absolute inset-0">
+          <Book
+            key={current.id}
+            name={current.name}
+            area={areas[current.id] ?? null}
+            onArea={(a) => setAreas((all) => ({ ...all, [current.id]: a }))}
+            onStudio={() => close(current.id)}
+            render={(a) => area(current, a)}
+          />
+        </div>
+      )}
+
+      {view.at === 'cover' && (
+        <div className="absolute inset-0">
+          <CoverEditor
+            key={view.id ?? 'new'}
+            project={project(view.id) ?? null}
+            no={view.id ? projects.findIndex((p) => p.id === view.id) + 1 : projects.length + 1}
+            onDone={toStudio}
+            onSaved={refresh}
+            onEnter={(id) => {
+              toStudio()
+              requestAnimationFrame(() => enter(id))
+            }}
+            onCreated={(p, open) => {
+              const list = [...projects, p].sort((a, b) => a.name.localeCompare(b.name))
+              setProjects(list)
+              toStudio()
+              if (open) requestAnimationFrame(() => enter(p.id))
+            }}
+          />
+        </div>
+      )}
+
+      {view.at === 'ensemble' && (
+        <div className="bg-dots absolute inset-0 overflow-y-auto px-10 pt-[74px] pb-10 animate-[area-in_550ms_var(--ease)_both]">
+          <div className="fixed top-3.5 left-3.5 z-10">
+            <Breadcrumb steps={[{ label: 'Studio', onClick: toStudio }, { label: 'Ensemble' }]} />
+          </div>
+          <div className="mx-auto max-w-[1280px] border border-card-line bg-card shadow-card">
+            <Agents />
+          </div>
+        </div>
+      )}
+
+      {opening && project(opening.id) && (
+        <Opening
+          info={coverInfo(project(opening.id)!, projects)}
+          shelf={opening.shelf}
+          dir={opening.dir}
+          onSwap={() => setView(opening.then)}
+          onDone={() => setOpening(null)}
+        />
+      )}
+    </div>
   )
 }
 

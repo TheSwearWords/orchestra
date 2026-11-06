@@ -274,15 +274,15 @@ app.whenReady().then(async () => {
     return renameProject(PROJECTS_DIR, id, name)
   })
 
-  // Right-click on a project. Opening and deleting happen here; renaming is answered with
-  // 'rename' so the sidebar can edit the name in place.
+  // Right-click on a cover. Opening a window and deleting happen here; Enter and Edit are
+  // answered so the Studio can play the opening or zoom into the cover editor.
   ipcMain.handle('projects:menu', (e, id: string, name: string) => {
     const dir = projectDir(id)
     const win = BrowserWindow.fromWebContents(e.sender)!
-    return new Promise<'rename' | 'side' | 'opened' | 'deleted' | null>((resolve) => {
+    return new Promise<'enter' | 'edit' | 'opened' | 'deleted' | null>((resolve) => {
       Menu.buildFromTemplate([
-        { label: 'Rename', click: () => resolve('rename') },
-        { label: 'Open to the side', click: () => resolve('side') },
+        { label: 'Enter project', click: () => resolve('enter') },
+        { label: 'Edit project', click: () => resolve('edit') },
         {
           label: 'Open in new window',
           click: () => {
@@ -314,6 +314,28 @@ app.whenReady().then(async () => {
         callback: () => setTimeout(() => resolve(null), 200)
       })
     })
+  })
+  // The Studio's arrangement: where each cover sits, and the free labels.
+  const studioFile = join(ORCHESTRA_HOME, 'studio.json')
+  ipcMain.handle('studio:load', async () => {
+    try {
+      return JSON.parse(await readFile(studioFile, 'utf8'))
+    } catch {
+      return { covers: {}, labels: [] } // none yet, or unreadable: the default layout
+    }
+  })
+  ipcMain.handle('studio:save', (_, layout: unknown) => {
+    const l = layout as { covers?: unknown; labels?: unknown }
+    const num = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v)
+    const covers = Object.entries((l?.covers ?? {}) as Record<string, unknown>).filter(
+      ([, v]) => Array.isArray(v) && v.length === 3 && v.every(num)
+    )
+    const labels = (Array.isArray(l?.labels) ? l.labels : []).filter(
+      (b: { x?: unknown; y?: unknown; text?: unknown }) =>
+        num(b?.x) && num(b?.y) && typeof b?.text === 'string'
+    )
+    const out = { covers: Object.fromEntries(covers), labels }
+    return writeFile(studioFile, JSON.stringify(out, null, 2) + '\n')
   })
   ipcMain.handle('projects:create', (_, input: Omit<Project, 'id'>) =>
     createProject(PROJECTS_DIR, input)

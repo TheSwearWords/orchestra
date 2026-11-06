@@ -28,6 +28,12 @@ export type {
 }
 
 /** One chat in a project: General, or a chosen deliverable's. */
+/** Studio arrangement (Orchestra/studio.json): each cover's [x, y, rotation°], and free labels. */
+export interface StudioLayout {
+  covers: Record<string, [number, number, number]>
+  labels: { x: number; y: number; text: string }[]
+}
+
 export interface ChatInfo {
   id: string
   title: string
@@ -86,8 +92,10 @@ const api = {
   projectMenu: (
     id: string,
     name: string
-  ): Promise<'rename' | 'side' | 'opened' | 'deleted' | null> =>
+  ): Promise<'enter' | 'edit' | 'opened' | 'deleted' | null> =>
     ipcRenderer.invoke('projects:menu', id, name),
+  loadStudio: (): Promise<StudioLayout> => ipcRenderer.invoke('studio:load'),
+  saveStudio: (layout: StudioLayout): Promise<void> => ipcRenderer.invoke('studio:save', layout),
   createProject: (input: Omit<Project, 'id'>): Promise<Project> =>
     ipcRenderer.invoke('projects:create', input),
 

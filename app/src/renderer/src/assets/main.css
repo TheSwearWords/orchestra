@@ -1,21 +1,44 @@
 @import 'tailwindcss';
-@import '@fontsource/instrument-serif/400.css';
-@import '@fontsource/instrument-serif/400-italic.css';
-@import '@fontsource-variable/instrument-sans';
+@import '@fontsource/bodoni-moda/800-italic.css';
+@import '@fontsource-variable/archivo/wdth.css';
 @import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
 @import './tokens.css';
 
 /* Short Tailwind names for the Figma semantic tokens, e.g. bg-subtle, text-fg-2, border-line */
 @theme inline {
-  --font-display: 'Instrument Serif', Georgia, serif;
-  --font-sans: 'Instrument Sans Variable', system-ui, sans-serif;
+  --font-display: 'Bodoni Moda', 'Didot', 'Bodoni 72', Georgia, serif;
+  --font-sans: 'Archivo Variable', 'Arial Narrow', Arial, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* brand v2: sharp everywhere; round only for pills, avatars and the orb */
   --radius-*: initial;
-  --radius-sm: 2px;
+  --radius-sm: 0;
   --radius-full: 9999px;
-  /* motion: strong curves read as intentional; stock CSS easings feel weak */
-  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  /* motion: one curve for everything (brand spec §6); the old names stay as aliases */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out-strong: var(--ease);
+  --ease-in-out-strong: var(--ease);
+  --shadow-float: var(--effect-float);
+  --shadow-card: var(--effect-card);
+  --shadow-lift: var(--effect-lift);
+  --shadow-book: var(--effect-book);
+
+  --color-chip: var(--color-chip-bg);
+  --color-chip-line: var(--color-chip-border);
+  --color-card: var(--color-card-bg);
+  --color-card-line: var(--color-card-border);
+  --color-selected: var(--color-card-selected);
+  --color-rule: var(--color-rule-default);
+  --color-hair: var(--color-rule-hair);
+  --color-wire: var(--color-wire-default);
+  --color-live: var(--color-wire-live);
+  --color-poster: var(--color-poster-bg);
+  --color-poster-dim: var(--color-poster-text-dim);
+  --color-needs-you: var(--color-needs-you-default);
+  --color-on-needs-you: var(--color-needs-you-on);
+  --color-terminal: var(--color-terminal-bg);
+  --color-dim: var(--color-text-dim);
+  --color-placeholder: var(--color-text-placeholder);
 
   --color-canvas: var(--color-bg-default);
   --color-subtle: var(--color-bg-subtle);
@@ -66,29 +89,45 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* "You are here": whatever is selected (project, page, phase) switches to the display
-   serif italic. Sizes are a step up so the serif's smaller x-height reads at the same weight as
-   the sans it replaces. Swap these in for the type-label/body style, never stack them. */
+/* "You are here": whatever is selected switches to the serif (Label/Serif S, M, L).
+   Swap these in for the type-label/body style, never stack them. */
 @utility type-current-s {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 15px;
-  line-height: 18px;
-  font-weight: 400;
+  @apply type-label-serif-s;
 }
 @utility type-current-m {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 18px;
-  line-height: 20px;
-  font-weight: 400;
+  @apply type-label-serif-m;
 }
 @utility type-current-l {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 24px;
-  line-height: 28px;
-  font-weight: 400;
+  @apply type-label-serif-l;
+}
+
+/* Labels swap to the serif on hover, focus and when current (brand spec §3.2). Keep a
+   min-height on the element so nothing jumps. */
+@utility serif-on {
+  transition: color 200ms var(--ease), background-color 200ms var(--ease);
+  &:hover,
+  &:focus-visible,
+  &[aria-current]:not([aria-current='false']) {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 800;
+    font-stretch: 100%;
+    text-transform: none;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* The artboard: 1px dots every 24px, blue on white (canvas) or white on blue (poster). */
+@utility bg-dots {
+  background-color: var(--color-canvas-bg);
+  background-image: radial-gradient(circle, var(--color-canvas-dot) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+@utility bg-poster-dots {
+  background-color: var(--color-poster-bg);
+  background-image: radial-gradient(circle, var(--color-poster-dot) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+  color: var(--color-text-on-brand);
 }
 
 /* Screen entrance: each child of .stagger rises in 40ms after the one before it.

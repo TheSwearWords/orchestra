@@ -1,6 +1,6 @@
 import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { existsSync } from 'fs'
-import { readFile, writeFile } from 'fs/promises'
+import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -336,6 +336,31 @@ app.whenReady().then(async () => {
     )
     const out = { covers: Object.fromEntries(covers), labels }
     return writeFile(studioFile, JSON.stringify(out, null, 2) + '\n')
+  })
+  // A board's arrangement (an area's or a deliverable's): each card's place, size and whether
+  // it is collapsed. One file per board, so boards saved at once never overwrite each other.
+  const boardFile = (project: string, board: string): string => {
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(board)) throw new Error('Unknown board.')
+    return join(projectDir(project), 'boards', `${board}.json`)
+  }
+  ipcMain.handle('board:load', async (_, project: string, board: string) => {
+    try {
+      return JSON.parse(await readFile(boardFile(project, board), 'utf8'))
+    } catch {
+      return {} // none yet: the board's default layout
+    }
+  })
+  ipcMain.handle('board:save', async (_, project: string, board: string, layout: unknown) => {
+    const file = boardFile(project, board)
+    const num = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v)
+    const cards = Object.entries((layout ?? {}) as Record<string, Record<string, unknown>>)
+      .filter(([id, c]) => /^[\w-]+$/.test(id) && num(c?.x) && num(c?.y) && num(c?.w))
+      .map(([id, c]) => [
+        id,
+        { x: c.x, y: c.y, w: c.w, ...(num(c.h) ? { h: c.h } : {}), collapsed: c.collapsed === true }
+      ])
+    await mkdir(join(file, '..'), { recursive: true })
+    return writeFile(file, JSON.stringify(Object.fromEntries(cards), null, 2) + '\n')
   })
   ipcMain.handle('projects:create', (_, input: Omit<Project, 'id'>) =>
     createProject(PROJECTS_DIR, input)

@@ -4,7 +4,7 @@ import type { Project, StudioLayout } from '../../../preload'
 import { Canvas } from './Canvas'
 import { useCamera } from './useCamera'
 import { fit, snap, type Rect } from './camera'
-import { COVER, GAP, ROW_Y, chip, coverInfo, studioPlace, type Area, type CoverInfo } from './board'
+import { COVER, ROW_Y, chip, coverInfo, studioPlace, type Area, type CoverInfo } from './shared'
 import { Breadcrumb, Minimap, ZoomChip } from './Chrome'
 import { CoverFace } from './Cover'
 
@@ -41,13 +41,8 @@ export function Studio({
     drag?.id === id ? [drag.x, drag.y, place[id][2]] : place[id]
 
   const rects: Rect[] = ids.map((id) => ({ x: at(id)[0], y: at(id)[1], w: COVER.w, h: COVER.h }))
-  const blank: Rect = {
-    x: Math.max(0, ...rects.map((r) => r.x + r.w)) + GAP,
-    y: rects.length ? Math.min(...rects.map((r) => r.y)) : ROW_Y,
-    w: COVER.w,
-    h: COVER.h
-  }
-  const everything = [...rects, blank]
+  // with no projects yet, the board still has a place to look at
+  const everything = rects.length ? rects : [{ x: 96, y: ROW_Y, w: COVER.w, h: COVER.h }]
   const bounds = (): Rect => {
     const x = Math.min(...everything.map((r) => r.x))
     const y = Math.min(...everything.map((r) => r.y))
@@ -110,6 +105,15 @@ export function Studio({
             </p>
             <p className="type-display-xl">Studio</p>
           </div>
+          {/* the blank cover, anchored bottom right beside the minimap, rising out of the edge */}
+          <button
+            onClick={onNew}
+            className="group absolute right-[170px] -bottom-16 flex h-[260px] w-[220px] flex-col items-center gap-2 border border-dashed border-wire bg-card pt-12 text-link shadow-book transition-transform duration-200 ease-(--ease) hover:-translate-y-4 [border-dasharray:6]"
+          >
+            <span className="font-mono text-2xl text-link/40">+</span>
+            <span className="serif-on type-heading-m">New project</span>
+            <span className="type-caption text-dim">A blank cover. Fill it in.</span>
+          </button>
           <div className="absolute right-3.5 bottom-3.5">
             <Minimap
               label="Studio"
@@ -144,15 +148,6 @@ export function Studio({
           onMenu={(el) => void menu(p, el)}
         />
       ))}
-      <button
-        onClick={onNew}
-        className="group absolute flex flex-col items-center justify-center gap-2 border border-dashed border-wire bg-card/60 text-link [border-dasharray:6]"
-        style={{ left: blank.x, top: blank.y, width: blank.w, height: blank.h }}
-      >
-        <span className="font-mono text-2xl text-link/40">+</span>
-        <span className="serif-on type-heading-m">New project</span>
-        <span className="type-caption text-dim">A blank cover. Fill it in.</span>
-      </button>
     </Canvas>
   )
 }

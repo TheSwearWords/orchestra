@@ -1,5 +1,7 @@
 import { useEffect, useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
 import type { Reference, ResearchState, Tag } from '../../../preload'
+import { Board } from '../canvas/Board'
+import type { Frame } from '../canvas/Book'
 import { Icon } from './Icon'
 
 const field =
@@ -12,7 +14,9 @@ const solidButton =
 // Electron prefixes IPC errors with the channel name; show only the reason
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 
-export function Research({ project }: { project: string }): React.JSX.Element {
+/** I · Research as its own artboard: the source sites, links, files and the interpretation,
+ * each a card you can arrange. */
+export function Research({ project, frame }: { project: string; frame: Frame }): React.JSX.Element {
   const [data, setData] = useState<ResearchState | null>(null)
   const [error, setError] = useState('')
   const [interpreting, setInterpreting] = useState(false)
@@ -40,37 +44,84 @@ export function Research({ project }: { project: string }): React.JSX.Element {
     setInterpreting(false)
   }
 
-  if (!data) return <div className="flex-1" />
+  if (!data) return <div className="bg-dots h-full" />
   const links = data.references.filter((r) => r.kind === 'link')
   const files = data.references.filter((r) => r.kind === 'file')
+  const n = (k: number, noun: string): string => `${k} ${noun}${k === 1 ? '' : 's'}`
 
   return (
-    <div className="stagger bg-canvas pb-12">
-      <Sites sites={data.sites} onAdd={(site) => run(() => window.api.addSite(site))} />
-
-      {error && (
-        <p
-          role="alert"
-          className="mx-6 mt-6 border-l-2 border-signal bg-signal-subtle px-3 py-2 type-body-s text-signal-fg"
-        >
-          {error}
-        </p>
-      )}
-
-      <LinkSection
-        refs={links}
-        project={project}
-        onAdd={(input) => run(() => window.api.addLink(project, input))}
-        run={run}
-      />
-      <FileSection refs={files} project={project} run={run} />
-      <Interpretation
-        text={data.interpretation}
-        count={data.references.length}
-        busy={interpreting}
-        onRun={interpret}
-      />
-    </div>
+    <Board
+      project={project}
+      board="research"
+      label="I · Research"
+      crumbs={frame.crumbs}
+      aside={frame.aside}
+      preview={frame.preview}
+      top={
+        error && (
+          <p
+            role="alert"
+            className="border-l-2 border-signal bg-signal-subtle px-3 py-2 type-body-s text-signal-fg shadow-float"
+          >
+            {error}
+          </p>
+        )
+      }
+      cards={[
+        {
+          id: 'sites',
+          title: 'Look further',
+          count: n(data.sites.length, 'site'),
+          x: 0,
+          y: 0,
+          w: 624,
+          body: <Sites sites={data.sites} onAdd={(site) => run(() => window.api.addSite(site))} />
+        },
+        {
+          id: 'links',
+          title: 'Reference links',
+          count: n(links.length, 'reference'),
+          x: 672,
+          y: 0,
+          w: 816,
+          body: (
+            <LinkSection
+              refs={links}
+              project={project}
+              onAdd={(input) => run(() => window.api.addLink(project, input))}
+              run={run}
+            />
+          )
+        },
+        {
+          id: 'files',
+          title: 'Reference files',
+          count: n(files.length, 'file'),
+          // under the sites, whose card is short and never grows much
+          x: 0,
+          y: 336,
+          w: 624,
+          body: <FileSection refs={files} project={project} run={run} />
+        },
+        {
+          id: 'interpretation',
+          title: 'research.md',
+          count: data.interpretation ? undefined : 'not written yet',
+          x: 1536,
+          y: 0,
+          w: 672,
+          tone: 'paper',
+          body: (
+            <Interpretation
+              text={data.interpretation}
+              count={data.references.length}
+              busy={interpreting}
+              onRun={interpret}
+            />
+          )
+        }
+      ]}
+    />
   )
 }
 
@@ -95,13 +146,10 @@ function Sites({
   }
 
   return (
-    <div className="mt-6 border-y border-line">
-      <ul className="grid grid-cols-2 @4xl:grid-cols-4">
+    <div>
+      <ul className="grid grid-cols-2">
         {sites.map((s) => (
-          <li
-            key={s.url}
-            className="border-r border-b border-line [&:nth-child(2n)]:border-r-0 @4xl:[&:nth-child(2n)]:border-r @4xl:[&:nth-child(4n)]:border-r-0"
-          >
+          <li key={s.url} className="border-r border-b border-line [&:nth-child(2n)]:border-r-0">
             <a
               href={s.url}
               target="_blank"
@@ -156,26 +204,11 @@ function Sites({
   )
 }
 
-function SectionHeader({
-  title,
-  count,
-  noun,
-  action
-}: {
-  title: string
-  count: number
-  noun: string
-  action: ReactNode
-}): React.JSX.Element {
+/** A card's first row: what to do in it. The card header carries the title and count. */
+function SectionHeader({ hint, action }: { hint: string; action: ReactNode }): React.JSX.Element {
   return (
-    <div className="flex items-end justify-between gap-6">
-      <div>
-        <h2 className="type-heading-s">{title}</h2>
-        <p className="mt-1 type-caption text-fg-2">
-          {count} {noun}
-          {count === 1 ? '' : 's'}
-        </p>
-      </div>
+    <div className="flex items-center justify-between gap-6">
+      <p className="type-caption text-fg-2">{hint}</p>
       {action}
     </div>
   )
@@ -210,11 +243,9 @@ function LinkSection({
   }
 
   return (
-    <section className="px-6 pt-10">
+    <div className="p-5">
       <SectionHeader
-        title="Reference links"
-        count={refs.length}
-        noun="reference"
+        hint="Links to anything that catches your eye."
         action={
           <button
             onClick={() => setAdding(!adding)}
@@ -294,7 +325,7 @@ function LinkSection({
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   )
 }
 
@@ -317,8 +348,8 @@ function FileSection({
   }
 
   return (
-    <section
-      className="px-6 pt-12"
+    <div
+      className="p-5"
       onDragOver={(e) => {
         e.preventDefault()
         setOver(true)
@@ -329,9 +360,7 @@ function FileSection({
       onDrop={drop}
     >
       <SectionHeader
-        title="Reference files"
-        count={refs.length}
-        noun="file"
+        hint="Images and PDFs, kept in the project."
         action={
           <button
             onClick={() => run(() => window.api.pickFiles(project))}
@@ -386,7 +415,7 @@ function FileSection({
           PNG, JPG, GIF, WebP, SVG or PDF, up to 25 MB each. A copy is kept in the project.
         </p>
       </div>
-    </section>
+    </div>
   )
 }
 
@@ -402,12 +431,12 @@ function Interpretation({
   onRun: () => void
 }): React.JSX.Element {
   return (
-    <section className="px-6 pt-12">
-      <div className="flex items-end justify-between gap-6">
+    <div className="p-6">
+      <div className="flex items-start justify-between gap-6">
         <div>
-          <h2 className="type-heading-s">Interpretation</h2>
+          <h3 className="type-heading-l text-link">Direction</h3>
           <p className="mt-1 type-caption text-fg-2">
-            The Orchestrator reads every reference and your notes, then writes research.md.
+            Interpret writes research.md from your references and notes.
           </p>
         </div>
         <button onClick={onRun} disabled={busy || count === 0} className={solidButton}>
@@ -431,7 +460,7 @@ function Interpretation({
           </p>
         )
       )}
-    </section>
+    </div>
   )
 }
 

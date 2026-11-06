@@ -1,7 +1,7 @@
 // A project's cover, generated from its name, client and art, like a concert programme
 // (brand spec §5.4 Book/Cover, canvas spec §2.3).
 import { Ascii } from '../components/Ascii'
-import { AREAS, coverArt, coverColor, type Area, type CoverColor, type CoverInfo } from './board'
+import { AREAS, coverArt, coverColor, type Area, type CoverColor, type CoverInfo } from './shared'
 
 const LOOK: Record<CoverColor, { face: string; spine: string; plate: string; dim: string }> = {
   blue: {

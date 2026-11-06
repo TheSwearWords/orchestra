@@ -2,7 +2,7 @@
 // swings open on its spine, then the camera pushes through the first page into the book.
 // Closing plays the same in reverse, back into the cover's place on the shelf.
 import { useLayoutEffect, useRef } from 'react'
-import { COVER, reducedMotion, type CoverInfo } from './board'
+import { COVER, reducedMotion, type CoverInfo } from './shared'
 import { CoverFace } from './Cover'
 
 interface Props {

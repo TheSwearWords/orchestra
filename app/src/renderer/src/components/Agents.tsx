@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { AgentFileOpener, type AgentFileRef } from '../canvas/shared'
 import type { EditKey, Library, ProviderStatus, Role } from '../../../preload'
 import { PROVIDERS, provider, RUNNABLE } from '../../../main/providers'
 import { Icon } from './Icon'
@@ -48,6 +49,10 @@ export function Agents(): React.JSX.Element {
   useEffect(() => {
     void reload()
     void window.api.providerStatus().then(setStatus)
+    // a file edited in its own window on the board changes the library too
+    const changed = (): void => void reload()
+    addEventListener('orchestra:agents-changed', changed)
+    return () => removeEventListener('orchestra:agents-changed', changed)
   }, [])
 
   if (!data) return <p className="px-6 type-body-s text-fg-2">{error || 'Loading the library…'}</p>
@@ -199,6 +204,7 @@ function Detail({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [fileOpen, setFileOpen] = useState(false)
+  const openOnBoard = useContext(AgentFileOpener)
 
   // every change is written straight to the agent's file, then the screen reloads from disk
   async function run(change: () => Promise<void>): Promise<void> {
@@ -273,7 +279,12 @@ function Detail({
       </div>
 
       <div className="flex items-center gap-3">
-        <button onClick={() => setFileOpen(true)} className={outlineButton}>
+        <button
+          onClick={() =>
+            openOnBoard && agent ? openOnBoard({ ...pick, name: agent.name }) : setFileOpen(true)
+          }
+          className={outlineButton}
+        >
           <Icon name="file-text-line" size={16} />
           Open its file
         </button>
@@ -740,5 +751,77 @@ function FileModal({
         )}
       </div>
     </dialog>
+  )
+}
+
+/** An agent's markdown file as a window on the artboard: the whole file, front matter then
+ * prompt, editable in place. It grows to fit the file (artboard windows never scroll). */
+export function AgentFile({ file: f }: { file: AgentFileRef }): React.JSX.Element {
+  const [file, setFile] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const dirty = file !== null && draft !== file
+
+  useEffect(() => {
+    void window.api.readAgent(f.role, f.id).then(
+      (t) => {
+        setFile(t)
+        setDraft(t)
+      },
+      (e) => setError(reason(e))
+    )
+  }, [f.role, f.id])
+
+  async function save(): Promise<void> {
+    setSaving(true)
+    setError('')
+    try {
+      await window.api.writeAgent(f.role, f.id, draft)
+      setFile(draft)
+      dispatchEvent(new Event('orchestra:agents-changed'))
+    } catch (e) {
+      setError(reason(e))
+    }
+    setSaving(false)
+  }
+
+  const path =
+    f.role === 'orchestrator'
+      ? 'library/orchestrator.md'
+      : `library/${f.role === 'musician' ? 'musicians' : 'instruments'}/${f.id}.md`
+  return (
+    <div className="flex flex-col">
+      <p className="border-b border-hair px-5 py-2.5 font-mono text-[12px] text-dim">{path}</p>
+      <textarea
+        aria-label={`${f.name}: markdown file, front matter then the prompt`}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        spellCheck={false}
+        disabled={file === null}
+        rows={Math.max(12, draft.split('\n').length + 1)}
+        className="resize-none overflow-hidden bg-card px-5 py-4 font-mono text-[13px] leading-5 text-fg outline-none"
+      />
+      <div className="flex items-center gap-4 border-t border-hair px-5 py-3">
+        <button onClick={() => void save()} disabled={saving || !dirty} className={solidButton}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        {dirty && (
+          <button
+            onClick={() => setDraft(file ?? '')}
+            className="type-label-m text-dim hover:text-link"
+          >
+            Discard changes
+          </button>
+        )}
+        {error ? (
+          <p className="type-caption text-signal-fg">{error}</p>
+        ) : (
+          <p className="ml-auto type-caption text-dim">
+            {dirty ? 'Unsaved changes' : 'Takes effect the next time this agent starts.'}
+          </p>
+        )}
+      </div>
+    </div>
   )
 }

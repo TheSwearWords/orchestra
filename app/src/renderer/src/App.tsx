@@ -179,6 +179,18 @@ function App(): React.JSX.Element {
     ? { project: current.id, label: `To ${current.name}` }
     : { project: STUDIO, label: 'To the Studio' }
 
+  /** A slash command picked in the bar. */
+  function command(id: string): void {
+    if (id === 'agents' || id === 'mcps' || id === 'settings') {
+      go({ at: 'studio' })
+      dispatchEvent(new CustomEvent('orchestra:desk', { detail: id }))
+    } else if (id === 'studio') go({ at: 'studio' })
+    else if (id === 'new') go({ at: 'cover', id: null })
+    else if (id === 'needs') dispatchEvent(new Event('orchestra:needs'))
+    else if (current && (id === 'research' || id === 'create' || id === 'refine'))
+      go({ at: 'book', id: current.id, area: id })
+  }
+
   function area(p: Project, a: Area, frame: Frame): React.ReactNode {
     if (a === 'research') return <Research key={p.id} project={p.id} frame={frame} />
     if (a === 'create') return <Create key={p.id} project={p.id} frame={frame} />
@@ -287,6 +299,22 @@ function App(): React.JSX.Element {
       <OrchestratorBar
         to={to}
         projects={projects}
+        commands={[
+          { id: 'agents', label: 'Agents', hint: 'Opens on the Studio desk' },
+          { id: 'mcps', label: 'MCPs and providers', hint: 'Opens on the Studio desk' },
+          { id: 'settings', label: 'Settings', hint: 'Opens on the Studio desk' },
+          { id: 'studio', label: 'Studio', hint: 'Every project' },
+          { id: 'new', label: 'New project', hint: 'A blank cover' },
+          ...(current
+            ? [
+                { id: 'research', label: 'I Research', hint: current.name },
+                { id: 'create', label: 'II Create', hint: current.name },
+                { id: 'refine', label: 'III Refine', hint: current.name }
+              ]
+            : []),
+          { id: 'needs', label: 'Needs you', hint: 'Everywhere you are needed' }
+        ]}
+        onCommand={command}
         onGo={(p) => go({ at: 'book', id: p.project, area: p.area })}
       />
 

@@ -1,5 +1,6 @@
 // What the canvas components share: constants, types and small pure helpers.
-import type { Project, StudioLayout } from '../../../preload'
+import { createContext } from 'react'
+import type { Project, Role, StudioLayout } from '../../../preload'
 import type { AsciiName } from '../components/Ascii'
 import { fit, type Camera, type Rect } from './camera'
 
@@ -99,3 +100,12 @@ export function requestFocus(project: string, card: string): void {
   pendingFocus.current = { project, card }
   dispatchEvent(new Event('orchestra:focus'))
 }
+
+/** Opens an agent's markdown file as a window on the artboard (the Studio provides it); with
+ * none, the Agents screen falls back to its modal. */
+export interface AgentFileRef {
+  role: Role
+  id: string
+  name: string
+}
+export const AgentFileOpener = createContext<((f: AgentFileRef) => void) | null>(null)

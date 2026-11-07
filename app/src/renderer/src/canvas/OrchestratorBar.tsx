@@ -9,6 +9,7 @@ import type { CreateState, Thread } from '../../../preload'
 import { ChatPanel } from '../components/Create'
 import { Icon } from '../components/Icon'
 import type { Place } from '../goto'
+import { matchCommands, type Command } from './commands'
 import { GENERAL, STUDIO, TOP_BAR, chip, typing } from './shared'
 
 export interface BarTarget {
@@ -50,16 +51,21 @@ const newThread = (): string => `t-${Date.now().toString(36)}`
 export function OrchestratorBar({
   to,
   projects,
-  onGo
+  onGo,
+  commands,
+  onCommand
 }: {
   to: BarTarget
   projects: { id: string; name: string }[]
   onGo: (place: Place) => void
+  commands: Command[] // what "/" offers here (App decides, by where you are)
+  onCommand: (id: string) => void
 }): React.JSX.Element {
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
   const [picking, setPicking] = useState(false) // the mode menu
   const [agents, setAgents] = useState(false) // the Agents pop-out
+  const [hi, setHi] = useState(0) // the highlighted slash command
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [plan, setPlan] = useState<CreateState | undefined>(undefined)
@@ -112,6 +118,7 @@ export function OrchestratorBar({
         e.stopPropagation()
         setOpen(false)
         setPicking(false)
+        setText((t) => (t.startsWith('/') ? '' : t)) // a half-typed command goes away
         input.current?.blur()
       }
     }
@@ -129,8 +136,30 @@ export function OrchestratorBar({
     }
   }, [open, picking])
 
+  // "/" commands: the bar's own, then the ones for where you are
+  const all: Command[] = [
+    ...commands,
+    { id: 'chat', label: 'New conversation', hint: 'Start a fresh one with the Orchestrator' }
+  ]
+  const matches = matchCommands(text, all)
+  const shown = matches[Math.min(hi, matches.length - 1)]
+  function run(c: Command): void {
+    setText('')
+    setHi(0)
+    if (c.id === 'chat') {
+      // the bar's own: a fresh conversation, open and ready
+      pick(newThread())
+      setOpen(true)
+      return
+    }
+    setOpen(false)
+    input.current?.blur()
+    onCommand(c.id)
+  }
+
   async function send(e: React.FormEvent): Promise<void> {
     e.preventDefault()
+    if (shown) return run(shown)
     const sent = text.trim()
     if (!sent || busy) return
     setError('')
@@ -291,6 +320,37 @@ export function OrchestratorBar({
           </section>
         )}
 
+        {matches.length > 0 && (
+          <ul
+            id="bar-commands"
+            role="listbox"
+            aria-label="Commands"
+            className="absolute inset-x-0 border border-chip-line bg-card p-1.5 shadow-lift animate-[rise-in_160ms_var(--ease)_both]"
+            style={{ bottom: BAR_H + 8 }}
+          >
+            {matches.map((c) => (
+              <li key={c.id} role="option" aria-selected={c === shown}>
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.preventDefault()} // keep the field focused
+                  onClick={() => run(c)}
+                  onPointerEnter={() => setHi(matches.indexOf(c))}
+                  className={`flex w-full items-baseline gap-3 px-3 py-2 text-left text-link ${c === shown ? 'bg-selected' : ''}`}
+                >
+                  <span className="w-24 shrink-0 font-mono text-[13px]">/{c.id}</span>
+                  <span className="type-label-serif-l">{c.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-right type-caption text-dim">
+                    {c.hint}
+                  </span>
+                </button>
+              </li>
+            ))}
+            <li className="px-3 pt-1.5 pb-0.5 type-caption text-dim">
+              ↑ ↓ to choose · Enter or Tab to go · Esc to close
+            </li>
+          </ul>
+        )}
+
         {picking && (
           <ul
             role="menu"
@@ -340,13 +400,37 @@ export function OrchestratorBar({
           <input
             ref={input}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value)
+              setHi(0)
+              // a command, not a message: the menu shows instead of the conversation
+              if (e.target.value.startsWith('/')) setOpen(false)
+            }}
+            onKeyDown={(e) => {
+              if (!matches.length) return
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                const n = matches.length
+                setHi((h) => (Math.min(h, n - 1) + (e.key === 'ArrowDown' ? 1 : n - 1)) % n)
+              }
+              if (e.key === 'Tab' && shown) {
+                e.preventDefault()
+                run(shown)
+              }
+            }}
             onFocus={() => {
-              setOpen(true)
+              if (!text.startsWith('/')) setOpen(true)
               if (error) setError('')
             }}
-            onClick={() => setOpen(true)}
-            placeholder={busy ? 'The Orchestrator is working…' : 'Ask the Orchestrator anything…'}
+            onClick={() => !text.startsWith('/') && setOpen(true)}
+            role="combobox"
+            aria-expanded={matches.length > 0}
+            aria-controls="bar-commands"
+            placeholder={
+              busy
+                ? 'The Orchestrator is working…'
+                : 'Ask the Orchestrator anything, or type / to go somewhere'
+            }
             aria-label={`Message the Orchestrator, ${to.label}`}
             className="min-w-0 flex-1 border-0 border-b-2 border-brand bg-transparent py-1 type-body-m text-link outline-none placeholder:text-placeholder focus-visible:outline-none"
           />

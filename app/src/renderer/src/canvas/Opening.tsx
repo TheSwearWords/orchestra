@@ -1,5 +1,5 @@
-// C3 · Opening the book, 1.6s: the cover comes to the centre, swings all the way open on its
-// spine, rests a beat, then its first page grows to fill the window and becomes the book.
+// C3 · Opening the book, 1.4s: the cover comes to the centre, swings all the way open on its
+// spine, rests a beat, then fades into the book's artboard.
 // Closing plays the same in reverse, back into the cover's place on the shelf.
 import { useLayoutEffect, useRef } from 'react'
 import { COVER, reducedMotion, type CoverInfo } from './shared'
@@ -26,29 +26,25 @@ export function Opening({ info, shelf, dir, onSwap, onDone }: Props): React.JSX.
     }
     const vw = innerWidth
     const vh = innerHeight
-    const T = 1600
+    const T = 1420
     const at = (ms: number): number => ms / T
     const ease = 'cubic-bezier(.2,.7,.2,1)'
     const s0 = shelf.height / COVER.h
     const s1 = Math.min((vh * 0.7) / COVER.h, (vw * 0.34) / COVER.w)
-    // the first page grows until it covers the window
-    const fill = Math.max(vw / COVER.w, vh / COVER.h) * 1.04
     const place = (cx: number, cy: number, s: number): string =>
       `translate(${cx - COVER.w / 2}px, ${cy - COVER.h / 2}px) scale(${s})`
     const shelfAt = place(shelf.x + shelf.width / 2, shelf.y + shelf.height / 2, s0)
     const closed = place(vw / 2, vh / 2, s1)
     // open, the spread is centred: the spine sits in the middle of the window
     const open = place(vw / 2 + (COVER.w * s1) / 2, vh / 2, s1)
-    const filled = place(vw / 2, vh / 2, fill)
 
-    // 1. to the centre  2. swings all the way open  3. a breath  4. the page fills the window
+    // 1. to the centre  2. swings all the way open  3. a breath  4. fades into the artboard
     const moves: Keyframe[] = [
       { offset: 0, transform: shelfAt, opacity: 1, easing: ease },
       { offset: at(380), transform: closed, opacity: 1, easing: ease },
       { offset: at(1020), transform: open, opacity: 1 },
-      { offset: at(1160), transform: open, opacity: 1, easing: ease },
-      { offset: at(1500), transform: filled, opacity: 1 },
-      { offset: 1, transform: filled, opacity: 0 }
+      { offset: at(1140), transform: open, opacity: 1, easing: ease },
+      { offset: 1, transform: open, opacity: 0 }
     ]
     const swing: Keyframe[] = [
       { offset: 0, transform: 'rotateY(0deg)' },
@@ -63,8 +59,9 @@ export function Opening({ info, shelf, dir, onSwap, onDone }: Props): React.JSX.
     }
     const a = book.current!.animate(moves, opts)
     front.current!.animate(swing, opts)
-    // opening swaps once the page covers the window; closing swaps at once, under the page
-    const swap = setTimeout(onSwap, dir === 'open' ? 1480 : 0)
+    // opening swaps the board in behind the open book as it starts to fade; closing swaps at
+    // once, under the book as it fades back in
+    const swap = setTimeout(onSwap, dir === 'open' ? 1140 : 0)
     a.finished.then(onDone, () => {})
     return () => {
       clearTimeout(swap)

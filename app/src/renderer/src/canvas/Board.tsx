@@ -11,6 +11,7 @@ import { Canvas } from './Canvas'
 import { Minimap, Shell, ZoomChip, barButton, type Step } from './Chrome'
 import { TOP_BAR, fitBelow } from './shared'
 import { freeSpot, settle } from './place'
+import { Wire } from './Wire'
 import { useCamera } from './useCamera'
 
 export interface CardSpec {
@@ -23,6 +24,8 @@ export interface CardSpec {
   tone?: 'white' | 'paper' | 'blue' // paper: a document (2px blue border); blue: the poster
   body: React.ReactNode
   onClose?: () => void // a window opened on the board, rather than one of its sections
+  link?: string // another card's id: a wire runs between them (a window and its Orchestrator)
+  needsYou?: boolean // waiting on the user: an orange tab on its top edge
 }
 
 const HEADER = 44
@@ -168,6 +171,28 @@ export function Board({
       }
     >
       {world}
+      {layout && (
+        <svg
+          aria-hidden
+          className="pointer-events-none absolute overflow-visible"
+          style={{ left: 0, top: 0, width: 1, height: 1 }}
+        >
+          {placed.flatMap((c) => {
+            const to = c.link && placed.find((p) => p.id === c.link)
+            if (!to) return []
+            return [
+              <Wire
+                key={c.id}
+                x1={c.x + c.w / 2}
+                y1={c.y + c.h / 2}
+                x2={to.x + to.w / 2}
+                y2={to.y + to.h / 2}
+                tone={c.needsYou ? 'needs-you' : 'wire'}
+              />
+            ]
+          })}
+        </svg>
+      )}
       {layout &&
         placed.map((c) => (
           <Card
@@ -254,6 +279,7 @@ export function Card({
   return (
     <section
       ref={box}
+      data-card={card.id}
       aria-label={card.title}
       className={`absolute flex flex-col ${
         blue
@@ -283,6 +309,11 @@ export function Card({
         }`}
         style={{ height: HEADER }}
       >
+        {card.needsYou && (
+          <span className="absolute -top-3 right-4 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
+            Needs you
+          </span>
+        )}
         <span aria-hidden className="font-mono text-[11px] tracking-[-0.2em] opacity-50">
           ⋮⋮
         </span>

@@ -5,7 +5,8 @@ import { Icon } from './components/Icon'
 import { Research } from './components/Research'
 import { Board } from './canvas/Board'
 import { Book, type Frame } from './canvas/Book'
-import { GENERAL, STUDIO, TOP_BAR, chip, coverInfo, type Area } from './canvas/shared'
+import { STUDIO, TOP_BAR, chip, coverInfo, requestFocus, type Area } from './canvas/shared'
+import { NeedsYou } from './canvas/NeedsYou'
 import { CoverEditor } from './canvas/CoverEditor'
 import { Opening } from './canvas/Opening'
 import { OrchestratorBar, type BarTarget } from './canvas/OrchestratorBar'
@@ -175,8 +176,8 @@ function App(): React.JSX.Element {
 
   // the bar talks to the Orchestrator of wherever you are
   const to: BarTarget = current
-    ? { project: current.id, chat: GENERAL, label: `To ${current.name}` }
-    : { project: STUDIO, chat: GENERAL, label: 'To the Studio' }
+    ? { project: current.id, label: `To ${current.name}` }
+    : { project: STUDIO, label: 'To the Studio' }
 
   function area(p: Project, a: Area, frame: Frame): React.ReactNode {
     if (a === 'research') return <Research key={p.id} project={p.id} frame={frame} />
@@ -276,6 +277,13 @@ function App(): React.JSX.Element {
         <Icon name="arrow-left-line" size={14} />
         Back
       </button>
+      <NeedsYou
+        projects={projects}
+        onOpen={(project, card) => {
+          requestFocus(project, card)
+          go({ at: 'book', id: project, area: 'create' })
+        }}
+      />
       <OrchestratorBar
         to={to}
         projects={projects}

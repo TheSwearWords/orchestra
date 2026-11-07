@@ -36,6 +36,11 @@ export interface Hub {
     done: boolean
   ): Promise<string>
   proposeMusician(project: string, chat: string, draft: MusicianDraft): Promise<string>
+  openWindow(
+    project: string,
+    chat: string,
+    w: { id: string; title: string; question: string; options: string[]; about?: string }
+  ): Promise<string>
   proposeInstrument(
     project: string,
     chat: string,
@@ -95,6 +100,24 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
         }
       },
       (draft) => run(() => hub.proposeMusician(project, chat, draft))
+    )
+    mcp.registerTool(
+      'open_window',
+      {
+        description:
+          "Open a window on the user's Create board to ask them one thing, with options to pick from: a colour direction, a type pairing, a logo route. One window per topic; call again with the same id to update it (new options after they refine). The window is wired to the seat or foundation it's about. Their pick, or their refinement, comes back to you as a message starting with the window's title in brackets.",
+        inputSchema: {
+          id: z.string().describe('lowercase-with-dashes, one per topic, e.g. "colours"'),
+          title: z.string().describe('Short, e.g. "Colours"'),
+          question: z.string(),
+          options: z.array(z.string()).describe('Two to six concrete options, a few words each'),
+          about: z
+            .string()
+            .optional()
+            .describe('The deliverable (Musician) or foundation (Instrument) id it is for')
+        }
+      },
+      (w) => run(() => hub.openWindow(project, chat, w))
     )
   }
 

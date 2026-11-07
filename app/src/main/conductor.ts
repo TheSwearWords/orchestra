@@ -1,5 +1,6 @@
 import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
+import { answerAsk, openAsk, readAsks, type Ask } from './asks.ts'
 import type { Instrument, Musician } from './library.ts'
 import { startOrchestraMcp, type Hub, type OrchestraMcp, type Role } from './orchestra-mcp.ts'
 import { foundationOrder } from './plan.ts'
@@ -50,6 +51,7 @@ type EventBody =
   | { kind: 'busy'; busy: boolean } // the Orchestrator is answering
   | { kind: 'log'; entry: LogEntry }
   | { kind: 'agents' } // a Musician or Instrument changed status
+  | { kind: 'asks' } // a window the Orchestrator opened changed
   | { kind: 'error'; text: string }
 export type ChatEvent = { project: string; chat: string } & EventBody
 
@@ -474,6 +476,35 @@ export class Conductor implements Hub {
   // ---- new agents, approved by the user ----
 
   /** The Orchestrator proposes a Musician for a deliverable the library doesn't cover. */
+  /** The Orchestrator opens (or updates) a window on the Create board to ask the user. */
+  async openWindow(
+    project: string,
+    chat: string,
+    w: { id: string; title: string; question: string; options: string[]; about?: string }
+  ): Promise<string> {
+    const a = await openAsk(this.opts.projectDir(project), { ...w, chat })
+    await this.log(project, chat, 'orchestrator', 'message', `opened a window: ${a.title}`)
+    this.opts.emit({ project, chat, kind: 'asks' })
+    return `The user now sees the "${a.title}" window with your ${a.options.length} options. Keep your chat reply to a sentence, then wait: their answer arrives as a message starting [${a.title}].`
+  }
+
+  /** The user answers a window: a pick closes it, a refinement keeps it open. Either way it
+   * goes to the Orchestrator that asked, as a message in its chat. */
+  async answerWindow(project: string, id: string, text: string, final: boolean): Promise<void> {
+    const clean = text.trim()
+    if (!clean) return
+    const a = (await readAsks(this.opts.projectDir(project)))[id]
+    if (!a) throw new Error('That window is gone.')
+    if (this.isBusy(project, a.chat)) throw new Error('The Orchestrator is still answering.')
+    await answerAsk(this.opts.projectDir(project), id, clean, final)
+    this.opts.emit({ project, chat: a.chat, kind: 'asks' })
+    await this.send(project, a.chat, `[${a.title}] ${final ? `Chose: ${clean}` : clean}`)
+  }
+
+  async asks(project: string): Promise<Record<string, Ask>> {
+    return readAsks(this.opts.projectDir(project))
+  }
+
   async proposeMusician(project: string, chat: string, draft: MusicianDraft): Promise<string> {
     await this.propose(project, chat, 'orchestrator', 'musician', draft)
     return `The user now sees an approval card for the ${draft.name} Musician. In this same reply, say in a sentence or two why it's needed, then stop and wait: you'll get a message when they decide.`

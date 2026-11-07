@@ -1,6 +1,6 @@
 import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { existsSync, mkdirSync } from 'fs'
-import { mkdir, readFile, writeFile } from 'fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -481,6 +481,26 @@ app.whenReady().then(async () => {
       })
     )
   })
+  // The bar's conversations with the Orchestrator: General, then each new one ("t-…"), the
+  // latest first. Deliverables' chats belong to their windows on the stage, not here.
+  ipcMain.handle('chats:threads', async (_, project: string) => {
+    const dir = chatHome(project)
+    const ids = await readdir(join(dir, '.orchestra', 'chats')).catch(() => [] as string[])
+    const threads = await Promise.all(
+      [GENERAL, ...ids.filter((id) => id.startsWith('t-'))].map(async (id) => {
+        const messages = (await readChat(dir, id)).filter((m) => m.role !== 'note')
+        const first = messages.find((m) => m.role === 'user')?.text.replace(/\s+/g, ' ')
+        return {
+          id,
+          title: id === GENERAL ? 'General' : (first?.slice(0, 64) ?? 'New conversation'),
+          count: messages.length,
+          updated: messages.at(-1)?.t ?? '',
+          busy: conductor.isBusy(project, id)
+        }
+      })
+    )
+    return [threads[0], ...threads.slice(1).sort((a, b) => b.updated.localeCompare(a.updated))]
+  })
   ipcMain.handle('chat:load', async (_, project: string, chat: string) => ({
     messages: await readChat(chatHome(project), chat),
     log: await readLog(chatHome(project), chat),
@@ -505,6 +525,14 @@ app.whenReady().then(async () => {
       return conductor.decide(project, chat, String(id), approve === true)
     }
   )
+  ipcMain.handle('asks:list', (_, project: string) => {
+    projectDir(project)
+    return conductor.asks(project)
+  })
+  ipcMain.handle('ask:answer', (_, project: string, id: string, text: string, final: boolean) => {
+    projectDir(project)
+    return conductor.answerWindow(project, String(id), String(text), final === true)
+  })
   ipcMain.handle('agents:states', (_, project: string) => {
     projectDir(project)
     return conductor.agentStates(project)

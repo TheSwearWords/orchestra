@@ -6,13 +6,15 @@ import type {
   CreateState,
   LogEntry,
   Musician,
+  Ask,
   Output,
   Proposal
 } from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
 import { Board, type CardSpec } from '../canvas/Board'
+import { Wire } from '../canvas/Wire'
 import type { Frame } from '../canvas/Book'
-import { STUDIO } from '../canvas/shared'
+import { GENERAL, STUDIO, pendingFocus } from '../canvas/shared'
 import {
   PODIUM,
   PREREQS,
@@ -52,12 +54,22 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const [outputs, setOutputs] = useState<Output[]>([])
   const [agents, setAgents] = useState<Record<string, AgentState>>({})
   const [proposals, setProposals] = useState<Record<string, Proposal>>({})
+  const [asks, setAsks] = useState<Record<string, Ask>>({})
   const [error, setError] = useState('')
   const [hover, setHover] = useState<string | null>(null) // a foundation pointed at
   // shortcut: confirmed is per viewer (localStorage); move it into deliverables.md if it
   // should follow the project to other machines
   const [confirmed, setConfirmed] = useState(() => remembered(`confirmed:${project}`).length > 0)
-  const [focus, setFocus] = useState<string | undefined>(undefined)
+  // a card to bring into view: one just opened, or one the Needs you list points at
+  const [focus, setFocus] = useState<string | undefined>(() => takeFocus(project))
+  useEffect(() => {
+    const look = (): void => {
+      const card = takeFocus(project)
+      if (card) setFocus(card)
+    }
+    addEventListener('orchestra:focus', look)
+    return () => removeEventListener('orchestra:focus', look)
+  }, [project])
 
   useEffect(() => {
     window.api.loadCreate(project).then(setPlan)
@@ -68,6 +80,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       void window.api.listOutputs(project).then(setOutputs, () => {})
       void window.api.agentStates(project).then(setAgents, () => {})
       void window.api.listProposals(project).then(setProposals, () => {})
+      void window.api.listAsks(project).then(setAsks, () => {})
     }
     load()
     return window.api.onChatEvent((e) => {
@@ -80,7 +93,17 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   function confirm(on: boolean): void {
     setConfirmed(on)
     remember(`confirmed:${project}`, on ? ['1'] : [])
-    if (on) setFocus(`chat-${plan!.selected[0]}`)
+    if (!on) return
+    setFocus('orchestrator')
+    // the Orchestrator takes it from here: it asks which deliverable to start with
+    const names = plan!.selected.map((id) => musician(id)?.name ?? id).join(', ')
+    void window.api
+      .sendChat(
+        project,
+        GENERAL,
+        `I have confirmed my deliverables: ${names}. Walk me through making them.`
+      )
+      .catch((e) => setError(reason(e)))
   }
   async function choose(ids: string[]): Promise<void> {
     setError('')
@@ -174,14 +197,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         style={{ left: 0, top: 0, width: 1, height: 1 }}
       >
         {wires.map((w) => (
-          <line
-            key={w.key}
-            x1={w.x1}
-            y1={w.y1}
-            x2={w.x2}
-            y2={w.y2}
-            className={`fill-none stroke-wire [stroke-dasharray:5_5] [stroke-width:1.4] transition-opacity duration-200 ${w.on ? '' : 'opacity-15'}`}
-          />
+          <Wire key={w.key} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} dim={!w.on} />
         ))}
       </svg>
 
@@ -360,30 +376,62 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     </>
   )
 
-  // once confirmed, each chosen deliverable's window, in a row under the circle
-  const cards: CardSpec[] = confirmed
-    ? chosen.map((id, i) => ({
-        id: `chat-${id}`,
-        title: musician(id)!.name,
-        count: chats.find((c) => c.id === id)?.busy ? 'playing' : undefined,
-        x: windowX(i, chosen.length),
-        y: WINDOWS_Y,
-        w: WINDOW_W,
-        body: (
-          <ChatPanel
-            project={project}
-            chat={id}
-            plan={plan}
-            onSelected={(ids) => {
-              // a Musician approved in the chat is new to the library too, so reload it
-              if (ids.every((x) => plan.musicians.some((m) => m.id === x)))
-                setPlan({ ...plan, selected: ids })
-              else void window.api.loadCreate(project).then(setPlan)
-            }}
-          />
-        )
-      }))
-    : []
+  // once confirmed: the Orchestrator's window under the circle, every deliverable's window
+  // below it, and the windows the Orchestrator opens to ask you things beside it; all wired to
+  // the Orchestrator, because it is the only one you talk to
+  const pending = (chat: string): boolean =>
+    Object.values(proposals).some((p) => p.chat === chat && p.status === 'pending')
+  const asked = Object.values(asks).sort((a, b) => a.t.localeCompare(b.t))
+  const cards: CardSpec[] = !confirmed
+    ? []
+    : [
+        {
+          id: 'orchestrator',
+          title: 'Orchestrator',
+          count: chats.find((c) => c.id === GENERAL)?.busy ? 'thinking' : undefined,
+          x: -ORCH_W / 2,
+          y: WINDOWS_Y,
+          w: ORCH_W,
+          tone: 'paper' as const,
+          needsYou: pending(GENERAL),
+          body: (
+            <ChatPanel
+              project={project}
+              chat={GENERAL}
+              plan={plan}
+              onSelected={(ids) => {
+                // a Musician approved in the chat is new to the library too, so reload it
+                if (ids.every((x) => plan.musicians.some((m) => m.id === x)))
+                  setPlan({ ...plan, selected: ids })
+                else void window.api.loadCreate(project).then(setPlan)
+              }}
+            />
+          )
+        },
+        ...asked.map((a, i) => ({
+          id: `ask-${a.id}`,
+          title: a.title,
+          count: a.status === 'answered' ? 'answered' : undefined,
+          // beside the Orchestrator, alternating sides
+          x: i % 2 ? ORCH_W / 2 + 48 : -ORCH_W / 2 - 48 - ASK_W,
+          y: WINDOWS_Y + Math.floor(i / 2) * 336,
+          w: ASK_W,
+          link: 'orchestrator',
+          needsYou: a.status === 'open',
+          body: <AskWindow project={project} ask={a} onError={setError} />
+        })),
+        ...chosen.map((id, i) => ({
+          id: `chat-${id}`,
+          title: musician(id)!.name,
+          count: chats.find((c) => c.id === id)?.busy ? 'playing' : undefined,
+          x: windowX(i, chosen.length),
+          y: WINDOWS_Y + 960,
+          w: WINDOW_W,
+          link: 'orchestrator',
+          needsYou: pending(id),
+          body: <ChatPanel project={project} chat={id} plan={plan} view="work" />
+        }))
+      ]
 
   return (
     <Board
@@ -431,6 +479,88 @@ function remember(key: string, value: string[]): void {
 }
 
 const NO_PLAN: CreateState = { musicians: [], instruments: [], selected: [] }
+const ORCH_W = 640
+const ASK_W = 432
+
+/** A window the Orchestrator opened to ask one thing: its options to pick from, and a line to
+ * refine them. Picking answers it; either way the Orchestrator hears back. */
+function AskWindow({
+  project,
+  ask,
+  onError
+}: {
+  project: string
+  ask: Ask
+  onError: (e: string) => void
+}): React.JSX.Element {
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+  async function answer(value: string, final: boolean): Promise<void> {
+    if (!value.trim()) return
+    setSending(true)
+    try {
+      await window.api.answerAsk(project, ask.id, value, final)
+      setText('')
+    } catch (e) {
+      onError(reason(e))
+    }
+    setSending(false)
+  }
+  const done = ask.status === 'answered'
+  return (
+    <div className="p-5">
+      <p className="type-body-m text-fg">{ask.question}</p>
+      <div className="mt-4 flex flex-col gap-2">
+        {ask.options.map((o) => {
+          const picked = done && ask.answer === o
+          return (
+            <button
+              key={o}
+              disabled={sending || done}
+              onClick={() => void answer(o, true)}
+              className={`flex items-center justify-between border px-3 py-2.5 text-left type-label-m ${
+                picked
+                  ? 'border-brand bg-brand text-on-brand'
+                  : done
+                    ? 'border-hair text-dim'
+                    : 'border-card-line text-link hover:bg-selected'
+              }`}
+            >
+              {o}
+              {picked && <Icon name="check-line" size={16} />}
+            </button>
+          )
+        })}
+      </div>
+      {!done && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void answer(text, false)
+          }}
+          className="mt-4"
+        >
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            disabled={sending}
+            placeholder="Not quite? Say what to change, then Enter"
+            aria-label={`Refine ${ask.title}`}
+            className="w-full border-0 border-b-2 border-brand bg-transparent py-1.5 type-body-s text-link outline-none placeholder:text-placeholder focus-visible:outline-none"
+          />
+        </form>
+      )}
+    </div>
+  )
+}
+
+/** A card the Needs you list asked to show in this project, taken once. */
+function takeFocus(project: string): string | undefined {
+  const want = pendingFocus.current
+  if (!want || want.project !== project) return undefined
+  pendingFocus.current = null
+  return want.card
+}
 
 /** One conversation with the Orchestrator, laid out as C7: the chat (or the agent channel),
  * then the agents' status and the files made, then the reply box. It is the card a seat opens
@@ -441,7 +571,7 @@ export function ChatPanel({
   chat,
   plan = NO_PLAN,
   composer = true,
-  chatOnly = false,
+  view = 'full',
   projects = [],
   onGo,
   onSelected = () => {}
@@ -450,7 +580,10 @@ export function ChatPanel({
   chat: string
   plan?: CreateState
   composer?: boolean
-  chatOnly?: boolean // just the back-and-forth (the bar's window), no agents or files
+  // full: everything (a window on the board) · conversation: just the back-and-forth (the bar's
+  // window) · agents: their status and what the Orchestrator says to them (beside the bar) ·
+  // work: a deliverable's window, its agents and files, no talking (you talk to the Orchestrator)
+  view?: 'full' | 'conversation' | 'agents' | 'work'
   projects?: { id: string; name: string }[] // for the cards a "Go to:" line makes
   onGo?: (place: Place) => void
   onSelected?: (ids: string[]) => void
@@ -544,40 +677,79 @@ export function ChatPanel({
   ).length
   const files = focus ? filesFor(focus, plan.instruments, outputs) : outputs
 
-  return (
-    <div className={`flex flex-col ${chatOnly ? 'h-full min-h-0' : ''}`}>
-      <div
-        className={`flex shrink-0 items-center justify-between gap-4 border-b border-hair px-5 py-3 ${chatOnly ? 'hidden' : ''}`}
-      >
-        <p className="line-clamp-2 type-caption text-fg-2">
-          {studio
-            ? 'Every project, with the Orchestrator'
-            : focus
-              ? focus.deliverable
-              : 'The whole project, with the Orchestrator'}
-        </p>
-        <div role="radiogroup" aria-label="View" className="flex shrink-0 border border-line">
-          {(
-            [
-              [false, 'Conversation'],
-              [true, 'Agent channel']
-            ] as const
-          ).map(([on, label]) => (
-            <button
-              key={label}
-              role="radio"
-              aria-checked={channel === on}
-              onClick={() => setChannel(on)}
-              className={`flex h-7 items-center px-2.5 transition-colors duration-150 ${channel === on ? 'bg-selected type-current-s text-link' : 'type-label-s text-fg-2 hover:text-link'}`}
-            >
-              {label}
-            </button>
-          ))}
+  const status = (
+    <section className="px-5 py-3">
+      <h3 className="type-label-mono text-link">Agent status</h3>
+      <div className="mt-2">
+        <Score plan={plan} focus={focus?.id} busy={busy} outputs={outputs} agents={agents} />
+      </div>
+    </section>
+  )
+  const made = (
+    <section className="border-t border-hair">
+      <h3 className="px-5 pt-3 type-label-mono text-link">Created files · {files.length}</h3>
+      <Files project={project} outputs={files} />
+    </section>
+  )
+
+  if (view === 'work')
+    return (
+      <div className="flex flex-col">
+        {focus && (
+          <p className="border-b border-hair px-5 py-3 type-caption text-fg-2">
+            {focus.deliverable}
+          </p>
+        )}
+        {status}
+        {made}
+      </div>
+    )
+  if (view === 'agents')
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        {!studio && <div className="shrink-0 border-b border-hair">{status}</div>}
+        <h3 className="shrink-0 px-5 pt-3 type-label-mono text-link">To its agents</h3>
+        <div className="flex min-h-0 flex-1 flex-col px-5">
+          <AgentChannel log={log} busy={busy || working > 0} onStop={stop} plan={plan} />
         </div>
       </div>
+    )
 
-      <div className={`flex flex-col px-5 ${chatOnly ? 'min-h-0 flex-1' : 'min-h-[220px]'}`}>
-        {channel ? (
+  const only = view === 'conversation'
+  return (
+    <div className={`flex flex-col ${only ? 'h-full min-h-0' : ''}`}>
+      {!only && (
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-hair px-5 py-3">
+          <p className="line-clamp-2 type-caption text-fg-2">
+            {studio
+              ? 'Every project, with the Orchestrator'
+              : focus
+                ? focus.deliverable
+                : 'The whole project, with the Orchestrator'}
+          </p>
+          <div role="radiogroup" aria-label="View" className="flex shrink-0 border border-line">
+            {(
+              [
+                [false, 'Conversation'],
+                [true, 'Agent channel']
+              ] as const
+            ).map(([on, label]) => (
+              <button
+                key={label}
+                role="radio"
+                aria-checked={channel === on}
+                onClick={() => setChannel(on)}
+                className={`flex h-7 items-center px-2.5 transition-colors duration-150 ${channel === on ? 'bg-selected type-current-s text-link' : 'type-label-s text-fg-2 hover:text-link'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className={`flex flex-col px-5 ${only ? 'min-h-0 flex-1' : 'min-h-[220px]'}`}>
+        {channel && !only ? (
           <AgentChannel log={log} busy={busy || working > 0} onStop={stop} plan={plan} />
         ) : (
           <Conversation
@@ -590,7 +762,7 @@ export function ChatPanel({
             onAdd={add}
             onAnswer={send}
             onDecide={decide}
-            scroll={chatOnly}
+            scroll={only}
             projects={projects}
             here={studio ? undefined : project}
             onGo={onGo}
@@ -605,21 +777,6 @@ export function ChatPanel({
           </p>
         )}
       </div>
-
-      {!studio && !chatOnly && (
-        <>
-          <section className="border-t border-hair px-5 py-3">
-            <h3 className="type-label-mono text-link">Agent status</h3>
-            <div className="mt-2">
-              <Score plan={plan} focus={focus?.id} busy={busy} outputs={outputs} agents={agents} />
-            </div>
-          </section>
-          <section className="border-t border-hair">
-            <h3 className="px-5 pt-3 type-label-mono text-link">Created files · {files.length}</h3>
-            <Files project={project} outputs={files} />
-          </section>
-        </>
-      )}
 
       {composer && (
         <div className="shrink-0 border-t border-hair px-5">

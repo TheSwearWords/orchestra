@@ -154,6 +154,11 @@ const api = {
     ipcRenderer.invoke('create:save', project, ids),
   listChats: (project: string): Promise<ChatInfo[]> => ipcRenderer.invoke('chats:list', project),
   listThreads: (project: string): Promise<Thread[]> => ipcRenderer.invoke('chats:threads', project),
+  graphStatus: (project: string): Promise<'none' | 'building' | 'ready'> =>
+    ipcRenderer.invoke('graph:status', project),
+  loadGraph: (project: string | null): Promise<unknown> =>
+    ipcRenderer.invoke('graph:load', project),
+  buildGraph: (project: string | null): Promise<void> => ipcRenderer.invoke('graph:build', project),
   loadChat: (
     project: string,
     chat: string

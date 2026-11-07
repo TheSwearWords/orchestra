@@ -436,6 +436,18 @@ app.whenReady().then(async () => {
     projectDir(project)
     return knowledge.status(project)
   })
+  // the Knowledge window: a graph to draw (a project's, or every project's), and builds on demand
+  ipcMain.handle('graph:load', (_, project: string | null) => {
+    if (project !== null) projectDir(project)
+    return knowledge.load(project)
+  })
+  ipcMain.handle('graph:build', async (_, project: string | null) => {
+    const ids = project === null ? (await listProjects(PROJECTS_DIR)).map((p) => p.id) : [project]
+    ids.forEach((id) => {
+      projectDir(id)
+      knowledge.touch(id)
+    })
+  })
   ipcMain.handle('sites:add', (_, site: Site) => addSite(ORCHESTRA_HOME, site))
 
   ipcMain.handle('create:load', async (_, project: string) => {

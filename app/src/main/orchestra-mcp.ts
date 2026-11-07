@@ -37,6 +37,7 @@ export interface Hub {
     done: boolean
   ): Promise<string>
   proposeMusician(project: string, chat: string, draft: MusicianDraft): Promise<string>
+  queryGraph(project: string, question: string): Promise<string>
   openWindow(
     project: string,
     chat: string,
@@ -72,6 +73,18 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
   const role = await hub.roleOf(project, agent)
   const choices = await hub.choices(project, agent)
   const list = choices.map((c) => `${c.id} (${c.name})`).join(', ') || 'none'
+
+  if (role === 'orchestrator' || role === 'musician') {
+    mcp.registerTool(
+      'ask_graph',
+      {
+        description:
+          'Ask the knowledge graph before reading files: it links everything in the project (notes, research, references, decisions, what agents made) and answers from those links, citing files you can then read. In the Studio it covers every project, so it answers questions across them (which typefaces the user keeps picking, where a palette came from). Ask in plain words.',
+        inputSchema: { question: z.string() }
+      },
+      ({ question }) => run(() => hub.queryGraph(project, question))
+    )
+  }
 
   if (role === 'orchestrator') {
     mcp.registerTool(

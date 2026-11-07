@@ -55,11 +55,13 @@ test('each level gets only its own tools', async () => {
   try {
     const c = conductor(dir)
     assert.deepEqual(await toolsFor(c, 'orchestrator'), [
+      'ask_graph',
       'brief_musician',
       'open_window',
       'propose_musician'
     ])
     assert.deepEqual(await toolsFor(c, 'website'), [
+      'ask_graph',
       'propose_instrument',
       'report',
       'run_instrument'

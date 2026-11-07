@@ -55,6 +55,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const [agents, setAgents] = useState<Record<string, AgentState>>({})
   const [proposals, setProposals] = useState<Record<string, Proposal>>({})
   const [asks, setAsks] = useState<Record<string, Ask>>({})
+  const [general, setGeneral] = useState<ChatMessage[]>([]) // the Orchestrator's chat
   const [error, setError] = useState('')
   const [hover, setHover] = useState<string | null>(null) // a foundation pointed at
   // shortcut: confirmed is per viewer (localStorage); move it into deliverables.md if it
@@ -83,8 +84,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       void window.api.listAsks(project).then(setAsks, () => {})
     }
     load()
+    void window.api.loadChat(project, GENERAL).then(
+      (c) => setGeneral(c.messages),
+      () => {}
+    )
     return window.api.onChatEvent((e) => {
-      if (e.project === project && e.kind !== 'live' && e.kind !== 'log') load()
+      if (e.project !== project) return
+      if (e.chat === GENERAL && e.kind === 'message') setGeneral((m) => [...m, e.message])
+      if (e.kind !== 'live' && e.kind !== 'log') load()
     })
   }, [project, plan?.selected])
 
@@ -381,10 +388,26 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   // wired to the Orchestrator, because it is the only one you talk to
   const pending = (chat: string): boolean =>
     Object.values(proposals).some((p) => p.chat === chat && p.status === 'pending')
+  // what the Orchestrator is waiting on, all in the Action box: approvals, its latest
+  // unanswered question, deliverables it suggests, and the choices it put there
+  const approvals = Object.values(proposals).filter((p) => p.status === 'pending')
+  const lastSaid = general
+    .map((m, i) => ({ m, i }))
+    .filter((x) => x.m.role === 'orchestrator')
+    .at(-1)
+  const answered = lastSaid && general.slice(lastSaid.i + 1).some((m) => m.role === 'user')
+  const generalBusy = !!chats.find((c) => c.id === GENERAL)?.busy
+  const parsed =
+    lastSaid && !answered
+      ? splitSuggestion(lastSaid.m.text, new Set(plan.musicians.map((m) => m.id)))
+      : null
+  const question = parsed ? splitDecision(parsed.body).decision : null
+  const suggested = (parsed?.ids ?? []).filter((id) => !plan.selected.includes(id))
   // only open choices: once picked, a choice leaves the box
   const asked = Object.values(asks)
     .filter((a) => a.status === 'open')
     .sort((a, b) => a.t.localeCompare(b.t))
+  const waiting = approvals.length + (question ? 1 : 0) + (suggested.length ? 1 : 0) + asked.length
   const cards: CardSpec[] = !confirmed
     ? []
     : [
@@ -404,6 +427,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               chat={GENERAL}
               plan={plan}
               fill
+              elsewhere
               onSelected={(ids) => {
                 // a Musician approved in the chat is new to the library too, so reload it
                 if (ids.every((x) => plan.musicians.some((m) => m.id === x)))
@@ -416,22 +440,65 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         {
           id: 'actions',
           title: 'Action',
-          count: asked.length ? `${asked.length} to choose` : undefined,
+          count: waiting ? `${waiting} waiting` : undefined,
           x: ORCH_W / 2 + 48,
           y: WINDOWS_Y,
           w: ASK_W,
           link: 'orchestrator',
-          needsYou: asked.length > 0,
-          body: asked.length ? (
+          needsYou: waiting > 0,
+          body: waiting ? (
             <div className="divide-y divide-hair">
+              {approvals.map((p) => (
+                <div key={p.id} className="p-5">
+                  <Approval
+                    p={p}
+                    musicians={plan.musicians}
+                    onDecide={async (yes) => {
+                      setError('')
+                      try {
+                        await window.api.decideProposal(project, p.chat, p.id, yes)
+                        if (yes && p.id.startsWith('musician:'))
+                          setPlan(await window.api.loadCreate(project))
+                      } catch (e) {
+                        setError(reason(e))
+                      }
+                    }}
+                  />
+                </div>
+              ))}
+              {question && (
+                <div className="p-5">
+                  <DecisionCard
+                    decision={question}
+                    disabled={generalBusy}
+                    onPick={(label) =>
+                      window.api.sendChat(project, GENERAL, label).then(
+                        () => true,
+                        (e) => {
+                          setError(reason(e))
+                          return false
+                        }
+                      )
+                    }
+                  />
+                </div>
+              )}
+              {suggested.length > 0 && (
+                <div className="p-5">
+                  <Suggestion
+                    items={plan.musicians.filter((m) => suggested.includes(m.id))}
+                    added={false}
+                    onAdd={() => choose([...plan.selected, ...suggested])}
+                  />
+                </div>
+              )}
               {asked.map((a) => (
                 <AskWindow key={a.id} project={project} ask={a} onError={setError} />
               ))}
             </div>
           ) : (
             <p className="p-5 type-body-s text-dim">
-              Nothing to choose right now. When a choice is easier seen than described, the
-              Orchestrator puts it here.
+              Nothing waiting on you. When the Orchestrator asks you something, it appears here.
             </p>
           )
         },
@@ -568,6 +635,17 @@ function AskWindow({
   )
 }
 
+/** Where a question or approval used to sit in the chat: it's answered in the Action box. */
+function ActionNote({ text, done }: { text: string; done: boolean }): React.JSX.Element {
+  return (
+    <p className="mt-3 flex items-center gap-2 type-caption text-dim">
+      <span className={`size-2 rounded-full ${done ? 'border border-wire' : 'bg-needs-you'}`} />
+      {done ? 'Answered in the Action box: ' : 'Waiting in the Action box: '}
+      <span className="truncate text-link">{text}</span>
+    </p>
+  )
+}
+
 /** A card the Needs you list asked to show in this project, taken once. */
 function takeFocus(project: string): string | undefined {
   const want = pendingFocus.current
@@ -587,6 +665,7 @@ export function ChatPanel({
   composer = true,
   view = 'full',
   fill = false,
+  elsewhere = false,
   projects = [],
   onGo,
   onSelected = () => {}
@@ -600,6 +679,7 @@ export function ChatPanel({
   // work: a deliverable's window, its agents and files, no talking (you talk to the Orchestrator)
   view?: 'full' | 'conversation' | 'agents' | 'work'
   fill?: boolean // fill a fixed-height window; the conversation scrolls inside it
+  elsewhere?: boolean // its questions and approvals appear in the Action box instead
   projects?: { id: string; name: string }[] // for the cards a "Go to:" line makes
   onGo?: (place: Place) => void
   onSelected?: (ids: string[]) => void
@@ -780,6 +860,7 @@ export function ChatPanel({
             onAnswer={send}
             onDecide={decide}
             scroll={scrolls}
+            elsewhere={elsewhere}
             projects={projects}
             here={studio ? undefined : project}
             onGo={onGo}
@@ -829,7 +910,8 @@ function Conversation({
   scroll,
   projects,
   here,
-  onGo
+  onGo,
+  elsewhere = false
 }: {
   messages: ChatMessage[]
   busy: boolean
@@ -844,6 +926,7 @@ function Conversation({
   projects: { id: string; name: string }[]
   here?: string
   onGo?: (place: Place) => void
+  elsewhere?: boolean // the questions and approvals show in the Action box, not here
 }): React.JSX.Element {
   const end = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -885,9 +968,12 @@ function Conversation({
           )
         if (m.role === 'proposal') {
           const p = m.ref ? proposals[m.ref] : undefined
-          return p ? (
+          if (!p) return null
+          return elsewhere ? (
+            <ActionNote key={i} done={p.status !== 'pending'} text={m.text} />
+          ) : (
             <Approval key={i} p={p} musicians={musicians} onDecide={(yes) => onDecide(p.id, yes)} />
-          ) : null
+          )
         }
         const went = splitGoTo(m.text, projectIds, here)
         const split = splitSuggestion(went.body, known)
@@ -927,7 +1013,13 @@ function Conversation({
                 </button>
               )
             })}
-            {decision && (
+            {elsewhere && (decision || ids.length > 0) && (
+              <ActionNote
+                done={!!reply || (ids.length > 0 && ids.every((id) => selected.includes(id)))}
+                text={decision ? decision.question : 'Suggested deliverables'}
+              />
+            )}
+            {!elsewhere && decision && (
               <DecisionCard
                 decision={decision}
                 answer={reply?.text}
@@ -935,7 +1027,7 @@ function Conversation({
                 onPick={onAnswer}
               />
             )}
-            {ids.length > 0 && (
+            {!elsewhere && ids.length > 0 && (
               <Suggestion
                 items={musicians.filter((x) => ids.includes(x.id))}
                 added={ids.every((id) => selected.includes(id))}

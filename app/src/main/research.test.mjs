@@ -77,9 +77,13 @@ test('sites: defaults first, then the user’s own', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'orchestra-sites-'))
   try {
     assert.equal((await listSites(dir)).length, DEFAULT_SITES.length)
-    await addSite(dir, { name: 'Godly', url: 'godly.website' })
+    await addSite(dir, { name: 'Godly', url: 'godly.website', about: '  Web design,\n curated ' })
     const sites = await listSites(dir)
-    assert.deepEqual(sites.at(-1), { name: 'Godly', url: 'https://godly.website/' })
+    assert.deepEqual(sites.at(-1), {
+      name: 'Godly',
+      url: 'https://godly.website/',
+      about: 'Web design, curated'
+    })
     await assert.rejects(addSite(dir, { name: ' ', url: 'x.com' }))
   } finally {
     await rm(dir, { recursive: true, force: true })

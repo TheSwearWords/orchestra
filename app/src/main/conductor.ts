@@ -180,6 +180,7 @@ export interface ConductorOptions {
   agentPrompt: (project: string, key: string) => Promise<string>
   /** Folders outside the project agents may read (the agent library). */
   extraDirs: (project: string) => string[] // more folders its sessions may read
+  queryGraph?: (project: string | null, question: string) => Promise<string>
   /** Writes an approved proposal into the library. */
   adopt: (p: Proposal) => Promise<void>
   /** Adds a newly approved Musician to the project's deliverables. */
@@ -503,6 +504,12 @@ export class Conductor implements Hub {
 
   async asks(project: string): Promise<Record<string, Ask>> {
     return readAsks(this.opts.projectDir(project))
+  }
+
+  /** A question for the knowledge graph: the project's, or in the Studio the whole vault's. */
+  async queryGraph(project: string, question: string): Promise<string> {
+    if (!this.opts.queryGraph) return 'There is no knowledge graph in this version. Read the files.'
+    return this.opts.queryGraph(project === STUDIO ? null : project, question)
   }
 
   async proposeMusician(project: string, chat: string, draft: MusicianDraft): Promise<string> {

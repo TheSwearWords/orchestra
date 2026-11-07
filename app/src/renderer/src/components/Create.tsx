@@ -12,19 +12,22 @@ import type {
 import { foundationOrder } from '../../../main/plan'
 import { Board, type CardSpec } from '../canvas/Board'
 import type { Frame } from '../canvas/Book'
-import { GENERAL, STUDIO } from '../canvas/shared'
+import { STUDIO } from '../canvas/shared'
 import {
   PODIUM,
   PREREQS,
   SEAT,
-  besideSeat,
+  WINDOWS_Y,
+  WINDOW_W,
   filesFor,
   outputPaths,
   ring,
-  seatArc
+  seatRow,
+  windowX
 } from '../canvas/stage'
 import { splitDecision, type Decision } from '../decide'
 import { splitSuggestion } from '../suggest'
+import { splitGoTo, type Place } from '../goto'
 import { Icon } from './Icon'
 import { Markdown } from './Research'
 
@@ -38,10 +41,11 @@ const solidButton =
 const outlineButton =
   'flex h-9 shrink-0 items-center gap-2 border border-line-strong bg-canvas px-4 type-label-m transition-[background-color,scale] duration-150 hover:bg-muted active:scale-[0.97]'
 
-/** II · Create, one artboard: the stage (every deliverable a seat around the Deliverables
- * podium, the foundations they need ringing the Prerequisites circle), and the windows you
- * open on it. Clicking a chosen seat opens its chat, agents and files in a card beside it;
- * clicking the podium does the same for the whole project (General). Nothing navigates away. */
+/** II · Create, one artboard. First you choose: every deliverable sits in one row, chosen ones
+ * turn blue and wire down to the Deliverables circle and up to the foundations they need on
+ * the Prerequisites ring. Hovering the circle with something chosen makes it Confirm. Once
+ * confirmed, each chosen deliverable opens its own window in a row under the circle: its
+ * chat, agents and files. Before that, nothing opens. */
 export function Create({ project, frame }: { project: string; frame: Frame }): React.JSX.Element {
   const [plan, setPlan] = useState<CreateState | null>(null)
   const [chats, setChats] = useState<ChatInfo[]>([])
@@ -49,9 +53,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const [agents, setAgents] = useState<Record<string, AgentState>>({})
   const [proposals, setProposals] = useState<Record<string, Proposal>>({})
   const [error, setError] = useState('')
-  const [hover, setHover] = useState<string | null>(null) // a seat or foundation pointed at
-  // the cards open on the stage, kept per project for next time
-  const [open, setOpen] = useState<string[]>(() => remembered(`open:${project}`))
+  const [hover, setHover] = useState<string | null>(null) // a foundation pointed at
+  // shortcut: confirmed is per viewer (localStorage); move it into deliverables.md if it
+  // should follow the project to other machines
+  const [confirmed, setConfirmed] = useState(() => remembered(`confirmed:${project}`).length > 0)
   const [focus, setFocus] = useState<string | undefined>(undefined)
 
   useEffect(() => {
@@ -72,20 +77,17 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
 
   if (!plan) return <div className="bg-dots h-full" />
 
-  function show(ids: string[]): void {
-    setOpen(ids)
-    remember(`open:${project}`, ids)
+  function confirm(on: boolean): void {
+    setConfirmed(on)
+    remember(`confirmed:${project}`, on ? ['1'] : [])
+    if (on) setFocus(`chat-${plan!.selected[0]}`)
   }
-  const openCard = (id: string): void => {
-    if (!open.includes(id)) show([...open, id])
-    setFocus(id)
-  }
-  const closeCard = (id: string): void => show(open.filter((o) => o !== id))
-
   async function choose(ids: string[]): Promise<void> {
     setError('')
     try {
-      setPlan({ ...plan!, selected: await window.api.saveDeliverables(project, ids) })
+      const saved = await window.api.saveDeliverables(project, ids)
+      setPlan({ ...plan!, selected: saved })
+      if (!saved.length) confirm(false) // nothing left to have confirmed
     } catch (e) {
       setError(reason(e))
     }
@@ -93,42 +95,77 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   async function seatMenu(id: string): Promise<void> {
     const chosen = plan!.selected.includes(id)
     const c = await window.api.menu([
-      { id: 'open', label: 'Open', enabled: chosen },
-      { id: 'toggle', label: chosen ? 'Remove from the project' : 'Add to the project' }
+      { id: 'toggle', label: chosen ? 'Take off the stage' : 'Choose' }
     ])
-    if (c === 'open') openCard(id)
     if (c !== 'toggle') return
     if (!chosen) return void choose([...plan!.selected, id])
     const started = chats.find((x) => x.id === id)?.count
-    if (started && !confirm('Its chat and files stay in the project. Take it off the stage?'))
+    if (
+      started &&
+      !window.confirm('Its chat and files stay in the project. Take it off the stage?')
+    )
       return
-    closeCard(id)
     void choose(plan!.selected.filter((s) => s !== id))
   }
+  /** A seat click: before confirming it chooses or unchooses; after, it shows the window. */
+  function seat(id: string): void {
+    const chosen = plan!.selected.includes(id)
+    if (confirmed && chosen) return setFocus(`chat-${id}`)
+    void choose(chosen ? plan!.selected.filter((s) => s !== id) : [...plan!.selected, id])
+  }
 
-  const seats = seatArc(plan.musicians)
+  const seats = seatRow(plan.musicians)
   const at = new Map(seats.map((s) => [s.id, s]))
+  const musician = (id: string): Musician | undefined => plan.musicians.find((m) => m.id === id)
+  const chosen = plan.selected.filter((id) => at.has(id))
   const foundations = plan.instruments.filter((i) =>
     plan.musicians.some((m) => m.prerequisites.includes(i.id))
   )
-  const lit = new Set(
-    foundationOrder(plan.musicians, plan.instruments, plan.selected).map((i) => i.id)
-  )
+  const lit = new Set(foundationOrder(plan.musicians, plan.instruments, chosen).map((i) => i.id))
   const spots = ring(foundations.length, PREREQS.x, PREREQS.y, PREREQS.ring)
+  const spot = new Map(foundations.map((f, i) => [f.id, spots[i]]))
   const exists = (output: string): boolean =>
     outputPaths(output).some((p) => outputs.some((o) => o.path === p || o.path.startsWith(p)))
   const making = (id: string): boolean =>
     Object.entries(agents).some(([k, a]) => k.endsWith(`--${id}`) && a.status === 'working')
-  const musician = (id: string): Musician | undefined => plan.musicians.find((m) => m.id === id)
-  // wires show only what you point at: a seat's foundations, or a foundation's seats
-  const wired = foundations.flatMap((f, i) =>
-    plan.selected
-      .filter((sid) => musician(sid)?.prerequisites.includes(f.id))
-      .filter((sid) => hover === f.id || hover === sid)
-      .map((sid) => ({ key: f.id + sid, from: spots[i], to: at.get(sid)! }))
-  )
 
-  const extent = { x: -1200, y: -1560, w: 2400, h: 1760 }
+  // every chosen seat wires down to the circle and up to each foundation it needs
+  const wires = chosen.flatMap((id) => {
+    const s = at.get(id)!
+    const down = {
+      key: `${id}-down`,
+      x1: s.x,
+      y1: s.y + SEAT.h / 2,
+      x2: PODIUM.x,
+      y2: PODIUM.y - PODIUM.r,
+      on: true
+    }
+    const up = musician(id)!
+      .prerequisites.filter((f) => spot.has(f))
+      .map((f) => ({
+        key: `${id}-${f}`,
+        x1: s.x,
+        y1: s.y - SEAT.h / 2,
+        x2: spot.get(f)!.x,
+        y2: spot.get(f)!.y,
+        on: !hover || hover === f
+      }))
+    return [down, ...up]
+  })
+
+  const extent = {
+    x: seats[0].x - SEAT.w,
+    y: PREREQS.y - PREREQS.ring - 80,
+    w: -seats[0].x * 2 + SEAT.w * 2,
+    h: PODIUM.y + PODIUM.r - (PREREQS.y - PREREQS.ring) + 160
+  }
+  // what the windows must keep clear of
+  const obstacles = [
+    { x: seats[0].x - SEAT.w / 2, y: -SEAT.h / 2, w: -seats[0].x * 2 + SEAT.w, h: SEAT.h },
+    { x: PODIUM.x - PODIUM.r, y: PODIUM.y - PODIUM.r, w: PODIUM.r * 2, h: PODIUM.r * 2 }
+  ]
+  const ready = chosen.length > 0
+
   const world = (
     <>
       <svg
@@ -136,38 +173,17 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         className="pointer-events-none absolute overflow-visible"
         style={{ left: 0, top: 0, width: 1, height: 1 }}
       >
-        {wired.map((w) => (
+        {wires.map((w) => (
           <line
             key={w.key}
-            x1={w.from.x}
-            y1={w.from.y}
-            x2={w.to.x}
-            y2={w.to.y - SEAT.h / 2}
-            className="fill-none stroke-wire [stroke-dasharray:5_5] [stroke-width:1.4]"
+            x1={w.x1}
+            y1={w.y1}
+            x2={w.x2}
+            y2={w.y2}
+            className={`fill-none stroke-wire [stroke-dasharray:5_5] [stroke-width:1.4] transition-opacity duration-200 ${w.on ? '' : 'opacity-15'}`}
           />
         ))}
       </svg>
-
-      {/* the podium: the Orchestrator, with every deliverable seated round it */}
-      <button
-        onClick={() => openCard(GENERAL)}
-        title="Talk to the Orchestrator about the whole project"
-        className="bg-poster-dots absolute flex flex-col items-center justify-center gap-2 rounded-full shadow-card"
-        style={{
-          left: PODIUM.x - PODIUM.r,
-          top: PODIUM.y - PODIUM.r,
-          width: PODIUM.r * 2,
-          height: PODIUM.r * 2
-        }}
-      >
-        <span className="flex size-16 items-center justify-center rounded-full bg-white text-link">
-          <Icon name="logo-mark" size={36} />
-        </span>
-        <span className="type-heading-m">Deliverables</span>
-        <span className="type-label-s text-poster-dim">
-          {plan.selected.length} chosen · General
-        </span>
-      </button>
 
       {/* the Prerequisites circle, ringed by every foundation; lit when a chosen seat needs it */}
       <div
@@ -180,8 +196,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         }}
       >
         <span className="type-label-serif-l text-link">Prerequisites</span>
-        <span className="mt-1 type-caption text-dim">
-          {lit.size} of {foundations.length} needed
+        <span className="mt-1 px-4 type-caption text-dim">
+          {lit.size ? `${lit.size} of ${foundations.length} needed` : 'Built once, shared'}
         </span>
       </div>
       {foundations.map((f, i) => {
@@ -193,7 +209,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             onPointerEnter={() => on && setHover(f.id)}
             onPointerLeave={() => setHover(null)}
             title={`${f.job}\n→ ${f.output}`}
-            className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full px-3 py-1.5 type-label-s whitespace-nowrap ${
+            className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full px-3 py-1.5 type-label-s whitespace-nowrap transition-colors duration-200 ${
               !on
                 ? 'border border-dashed border-wire/40 bg-card text-placeholder'
                 : state === 'Ready'
@@ -219,106 +235,140 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           return (
             <button
               key="add"
-              onClick={() => openCard(GENERAL)}
+              onClick={() =>
+                document
+                  .querySelector<HTMLInputElement>('input[aria-label^="Message the Orchestrator"]')
+                  ?.focus()
+              }
               title="Ask the Orchestrator for a deliverable the library doesn't have"
-              className="absolute flex flex-col items-center justify-center gap-1 border border-dashed border-wire bg-card/70 text-link"
+              className="absolute flex flex-col items-center justify-center gap-1 border border-dashed border-wire bg-card/70 px-4 text-center text-link"
               style={style}
             >
               <span className="font-mono text-xl text-link/40">+</span>
               <span className="serif-on type-heading-m">Add a seat</span>
-              <span className="type-caption text-dim">Ask the Orchestrator</span>
+              <span className="type-caption text-dim">Ask the Orchestrator for one</span>
             </button>
           )
         const m = musician(s.id)!
-        const chosen = plan.selected.includes(m.id)
+        const on = chosen.includes(m.id)
         const c = chats.find((x) => x.id === m.id)
         // an approval waiting in its chat
         const needsYou = Object.values(proposals).some(
           (p) => p.chat === m.id && p.status === 'pending'
         )
-        const status = !chosen
-          ? 'Add'
-          : needsYou
-            ? 'Needs you'
-            : c?.busy
-              ? 'Playing'
-              : c?.count
-                ? 'Started'
-                : 'Not started'
+        const status = !on
+          ? 'Choose'
+          : !confirmed
+            ? 'Chosen'
+            : needsYou
+              ? 'Needs you'
+              : c?.busy
+                ? 'Playing'
+                : c?.count
+                  ? 'Started'
+                  : 'Not started'
         return (
           <button
             key={m.id}
-            onClick={() => (chosen ? openCard(m.id) : void choose([...plan.selected, m.id]))}
-            onPointerEnter={() => setHover(m.id)}
-            onPointerLeave={() => setHover(null)}
+            onClick={() => seat(m.id)}
             onContextMenu={(e) => {
               e.preventDefault()
               e.stopPropagation()
               void seatMenu(m.id)
             }}
-            title={chosen ? `Open ${m.name}` : `Add ${m.name}: ${m.deliverable}`}
-            aria-pressed={open.includes(m.id)}
-            className={`absolute flex flex-col items-center px-4 pt-5 pb-4 text-center transition-[background-color,outline-color] duration-200 ease-(--ease) ${
-              chosen
+            aria-pressed={on}
+            title={
+              on
+                ? confirmed
+                  ? `Show ${m.name}`
+                  : `Unchoose ${m.name}`
+                : `Choose ${m.name}: ${m.deliverable}`
+            }
+            className={`absolute flex flex-col items-center px-4 pt-5 pb-4 text-center transition-[background-color,color] duration-200 ease-(--ease) ${
+              on
                 ? 'bg-poster-dots shadow-card'
                 : 'border border-card-line bg-card text-link shadow-card hover:bg-selected'
-            } ${open.includes(m.id) ? 'outline-2 outline-offset-4 outline-brand' : ''}`}
+            }`}
             style={style}
           >
-            {needsYou && (
+            {needsYou && confirmed && (
               <span className="absolute -top-3 right-4 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
                 Needs you
               </span>
             )}
             <span
-              className={`flex size-14 shrink-0 items-center justify-center rounded-full ${chosen ? 'bg-white text-link' : 'bg-brand text-on-brand'}`}
+              className={`flex size-14 shrink-0 items-center justify-center rounded-full ${on ? 'bg-white text-link' : 'bg-brand text-on-brand'}`}
             >
               <Icon name={m.icon} size={26} />
             </span>
             <span className="mt-3 type-heading-m leading-none">{m.name}</span>
-            <span className={`mt-1.5 type-label-s ${chosen ? 'text-poster-dim' : 'text-dim'}`}>
+            <span className={`mt-1.5 type-label-s ${on ? 'text-poster-dim' : 'text-dim'}`}>
               {m.category}
             </span>
             <span
               className={`mt-2 rounded-full px-2.5 py-0.5 type-label-s ${
-                !chosen
-                  ? 'border border-dashed border-wire'
-                  : needsYou
-                    ? 'bg-needs-you text-on-needs-you'
-                    : 'bg-white text-link'
+                !on ? 'border border-dashed border-wire' : 'bg-white text-link'
               }`}
             >
               {status}
             </span>
             <span
-              className={`mt-2 line-clamp-2 type-caption ${chosen ? 'text-poster-dim' : 'text-dim'}`}
+              className={`mt-2 line-clamp-2 type-caption ${on ? 'text-poster-dim' : 'text-dim'}`}
             >
-              {chosen && c?.last ? c.last.text.replace(/\s+/g, ' ') : m.deliverable}
+              {on && confirmed && c?.last ? c.last.text.replace(/\s+/g, ' ') : m.deliverable}
             </span>
           </button>
         )
       })}
+
+      {/* the Deliverables circle: the prompt, then Confirm once something is chosen */}
+      <button
+        onClick={() => ready && confirm(!confirmed)}
+        disabled={!ready}
+        title={
+          !ready
+            ? 'Choose the deliverables this project needs'
+            : confirmed
+              ? 'Change what is chosen'
+              : 'Confirm these deliverables'
+        }
+        className={`group absolute flex flex-col items-center justify-center gap-1 rounded-full px-6 text-center shadow-card transition-colors duration-200 ease-(--ease) ${
+          ready ? 'bg-poster-dots hover:bg-inverse' : 'border border-card-line bg-card text-link'
+        }`}
+        style={{
+          left: PODIUM.x - PODIUM.r,
+          top: PODIUM.y - PODIUM.r,
+          width: PODIUM.r * 2,
+          height: PODIUM.r * 2
+        }}
+      >
+        <span className="type-heading-m">Deliverables</span>
+        {/* at rest: what to do; on hover, the action */}
+        <span
+          className={`type-label-s ${ready ? 'text-poster-dim group-hover:hidden' : 'text-dim'}`}
+        >
+          {!ready
+            ? 'Select your deliverables'
+            : `${chosen.length} chosen${confirmed ? ' · confirmed' : ''}`}
+        </span>
+        {ready && (
+          <span className="hidden type-label-serif-l group-hover:block">
+            {confirmed ? 'Change selection' : 'Confirm'}
+          </span>
+        )}
+      </button>
     </>
   )
 
-  // each open card sits beside its seat (General: beside the podium), until it is moved
-  const W = 520
-  const cards: CardSpec[] = open
-    .filter((id) => id === GENERAL || plan.selected.includes(id))
-    .map((id) => {
-      const spot =
-        id === GENERAL
-          ? { x: PODIUM.x + PODIUM.r + 48, y: PODIUM.y - 360 }
-          : besideSeat(at.get(id)!, W)
-      return {
+  // once confirmed, each chosen deliverable's window, in a row under the circle
+  const cards: CardSpec[] = confirmed
+    ? chosen.map((id, i) => ({
         id: `chat-${id}`,
-        title: id === GENERAL ? 'General' : musician(id)!.name,
+        title: musician(id)!.name,
         count: chats.find((c) => c.id === id)?.busy ? 'playing' : undefined,
-        x: spot.x,
-        y: spot.y,
-        w: W,
-        h: 800,
-        onClose: () => closeCard(id),
+        x: windowX(i, chosen.length),
+        y: WINDOWS_Y,
+        w: WINDOW_W,
         body: (
           <ChatPanel
             project={project}
@@ -332,8 +382,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             }}
           />
         )
-      }
-    })
+      }))
+    : []
 
   return (
     <Board
@@ -345,7 +395,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       preview={frame.preview}
       world={world}
       worldRect={extent}
-      focus={focus && `chat-${focus}`}
+      obstacles={obstacles}
+      focus={focus}
       top={
         error && (
           <p
@@ -361,7 +412,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   )
 }
 
-// Per-viewer memory of which cards are open; storage can be unavailable, so it is guarded.
+// Per-viewer memory (whether the stage is confirmed); storage can be unavailable, so it is
+// guarded.
 function remembered(key: string): string[] {
   try {
     const v = JSON.parse(localStorage.getItem(key) ?? '[]')
@@ -389,12 +441,18 @@ export function ChatPanel({
   chat,
   plan = NO_PLAN,
   composer = true,
+  chatOnly = false,
+  projects = [],
+  onGo,
   onSelected = () => {}
 }: {
   project: string
   chat: string
   plan?: CreateState
   composer?: boolean
+  chatOnly?: boolean // just the back-and-forth (the bar's window), no agents or files
+  projects?: { id: string; name: string }[] // for the cards a "Go to:" line makes
+  onGo?: (place: Place) => void
   onSelected?: (ids: string[]) => void
 }): React.JSX.Element {
   const studio = project === STUDIO
@@ -487,8 +545,10 @@ export function ChatPanel({
   const files = focus ? filesFor(focus, plan.instruments, outputs) : outputs
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-hair px-5 py-3">
+    <div className={`flex flex-col ${chatOnly ? 'h-full min-h-0' : ''}`}>
+      <div
+        className={`flex shrink-0 items-center justify-between gap-4 border-b border-hair px-5 py-3 ${chatOnly ? 'hidden' : ''}`}
+      >
         <p className="line-clamp-2 type-caption text-fg-2">
           {studio
             ? 'Every project, with the Orchestrator'
@@ -516,7 +576,7 @@ export function ChatPanel({
         </div>
       </div>
 
-      <div className="flex min-h-[220px] flex-1 flex-col px-5">
+      <div className={`flex flex-col px-5 ${chatOnly ? 'min-h-0 flex-1' : 'min-h-[220px]'}`}>
         {channel ? (
           <AgentChannel log={log} busy={busy || working > 0} onStop={stop} plan={plan} />
         ) : (
@@ -530,6 +590,10 @@ export function ChatPanel({
             onAdd={add}
             onAnswer={send}
             onDecide={decide}
+            scroll={chatOnly}
+            projects={projects}
+            here={studio ? undefined : project}
+            onGo={onGo}
           />
         )}
         {error && (
@@ -542,15 +606,15 @@ export function ChatPanel({
         )}
       </div>
 
-      {!studio && (
+      {!studio && !chatOnly && (
         <>
-          <section className="max-h-56 shrink-0 overflow-y-auto border-t border-hair px-5 py-3">
+          <section className="border-t border-hair px-5 py-3">
             <h3 className="type-label-mono text-link">Agent status</h3>
             <div className="mt-2">
               <Score plan={plan} focus={focus?.id} busy={busy} outputs={outputs} agents={agents} />
             </div>
           </section>
-          <section className="max-h-44 shrink-0 overflow-y-auto border-t border-hair">
+          <section className="border-t border-hair">
             <h3 className="px-5 pt-3 type-label-mono text-link">Created files · {files.length}</h3>
             <Files project={project} outputs={files} />
           </section>
@@ -587,7 +651,11 @@ function Conversation({
   proposals,
   onAdd,
   onAnswer,
-  onDecide
+  onDecide,
+  scroll,
+  projects,
+  here,
+  onGo
 }: {
   messages: ChatMessage[]
   busy: boolean
@@ -598,16 +666,22 @@ function Conversation({
   onAdd: (ids: string[]) => Promise<void>
   onAnswer: (text: string) => Promise<boolean>
   onDecide: (id: string, approve: boolean) => Promise<void>
+  scroll: boolean // in the bar's fixed window; on the artboard the card grows instead
+  projects: { id: string; name: string }[]
+  here?: string
+  onGo?: (place: Place) => void
 }): React.JSX.Element {
   const end = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    end.current?.scrollIntoView({ block: 'nearest' })
-  }, [messages.length, live, busy])
+    if (scroll) end.current?.scrollIntoView({ block: 'nearest' })
+  }, [messages.length, live, busy, scroll])
   const known = new Set(musicians.map((m) => m.id))
+  const projectIds = new Set(projects.map((p) => p.id))
+  const nameOf = (id: string): string => projects.find((p) => p.id === id)?.name ?? id
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-6 pr-2"
+      className={`flex flex-col gap-5 py-6 ${scroll ? 'min-h-0 flex-1 overflow-y-auto pr-2' : ''}`}
       aria-live="polite"
     >
       {messages.length === 0 && !busy && (
@@ -641,7 +715,8 @@ function Conversation({
             <Approval key={i} p={p} musicians={musicians} onDecide={(yes) => onDecide(p.id, yes)} />
           ) : null
         }
-        const split = splitSuggestion(m.text, known)
+        const went = splitGoTo(m.text, projectIds, here)
+        const split = splitSuggestion(went.body, known)
         const { body, decision } = splitDecision(split.body)
         const ids = split.ids
         // answered by the next thing the user said, if anything
@@ -649,6 +724,35 @@ function Conversation({
         return (
           <OrchestratorSays key={i} t={m.t}>
             <Markdown text={body} className="[&>*:first-child]:mt-1" />
+            {went.places.map((p, j) => {
+              const a =
+                p.area &&
+                { research: 'I Research', create: 'II Create', refine: 'III Refine' }[p.area]
+              return (
+                <button
+                  key={j}
+                  onClick={() => onGo?.(p)}
+                  disabled={!onGo}
+                  className="group mt-3 flex w-full items-center gap-3 border border-card-line bg-card px-3 py-2.5 text-left text-link shadow-card hover:bg-selected"
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center bg-brand text-on-brand">
+                    <Icon name="arrow-right-up-line" size={16} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate type-label-serif-l">
+                      {p.project === here && a ? a : nameOf(p.project)}
+                    </span>
+                    <span className="type-caption text-dim">
+                      {p.project === here
+                        ? 'In this project'
+                        : a
+                          ? `Open at ${a}`
+                          : 'Open the project'}
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
             {decision && (
               <DecisionCard
                 decision={decision}

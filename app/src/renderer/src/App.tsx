@@ -276,7 +276,11 @@ function App(): React.JSX.Element {
         <Icon name="arrow-left-line" size={14} />
         Back
       </button>
-      <OrchestratorBar to={to} />
+      <OrchestratorBar
+        to={to}
+        projects={projects}
+        onGo={(p) => go({ at: 'book', id: p.project, area: p.area })}
+      />
 
       {opening && project(opening.id) && (
         <Opening

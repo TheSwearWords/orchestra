@@ -2,12 +2,15 @@
 // collapse and (when the board allows) close; anything else on the board, like the Create
 // stage, sits under them. Each board keeps its arrangement in projects/<id>/boards/<board>.json;
 // Tidy puts every card back (brand spec §5.3 Board/Section card, C4–C6).
+// A window on the artboard never scrolls: the board has room, so a card grows to show all of
+// its content, and resizing changes only its width.
 import { useEffect, useRef, useState } from 'react'
 import type { BoardLayout } from '../../../preload'
 import { snap, fit, type Rect } from './camera'
 import { Canvas } from './Canvas'
 import { Minimap, Shell, ZoomChip, barButton, type Step } from './Chrome'
 import { TOP_BAR, fitBelow } from './shared'
+import { freeSpot, settle } from './place'
 import { useCamera } from './useCamera'
 
 export interface CardSpec {
@@ -17,14 +20,13 @@ export interface CardSpec {
   x: number
   y: number
   w: number
-  h?: number // fixed body height; otherwise it grows to its content, up to MAX_BODY
   tone?: 'white' | 'paper' | 'blue' // paper: a document (2px blue border); blue: the poster
   body: React.ReactNode
   onClose?: () => void // a window opened on the board, rather than one of its sections
 }
 
-const MAX_BODY = 640
 const HEADER = 44
+const GUESS = 360 // a card's height before it has rendered, for fitting the view
 
 interface Props {
   project: string
@@ -36,6 +38,7 @@ interface Props {
   // more on the board under the cards (the stage); in world px, with its extent for fitting
   world?: React.ReactNode
   worldRect?: Rect
+  obstacles?: Rect[] // things on the board under the cards that cards must keep clear of
   top?: React.ReactNode // screen-space note under the top bar, e.g. an error
   focus?: string // a card to bring into view, e.g. one just opened
   preview?: boolean // the book's small live copy: no chrome, nothing saved
@@ -50,6 +53,7 @@ export function Board({
   cards,
   world,
   worldRect,
+  obstacles = [],
   top,
   focus,
   preview
@@ -60,14 +64,20 @@ export function Board({
     void window.api.loadBoard(project, board).then(setLayout, () => setLayout({}))
   }, [project, board])
 
-  const placed = cards.map((c) => ({ ...c, ...layout?.[c.id] }))
-  // card heights aren't known before they render; the fit uses what a body usually takes
-  const rectOf = (c: (typeof placed)[number]): Rect => ({
-    x: c.x,
-    y: c.y,
-    w: c.w,
-    h: HEADER + (c.collapsed ? 0 : (c.h ?? Math.min(MAX_BODY, 360)))
-  })
+  // each card's real height, as rendered (a guess until then)
+  const [heights, setHeights] = useState<Record<string, number>>({})
+  const tall = (c: CardSpec & { collapsed?: boolean }): number =>
+    c.collapsed ? HEADER : (heights[c.id] ?? HEADER + GUESS)
+  // where each card wants to be (its saved place, else its default), then settled so nothing
+  // overlaps: cards you placed keep their spot first, the rest move beside them
+  const wanted = cards.map((c) => ({ ...c, ...layout?.[c.id], h: 0 }))
+  const order = [...wanted].sort((a, b) => Number(!layout?.[a.id]) - Number(!layout?.[b.id]))
+  const settled = settle(
+    order.map((c) => ({ ...c, h: tall(c) })),
+    obstacles
+  )
+  const placed = wanted.map((c) => settled.find((s) => s.id === c.id)!)
+  const rectOf = (c: (typeof placed)[number]): Rect => ({ x: c.x, y: c.y, w: c.w, h: c.h })
   const rects: Rect[] = [...placed.map(rectOf), ...(worldRect ? [worldRect] : [])]
   const bounds = (): Rect => {
     const x = Math.min(...rects.map((r) => r.x))
@@ -100,7 +110,11 @@ export function Board({
   }
   const change = (id: string, patch: Partial<BoardLayout[string]>): void => {
     const c = placed.find((p) => p.id === id)!
-    save({ ...layout, [id]: { x: c.x, y: c.y, w: c.w, h: c.h, collapsed: c.collapsed, ...patch } })
+    const next = { x: c.x, y: c.y, w: c.w, collapsed: c.collapsed, ...patch }
+    // dropped on top of something: it moves to the nearest free spot beside it
+    const others = [...placed.filter((p) => p.id !== id).map(rectOf), ...obstacles]
+    const spot = freeSpot({ x: next.x, y: next.y, w: next.w, h: c.h }, others)
+    save({ ...layout, [id]: { ...next, x: spot.x, y: spot.y } })
   }
   function tidy(): void {
     setTidying(true)
@@ -111,7 +125,6 @@ export function Board({
   return (
     <Canvas
       cam={cam}
-      scrollable="[data-card-body], [data-scroll]"
       className={preview ? '' : 'animate-[area-in_550ms_var(--ease)_both]'}
       chrome={
         !preview && (
@@ -160,10 +173,13 @@ export function Board({
           <Card
             key={c.id}
             card={c}
+            onHeight={(hh) =>
+              setHeights((all) => (all[c.id] === hh ? all : { ...all, [c.id]: hh }))
+            }
             z={cam.camera.z}
             tidying={tidying}
             onMove={(x, y) => change(c.id, { x, y })}
-            onResize={(w, h) => change(c.id, { w, h })}
+            onResize={(w) => change(c.id, { w })}
             onCollapse={() => change(c.id, { collapsed: !c.collapsed })}
           />
         ))}
@@ -173,6 +189,7 @@ export function Board({
 
 export function Card({
   card,
+  onHeight,
   z,
   tidying,
   onMove,
@@ -180,23 +197,23 @@ export function Card({
   onCollapse
 }: {
   card: CardSpec & { collapsed?: boolean }
+  onHeight?: (h: number) => void // its rendered height in board px, so others can keep clear
   z: number
   tidying: boolean
   onMove: (x: number, y: number) => void
-  onResize: (w: number, h: number) => void
+  onResize: (w: number) => void
   onCollapse: () => void
 }): React.JSX.Element {
   // while dragging, the card follows the pointer locally; it is saved once, on release
-  const [live, setLive] = useState<{ x: number; y: number; w: number; h?: number } | null>(null)
+  const [live, setLive] = useState<{ x: number; y: number; w: number } | null>(null)
   const x = live?.x ?? card.x
   const y = live?.y ?? card.y
   const w = live?.w ?? card.w
-  const h = live?.h ?? card.h
 
   function track(
     e: React.PointerEvent,
-    apply: (dx: number, dy: number) => { x: number; y: number; w: number; h?: number },
-    done: (r: { x: number; y: number; w: number; h?: number }) => void
+    apply: (dx: number, dy: number) => { x: number; y: number; w: number },
+    done: (r: { x: number; y: number; w: number }) => void
   ): void {
     if (e.button !== 0) return
     e.preventDefault()
@@ -222,11 +239,21 @@ export function Card({
     el.addEventListener('pointerup', up)
   }
 
+  const box = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const el = box.current
+    if (!el || !onHeight) return
+    const ro = new ResizeObserver(() => onHeight(Math.ceil(el.offsetHeight / 24) * 24))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [onHeight])
+
   const blue = card.tone === 'blue'
   const dragging = live !== null
   const stop = (e: React.PointerEvent): void => e.stopPropagation()
   return (
     <section
+      ref={box}
       aria-label={card.title}
       className={`absolute flex flex-col ${
         blue
@@ -247,7 +274,7 @@ export function Card({
         onPointerDown={(e) =>
           track(
             e,
-            (dx, dy) => ({ x: card.x + dx, y: card.y + dy, w, h }),
+            (dx, dy) => ({ x: card.x + dx, y: card.y + dy, w }),
             (r) => onMove(snap(r.x), snap(r.y))
           )
         }
@@ -283,28 +310,19 @@ export function Card({
           </button>
         )}
       </header>
-      {!card.collapsed && (
-        <div
-          data-card-body
-          className="min-h-0 overflow-auto select-text"
-          style={h ? { height: h } : { maxHeight: MAX_BODY }}
-        >
-          {card.body}
-        </div>
-      )}
+      {!card.collapsed && <div className="select-text">{card.body}</div>}
       {!card.collapsed && (
         <span
           aria-hidden
-          onPointerDown={(e) => {
-            const startH =
-              h ?? e.currentTarget.parentElement!.getBoundingClientRect().height / z - HEADER
+          onPointerDown={(e) =>
             track(
               e,
-              (dx, dy) => ({ x, y, w: Math.max(280, w + dx), h: Math.max(120, startH + dy) }),
-              (r) => onResize(snap(r.w), snap(r.h ?? startH))
+              (dx) => ({ x, y, w: Math.max(280, w + dx) }),
+              (r) => onResize(snap(r.w))
             )
-          }}
-          className="absolute -right-1 -bottom-1 size-4 cursor-nwse-resize"
+          }
+          title="Drag to widen"
+          className="absolute -right-1 -bottom-1 size-4 cursor-ew-resize"
         >
           <span className="absolute right-1 bottom-1 size-2 border-r-2 border-b-2 border-current opacity-50" />
         </span>

@@ -241,7 +241,6 @@ function Tiles({
 
   return (
     <div
-      data-scroll
       onDragOver={(e) => {
         e.preventDefault()
         setOver(true)

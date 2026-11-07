@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PODIUM, SEAT, besideSeat, filesFor, outputPaths, ring, seatArc } from './stage.ts'
+import { SEAT, WINDOW_W, filesFor, outputPaths, ring, seatRow, windowX } from './stage.ts'
 
-test('seats run left to right by category, ending with the Add seat', () => {
-  const seats = seatArc([
+test('seats sit in one row by category, ending with the Add seat', () => {
+  const seats = seatRow([
     { id: 'site', category: 'Web', name: 'Website' },
     { id: 'kit', category: 'Brand', name: 'Brand Kit' },
     { id: 'copy', category: 'Brand', name: 'Brand Copy' }
@@ -12,8 +12,9 @@ test('seats run left to right by category, ending with the Add seat', () => {
     seats.map((s) => s.id),
     ['copy', 'kit', 'site', 'add']
   )
-  assert.ok(seats.every((s, i) => i === 0 || s.x > seats[i - 1].x))
-  assert.ok(seats.every((s) => s.y <= PODIUM.y + 1e-9)) // none below the podium
+  assert.ok(seats.every((s, i) => s.y === 0 && (i === 0 || s.x > seats[i - 1].x)))
+  assert.equal(seats[0].x, -seats[3].x) // centred
+  assert.ok(seats[1].x - seats[0].x >= SEAT.w) // never touching
 })
 
 test('ring starts at the top', () => {
@@ -51,9 +52,9 @@ test('filesFor keeps only the files its instruments and foundations name', () =>
   )
 })
 
-test('a seat card opens on the side away from the podium', () => {
-  const left = besideSeat({ x: -600, y: -300 }, 520)
-  const right = besideSeat({ x: 600, y: -300 }, 520)
-  assert.ok(left.x + 520 <= -600 - SEAT.w / 2)
-  assert.ok(right.x >= 600 + SEAT.w / 2)
+test('windows under the circle are centred and never touch', () => {
+  const xs = [0, 1, 2].map((i) => windowX(i, 3))
+  assert.ok(Math.abs(xs[0] + WINDOW_W + xs[2]) <= 24) // symmetric about the middle
+  assert.ok(xs[1] - xs[0] > WINDOW_W)
+  assert.ok(Math.abs(windowX(0, 1) + WINDOW_W / 2) <= 12) // one window sits under the centre
 })

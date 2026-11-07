@@ -181,7 +181,7 @@ function App(): React.JSX.Element {
 
   /** A slash command picked in the bar. */
   function command(id: string): void {
-    if (id === 'agents' || id === 'mcps' || id === 'settings') {
+    if (id === 'agents' || id === 'mcps' || id === 'graph' || id === 'settings') {
       go({ at: 'studio' })
       dispatchEvent(new CustomEvent('orchestra:desk', { detail: id }))
     } else if (id === 'studio') go({ at: 'studio' })
@@ -302,6 +302,7 @@ function App(): React.JSX.Element {
         commands={[
           { id: 'agents', label: 'Agents', hint: 'Opens on the Studio desk' },
           { id: 'mcps', label: 'MCPs and providers', hint: 'Opens on the Studio desk' },
+          { id: 'graph', label: 'Knowledge graph', hint: 'Opens on the Studio desk' },
           { id: 'settings', label: 'Settings', hint: 'Opens on the Studio desk' },
           { id: 'studio', label: 'Studio', hint: 'Every project' },
           { id: 'new', label: 'New project', hint: 'A blank cover' },

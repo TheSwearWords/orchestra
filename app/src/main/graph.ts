@@ -54,6 +54,23 @@ export interface Graphs {
   /** Answers a question from a project's graph, or the vault's (project null). */
   query(project: string | null, question: string): Promise<string>
   status(project: string): 'none' | 'building' | 'ready'
+  /** A graph slimmed for drawing: the project's, or the vault's (project null); null if none. */
+  load(project: string | null): Promise<unknown>
+}
+
+/** What a person-facing view needs from a graph.json, and nothing more. */
+export function slim(g: { nodes?: Record<string, unknown>[]; links?: Record<string, unknown>[] }): {
+  nodes: Record<string, unknown>[]
+  links: Record<string, unknown>[]
+} {
+  const pick = (o: Record<string, unknown>, keys: string[]): Record<string, unknown> =>
+    Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]))
+  return {
+    nodes: (g.nodes ?? []).map((n) =>
+      pick(n, ['id', 'label', 'community', 'community_name', 'source_file', 'file_type'])
+    ),
+    links: (g.links ?? []).map((l) => pick(l, ['source', 'target', 'relation', 'confidence']))
+  }
 }
 
 export function graphs(opts: {
@@ -120,6 +137,11 @@ export function graphs(opts: {
     status(project) {
       if (running.has(project)) return 'building'
       return existsSync(graphFile(opts.projectDir(project))) ? 'ready' : 'none'
+    },
+    async load(project) {
+      const file = project ? graphFile(opts.projectDir(project)) : vault
+      if (!existsSync(file)) return null
+      return slim(JSON.parse(await readFile(file, 'utf8')))
     }
   }
 }

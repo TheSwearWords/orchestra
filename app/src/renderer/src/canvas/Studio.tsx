@@ -20,6 +20,7 @@ import { CoverFace } from './Cover'
 import { Card, type CardSpec } from './Board'
 import { settle } from './place'
 import { AgentFile, Agents } from '../components/Agents'
+import { Knowledge } from './Knowledge'
 import { Icon } from '../components/Icon'
 import { PROVIDERS, type ProviderId } from '../../../main/providers'
 
@@ -242,6 +243,8 @@ export function Studio({
               </AgentFileOpener.Provider>
             ) : w.id === 'mcps' ? (
               <Connections />
+            ) : w.id === 'graph' ? (
+              <Knowledge projects={projects} />
             ) : (
               <Settings />
             )
@@ -380,12 +383,18 @@ function ShelfCover({
   )
 }
 
-type Desk = 'agents' | 'mcps' | 'settings'
+type Desk = 'agents' | 'mcps' | 'graph' | 'settings'
 const DESK_W = 216
 const DESK_H = 156
 const DESK: { id: Desk; name: string; note: string; icon: string }[] = [
   { id: 'agents', name: 'Agents', note: 'The Ensemble: who plays what', icon: 'team-line' },
   { id: 'mcps', name: 'MCPs', note: 'Providers and the tools agents use', icon: 'shapes-line' },
+  {
+    id: 'graph',
+    name: 'Knowledge graph',
+    note: 'What your work keeps coming back to',
+    icon: 'layout-grid-line'
+  },
   { id: 'settings', name: 'Settings', note: 'You, and this machine', icon: 'settings-3-line' }
 ]
 // the windows the desk opens, on the board below it
@@ -394,6 +403,7 @@ const DESK: { id: Desk; name: string; note: string; icon: string }[] = [
 const WINDOW: Record<Desk, Omit<CardSpec, 'id' | 'x' | 'y' | 'body'> & { guess: number }> = {
   agents: { title: 'Agents · the Ensemble', w: 1152, guess: 1100 },
   mcps: { title: 'MCPs and providers', w: 528, guess: 360 },
+  graph: { title: 'Knowledge graph', w: 704, guess: 1100 },
   settings: { title: 'Settings', w: 480, guess: 160 }
 }
 

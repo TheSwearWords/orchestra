@@ -1,14 +1,50 @@
 // Floating chrome (brand spec §5.2): sharp white chips that sit above the board.
 import { Icon } from '../components/Icon'
-import { AREAS, chip, type Area } from './shared'
+import { AREAS, TOP_BAR, chip, type Area } from './shared'
 import { clampZoom, type Camera, type Rect } from './camera'
 
 export type Step = { label: string; onClick?: () => void }
 
+/** Every screen's frame: the breadcrumb across the top (with the screen's own controls on its
+ * right), the pages bottom left and the minimap bottom right. The Orchestrator bar and the
+ * back button belong to the whole window, so App draws them. */
+export function Shell({
+  crumbs,
+  right,
+  pages,
+  minimap,
+  children
+}: {
+  crumbs: Step[]
+  right?: React.ReactNode
+  pages?: React.ReactNode
+  minimap?: React.ReactNode
+  children?: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <>
+      <header
+        className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 border-b border-chip-line bg-chip pr-2 pl-2 shadow-float"
+        style={{ height: TOP_BAR }}
+      >
+        <Breadcrumb steps={crumbs} />
+        <div className="flex items-center gap-2">{right}</div>
+      </header>
+      {pages && <div className="absolute bottom-3.5 left-3.5 z-20">{pages}</div>}
+      {minimap && <div className="absolute right-3.5 bottom-3.5 z-20">{minimap}</div>}
+      {children}
+    </>
+  )
+}
+
+/** A control inside the top bar: a hairline box, not a floating chip. */
+export const barButton =
+  'serif-on flex h-9 items-center border border-chip-line px-3.5 type-label-s text-link hover:bg-selected'
+
 /** Where you are, as steps; clicking an earlier step zooms back out to it. */
 export function Breadcrumb({ steps }: { steps: Step[] }): React.JSX.Element {
   return (
-    <nav aria-label="Where you are" className={`${chip} gap-3 pr-5 pl-2`}>
+    <nav aria-label="Where you are" className="flex min-w-0 items-center gap-3 text-link">
       <span className="flex size-8 items-center justify-center rounded-full bg-brand text-on-brand">
         <Icon name="logo-mark" size={20} />
       </span>
@@ -88,11 +124,11 @@ export function ZoomChip({
   }
   const btn = 'flex h-full w-9 items-center justify-center hover:bg-selected'
   return (
-    <div className={`${chip} type-caption`}>
+    <div className="flex h-9 items-stretch border border-chip-line type-caption text-link">
       <button aria-label="Zoom out" className={btn} onClick={() => by(1 / 1.25)}>
         −
       </button>
-      <span className="min-w-12 text-center tabular-nums">
+      <span className="flex min-w-12 items-center justify-center tabular-nums">
         {Math.round(camera.z * 100)}%{note && <span className="text-dim"> · {note}</span>}
       </span>
       <button aria-label="Zoom in" className={btn} onClick={() => by(1.25)}>
@@ -112,7 +148,7 @@ export function Minimap({
   compact
 }: {
   label: string
-  blocks: (Rect & { on?: boolean })[]
+  blocks: (Rect & { on?: boolean; name?: string })[]
   camera: Camera
   viewport: { w: number; h: number }
   onMove: (c: Camera) => void
@@ -170,9 +206,15 @@ export function Minimap({
           {blocks.map((b, i) => (
             <span
               key={i}
-              className={`absolute ${b.on ? 'bg-brand' : 'bg-brand/20'}`}
+              className={`absolute ${b.on ? 'bg-brand text-on-brand' : 'bg-brand/20 text-link'}`}
               style={box(b)}
-            />
+            >
+              {b.name && (
+                <span className="absolute top-0.5 left-1 font-mono text-[9px] leading-none">
+                  {b.name}
+                </span>
+              )}
+            </span>
           ))}
           <span className="absolute border-[1.5px] border-brand" style={box(view)} />
         </div>

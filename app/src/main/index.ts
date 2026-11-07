@@ -1,12 +1,12 @@
 import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
-import { existsSync } from 'fs'
+import { existsSync, mkdirSync } from 'fs'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { Conductor, GENERAL, readChat, readLog } from './conductor'
-import { agentPrompt, orchestratorPrompt } from './prompts'
+import { Conductor, GENERAL, STUDIO, readChat, readLog } from './conductor'
+import { agentPrompt, orchestratorPrompt, studioPrompt } from './prompts'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { providerStatus } from './connections'
@@ -47,7 +47,7 @@ const conductor = new Conductor({
     for (const w of BrowserWindow.getAllWindows())
       if (!w.isDestroyed()) w.webContents.send('chat:event', e)
   },
-  projectDir: (id) => projectDir(id),
+  projectDir: (id) => chatHome(id),
   library: () => loadLibrary(ORCHESTRA_HOME),
   selected: (dir) => readSelection(dir),
   orchestratorModel: async () => {
@@ -55,15 +55,28 @@ const conductor = new Conductor({
     if (o) runnableOrThrow(o)
     return o?.model ?? 'opus'
   },
-  orchestratorPrompt: (id, chat) => orchestratorPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, chat),
+  orchestratorPrompt: (id, chat) =>
+    id === STUDIO
+      ? studioPrompt(ORCHESTRA_HOME, PROJECTS_DIR)
+      : orchestratorPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, chat),
   agentPrompt: (id, key) => agentPrompt(ORCHESTRA_HOME, PROJECTS_DIR, id, key),
-  extraDirs: [join(ORCHESTRA_HOME, 'library')],
+  // the Studio's Orchestrator reads across every project
+  extraDirs: (id) => [join(ORCHESTRA_HOME, 'library'), ...(id === STUDIO ? [PROJECTS_DIR] : [])],
   adopt: (p) => adopt(ORCHESTRA_HOME, p),
   addDeliverable: async (dir, id) => {
     const lib = await loadLibrary(ORCHESTRA_HOME)
     await saveSelection(dir, lib, [...new Set([...(await readSelection(dir)), id])])
   }
 })
+
+/** Where a chat lives: a project's folder, or the Studio's own (Orchestra/studio/) for the
+ * chat above every project. */
+function chatHome(id: string): string {
+  if (id !== STUDIO) return projectDir(id)
+  const dir = join(ORCHESTRA_HOME, 'studio')
+  mkdirSync(dir, { recursive: true })
+  return dir
+}
 
 /** A project's folder, refusing ids that could point outside the vault. */
 function projectDir(id: string): string {
@@ -469,16 +482,16 @@ app.whenReady().then(async () => {
     )
   })
   ipcMain.handle('chat:load', async (_, project: string, chat: string) => ({
-    messages: await readChat(projectDir(project), chat),
-    log: await readLog(projectDir(project), chat),
+    messages: await readChat(chatHome(project), chat),
+    log: await readLog(chatHome(project), chat),
     busy: conductor.isBusy(project, chat)
   }))
   ipcMain.handle('chat:send', (_, project: string, chat: string, text: string) => {
-    projectDir(project)
+    chatHome(project)
     return conductor.send(project, chat, String(text))
   })
   ipcMain.handle('chat:stop', (_, project: string, chat: string) => {
-    projectDir(project)
+    chatHome(project)
     return conductor.stop(project, chat)
   })
   ipcMain.handle('proposals:list', (_, project: string) => {

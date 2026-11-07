@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { filesFor, outputPaths, ring, seatArc } from './stage.ts'
+import { PODIUM, SEAT, besideSeat, filesFor, outputPaths, ring, seatArc } from './stage.ts'
 
 test('seats run left to right by category, ending with the Add seat', () => {
   const seats = seatArc([
@@ -13,7 +13,7 @@ test('seats run left to right by category, ending with the Add seat', () => {
     ['copy', 'kit', 'site', 'add']
   )
   assert.ok(seats.every((s, i) => i === 0 || s.x > seats[i - 1].x))
-  assert.ok(seats.every((s) => s.y < 100)) // all above the podium
+  assert.ok(seats.every((s) => s.y <= PODIUM.y + 1e-9)) // none below the podium
 })
 
 test('ring starts at the top', () => {
@@ -49,4 +49,11 @@ test('filesFor keeps only the files its instruments and foundations name', () =>
     got.map((o) => o.path),
     ['prereqs/brand-spec.md', 'prereqs/logo/mark.svg']
   )
+})
+
+test('a seat card opens on the side away from the podium', () => {
+  const left = besideSeat({ x: -600, y: -300 }, 520)
+  const right = besideSeat({ x: 600, y: -300 }, 520)
+  assert.ok(left.x + 520 <= -600 - SEAT.w / 2)
+  assert.ok(right.x >= 600 + SEAT.w / 2)
 })

@@ -1,12 +1,13 @@
-// An area's (or a deliverable's) own artboard: floating section cards you drag by the header,
-// resize from the corner and collapse (brand spec §5.3 Board/Section card). Each board keeps
-// its arrangement in projects/<id>/boards/<board>.json; Tidy puts every card back.
-import { useEffect, useState } from 'react'
+// An area's artboard: floating section cards you drag by the header, resize from the corner,
+// collapse and (when the board allows) close; anything else on the board, like the Create
+// stage, sits under them. Each board keeps its arrangement in projects/<id>/boards/<board>.json;
+// Tidy puts every card back (brand spec §5.3 Board/Section card, C4–C6).
+import { useEffect, useRef, useState } from 'react'
 import type { BoardLayout } from '../../../preload'
 import { snap, fit, type Rect } from './camera'
 import { Canvas } from './Canvas'
-import { Breadcrumb, Minimap, ZoomChip, type Step } from './Chrome'
-import { chip } from './shared'
+import { Minimap, Shell, ZoomChip, barButton, type Step } from './Chrome'
+import { TOP_BAR, fitBelow } from './shared'
 import { useCamera } from './useCamera'
 
 export interface CardSpec {
@@ -17,24 +18,26 @@ export interface CardSpec {
   y: number
   w: number
   h?: number // fixed body height; otherwise it grows to its content, up to MAX_BODY
-  tone?: 'white' | 'paper' // paper: a document card, with a 2px blue border
+  tone?: 'white' | 'paper' | 'blue' // paper: a document (2px blue border); blue: the poster
   body: React.ReactNode
+  onClose?: () => void // a window opened on the board, rather than one of its sections
 }
 
 const MAX_BODY = 640
-const HEADER = 40
+const HEADER = 44
 
 interface Props {
   project: string
-  board: string // file name, e.g. "research" or "deliverable-brand-kit"
+  board: string // file name, e.g. "research" or "create"
   label: string // the minimap's page label
   crumbs: Step[]
-  aside?: React.ReactNode // beside the breadcrumb (the area switch)
+  pages?: React.ReactNode // bottom left: the area switch
   cards: CardSpec[]
   // more on the board under the cards (the stage); in world px, with its extent for fitting
   world?: React.ReactNode
   worldRect?: Rect
-  top?: React.ReactNode // screen-space note under the chrome, e.g. an error
+  top?: React.ReactNode // screen-space note under the top bar, e.g. an error
+  focus?: string // a card to bring into view, e.g. one just opened
   preview?: boolean // the book's small live copy: no chrome, nothing saved
 }
 
@@ -43,11 +46,12 @@ export function Board({
   board,
   label,
   crumbs,
-  aside,
+  pages,
   cards,
   world,
   worldRect,
   top,
+  focus,
   preview
 }: Props): React.JSX.Element {
   const [layout, setLayout] = useState<BoardLayout | null>(null)
@@ -57,16 +61,14 @@ export function Board({
   }, [project, board])
 
   const placed = cards.map((c) => ({ ...c, ...layout?.[c.id] }))
-  // card heights aren't known before they render; the fit uses the most a body can take
-  const rects: Rect[] = [
-    ...placed.map((c) => ({
-      x: c.x,
-      y: c.y,
-      w: c.w,
-      h: HEADER + (c.collapsed ? 0 : (c.h ?? Math.min(MAX_BODY, 420)))
-    })),
-    ...(worldRect ? [worldRect] : [])
-  ]
+  // card heights aren't known before they render; the fit uses what a body usually takes
+  const rectOf = (c: (typeof placed)[number]): Rect => ({
+    x: c.x,
+    y: c.y,
+    w: c.w,
+    h: HEADER + (c.collapsed ? 0 : (c.h ?? Math.min(MAX_BODY, 360)))
+  })
+  const rects: Rect[] = [...placed.map(rectOf), ...(worldRect ? [worldRect] : [])]
   const bounds = (): Rect => {
     const x = Math.min(...rects.map((r) => r.x))
     const y = Math.min(...rects.map((r) => r.y))
@@ -77,8 +79,19 @@ export function Board({
       h: Math.max(...rects.map((r) => r.y + r.h)) - y
     }
   }
-  // leaves room for the chrome above and the minimap below
-  const cam = useCamera(fit(bounds(), innerWidth, innerHeight - 80, 80, 1))
+  const cam = useCamera(
+    preview ? fit(bounds(), innerWidth, innerHeight, 40, 1) : fitBelow(bounds())
+  )
+
+  // a card asked for (just opened) flies into view once it is on the board
+  const shown = useRef<string | undefined>(undefined)
+  const target = placed.find((c) => c.id === focus)
+  useEffect(() => {
+    if (preview || !target || !layout || shown.current === focus) return
+    shown.current = focus
+    void cam.fly(fitBelow(rectOf(target), 1), 450)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fly once per focused card
+  }, [focus, layout, target])
 
   function save(next: BoardLayout): void {
     if (preview) return
@@ -98,29 +111,28 @@ export function Board({
   return (
     <Canvas
       cam={cam}
-      scrollable="[data-card-body]"
+      scrollable="[data-card-body], [data-scroll]"
       className={preview ? '' : 'animate-[area-in_550ms_var(--ease)_both]'}
       chrome={
         !preview && (
-          <>
-            <div className="absolute top-3.5 left-3.5 flex gap-2.5">
-              <Breadcrumb steps={crumbs} />
-              {aside}
-            </div>
-            <div className="absolute top-3.5 right-3.5 flex gap-2.5">
-              {layout && Object.keys(layout).length > 0 && (
-                <button onClick={tidy} className={`${chip} serif-on px-4 type-label-s`}>
-                  Tidy
-                </button>
-              )}
-              <ZoomChip
-                camera={cam.camera}
-                viewport={cam.viewport}
-                onZoom={(c) => void cam.fly(c, 200)}
-              />
-            </div>
-            {top && <div className="absolute top-[74px] left-1/2 -translate-x-1/2">{top}</div>}
-            <div className="absolute right-3.5 bottom-3.5">
+          <Shell
+            crumbs={crumbs}
+            right={
+              <>
+                {layout && Object.keys(layout).length > 0 && (
+                  <button onClick={tidy} className={barButton}>
+                    Tidy
+                  </button>
+                )}
+                <ZoomChip
+                  camera={cam.camera}
+                  viewport={cam.viewport}
+                  onZoom={(c) => void cam.fly(c, 200)}
+                />
+              </>
+            }
+            pages={pages}
+            minimap={
               <Minimap
                 label={label}
                 blocks={rects}
@@ -128,19 +140,26 @@ export function Board({
                 viewport={cam.viewport}
                 onMove={cam.set}
               />
-            </div>
-          </>
+            }
+          >
+            {top && (
+              <div
+                className="absolute left-1/2 z-20 -translate-x-1/2"
+                style={{ top: TOP_BAR + 12 }}
+              >
+                {top}
+              </div>
+            )}
+          </Shell>
         )
       }
     >
       {world}
       {layout &&
-        placed.map((c, i) => (
+        placed.map((c) => (
           <Card
             key={c.id}
             card={c}
-            index={i}
-            total={placed.length}
             z={cam.camera.z}
             tidying={tidying}
             onMove={(x, y) => change(c.id, { x, y })}
@@ -152,10 +171,8 @@ export function Board({
   )
 }
 
-function Card({
+export function Card({
   card,
-  index,
-  total,
   z,
   tidying,
   onMove,
@@ -163,8 +180,6 @@ function Card({
   onCollapse
 }: {
   card: CardSpec & { collapsed?: boolean }
-  index: number
-  total: number
   z: number
   tidying: boolean
   onMove: (x: number, y: number) => void
@@ -191,7 +206,9 @@ function Card({
     const sx = e.clientX
     const sy = e.clientY
     let last = apply(0, 0)
+    let moved = false
     const move = (m: PointerEvent): void => {
+      moved = true
       last = apply((m.clientX - sx) / z, (m.clientY - sy) / z)
       setLive(last)
     }
@@ -199,20 +216,25 @@ function Card({
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', up)
       setLive(null)
-      done(last)
+      if (moved) done(last)
     }
     el.addEventListener('pointermove', move)
     el.addEventListener('pointerup', up)
   }
 
-  const paper = card.tone === 'paper'
+  const blue = card.tone === 'blue'
   const dragging = live !== null
+  const stop = (e: React.PointerEvent): void => e.stopPropagation()
   return (
     <section
       aria-label={card.title}
-      className={`absolute flex flex-col bg-card ${paper ? 'border-2 border-brand' : 'border border-card-line'} ${
-        dragging ? 'z-10 shadow-lift outline-2 outline-brand' : 'shadow-card'
-      }`}
+      className={`absolute flex flex-col ${
+        blue
+          ? 'bg-poster-dots'
+          : card.tone === 'paper'
+            ? 'border-2 border-brand bg-card'
+            : 'border border-card-line bg-card'
+      } ${dragging ? 'z-10 shadow-lift outline-2 outline-brand' : 'shadow-card'}`}
       style={{
         left: 0,
         top: 0,
@@ -229,24 +251,37 @@ function Card({
             (r) => onMove(snap(r.x), snap(r.y))
           )
         }
-        className="flex h-10 shrink-0 cursor-grab items-center gap-3 border-b border-hair px-3 text-link active:cursor-grabbing"
+        className={`flex shrink-0 cursor-grab items-center gap-3 px-4 active:cursor-grabbing ${
+          blue ? 'text-on-brand' : 'border-b border-hair text-link'
+        }`}
+        style={{ height: HEADER }}
       >
-        <span aria-hidden className="font-mono text-[11px] tracking-[-0.2em] text-link/50">
+        <span aria-hidden className="font-mono text-[11px] tracking-[-0.2em] opacity-50">
           ⋮⋮
         </span>
-        <h2 className="min-w-0 flex-1 truncate type-label-mono">
-          {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')} · {card.title}
-        </h2>
-        {card.count && <span className="type-caption text-dim">{card.count}</span>}
+        <h2 className="min-w-0 flex-1 truncate type-label-serif-l">{card.title}</h2>
+        {card.count && <span className="font-mono text-[12px] opacity-70">{card.count}</span>}
         <button
-          onPointerDown={(e) => e.stopPropagation()}
+          onPointerDown={stop}
           onClick={onCollapse}
           aria-expanded={!card.collapsed}
           aria-label={card.collapsed ? `Show ${card.title}` : `Collapse ${card.title}`}
+          title={card.collapsed ? 'Show' : 'Collapse'}
           className="flex size-7 items-center justify-center font-mono text-[13px] hover:bg-selected"
         >
-          {card.collapsed ? '+' : '−'}
+          {card.collapsed ? '+' : '—'}
         </button>
+        {card.onClose && (
+          <button
+            onPointerDown={stop}
+            onClick={card.onClose}
+            aria-label={`Close ${card.title}`}
+            title="Close"
+            className="flex size-7 items-center justify-center font-mono text-[13px] hover:bg-selected"
+          >
+            ✕
+          </button>
+        )}
       </header>
       {!card.collapsed && (
         <div
@@ -271,7 +306,7 @@ function Card({
           }}
           className="absolute -right-1 -bottom-1 size-4 cursor-nwse-resize"
         >
-          <span className="absolute right-1 bottom-1 size-2 border-r-2 border-b-2 border-brand/60" />
+          <span className="absolute right-1 bottom-1 size-2 border-r-2 border-b-2 border-current opacity-50" />
         </span>
       )}
     </section>

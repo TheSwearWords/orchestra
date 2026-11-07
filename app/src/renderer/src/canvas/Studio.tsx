@@ -4,9 +4,13 @@ import type { Project, StudioLayout } from '../../../preload'
 import { Canvas } from './Canvas'
 import { useCamera } from './useCamera'
 import { fit, snap, type Rect } from './camera'
-import { COVER, ROW_Y, chip, coverInfo, studioPlace, type Area, type CoverInfo } from './shared'
-import { Breadcrumb, Minimap, ZoomChip } from './Chrome'
+import { COVER, ROW_Y, fitBelow, coverInfo, studioPlace, type Area, type CoverInfo } from './shared'
+import { Minimap, Shell, ZoomChip, barButton } from './Chrome'
 import { CoverFace } from './Cover'
+import { Card, type CardSpec } from './Board'
+import { Agents } from '../components/Agents'
+import { Icon } from '../components/Icon'
+import { PROVIDERS, type ProviderId } from '../../../main/providers'
 
 interface Props {
   projects: Project[]
@@ -16,7 +20,6 @@ interface Props {
   onEnter: (id: string, from: DOMRect) => void
   onEdit: (id: string) => void
   onNew: () => void
-  onEnsemble: () => void
   onChanged: () => void // a project was deleted
   hidden?: string // a cover that is out on an animation; leave its spot empty
 }
@@ -29,7 +32,6 @@ export function Studio({
   onEnter,
   onEdit,
   onNew,
-  onEnsemble,
   onChanged,
   hidden
 }: Props): React.JSX.Element {
@@ -41,8 +43,16 @@ export function Studio({
     drag?.id === id ? [drag.x, drag.y, place[id][2]] : place[id]
 
   const rects: Rect[] = ids.map((id) => ({ x: at(id)[0], y: at(id)[1], w: COVER.w, h: COVER.h }))
-  // with no projects yet, the board still has a place to look at
-  const everything = rects.length ? rects : [{ x: 96, y: ROW_Y, w: COVER.w, h: COVER.h }]
+  // the desk, under the shelf: what every project shares
+  const deskY = ROW_Y + COVER.h + 120
+  const desk = DESK.map((d, i) => ({ ...d, x: 96 + i * (DESK_W + 24), y: deskY }))
+  const [windows, setWindows] = useState<{ id: Desk; x: number; y: number }[]>([])
+  // with no projects yet, the board still has the desk to look at
+  const everything: Rect[] = [
+    ...rects,
+    ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H })),
+    ...windows.map((w) => ({ x: w.x, y: w.y, w: WINDOW[w.id].w, h: WINDOW[w.id].h ?? 400 }))
+  ]
   const bounds = (): Rect => {
     const x = Math.min(...everything.map((r) => r.x))
     const y = Math.min(...everything.map((r) => r.y))
@@ -54,6 +64,13 @@ export function Studio({
     }
   }
   const cam = useCamera(fit(bounds(), innerWidth, innerHeight, 120, 1))
+
+  function openWindow(id: Desk): void {
+    const d = desk.find((x) => x.id === id)!
+    const spot = windows.find((w) => w.id === id) ?? { id, x: d.x, y: d.y + DESK_H + 48 }
+    if (!windows.some((w) => w.id === id)) setWindows([...windows, spot])
+    void cam.fly(fitBelow({ ...spot, w: WINDOW[id].w, h: (WINDOW[id].h ?? 400) + 44 }), 450)
+  }
 
   function tidy(): void {
     setTidying(true)
@@ -80,41 +97,31 @@ export function Studio({
         if (c === 'tidy') tidy()
       }}
       chrome={
-        <>
-          <div className="absolute top-3.5 left-3.5">
-            <Breadcrumb steps={[{ label: 'Studio' }]} />
-          </div>
-          <div className="absolute top-3.5 right-3.5 flex gap-2.5">
-            <button onClick={onEnsemble} className={`${chip} serif-on px-4 type-label-s`}>
-              Ensemble
-            </button>
-            {Object.keys(layout.covers).length > 0 && (
-              <button onClick={tidy} className={`${chip} serif-on px-4 type-label-s`}>
-                Tidy
-              </button>
-            )}
-            <ZoomChip
-              camera={cam.camera}
-              viewport={cam.viewport}
-              onZoom={(c) => void cam.fly(c, 200)}
-            />
-          </div>
-          <div className="pointer-events-none absolute bottom-3.5 left-3.5 text-link">
-            <p className="type-label-s">
-              {projects.length} {projects.length === 1 ? 'project' : 'projects'} · drag to arrange
-            </p>
-            <p className="type-display-xl">Studio</p>
-          </div>
-          {/* the blank cover, anchored bottom right beside the minimap, rising out of the edge */}
-          <button
-            onClick={onNew}
-            className="group absolute right-[170px] -bottom-16 flex h-[260px] w-[220px] flex-col items-center gap-2 border border-dashed border-wire bg-card pt-12 text-link shadow-book transition-transform duration-200 ease-(--ease) hover:-translate-y-4 [border-dasharray:6]"
-          >
-            <span className="font-mono text-2xl text-link/40">+</span>
-            <span className="serif-on type-heading-m">New project</span>
-            <span className="type-caption text-dim">A blank cover. Fill it in.</span>
-          </button>
-          <div className="absolute right-3.5 bottom-3.5">
+        <Shell
+          crumbs={[{ label: 'Studio' }]}
+          right={
+            <>
+              {Object.keys(layout.covers).length > 0 && (
+                <button onClick={tidy} className={barButton}>
+                  Tidy
+                </button>
+              )}
+              <ZoomChip
+                camera={cam.camera}
+                viewport={cam.viewport}
+                onZoom={(c) => void cam.fly(c, 200)}
+              />
+            </>
+          }
+          pages={
+            <div className="pointer-events-none text-link">
+              <p className="type-label-s">
+                {projects.length} {projects.length === 1 ? 'project' : 'projects'} · drag to arrange
+              </p>
+              <p className="type-display-xl">Studio</p>
+            </div>
+          }
+          minimap={
             <Minimap
               label="Studio"
               blocks={everything}
@@ -122,8 +129,18 @@ export function Studio({
               viewport={cam.viewport}
               onMove={cam.set}
             />
-          </div>
-        </>
+          }
+        >
+          {/* the blank cover, pinned bottom right, standing a clear gap above the minimap */}
+          <button
+            onClick={onNew}
+            className="group absolute right-3.5 bottom-[176px] z-10 flex h-[220px] w-[168px] flex-col items-center justify-center gap-2 border border-dashed border-wire bg-card px-3 text-center text-link shadow-book transition-transform duration-200 ease-(--ease) hover:-translate-y-1 [border-dasharray:6]"
+          >
+            <span className="font-mono text-2xl text-link/40">+</span>
+            <span className="serif-on type-heading-m">New project</span>
+            <span className="type-caption text-dim">A blank cover. Fill it in.</span>
+          </button>
+        </Shell>
       }
     >
       {projects.map((p) => (
@@ -146,6 +163,42 @@ export function Studio({
           onEnter={(el) => onEnter(p.id, el.getBoundingClientRect())}
           onEdit={() => onEdit(p.id)}
           onMenu={(el) => void menu(p, el)}
+        />
+      ))}
+
+      {desk.map((d) => (
+        <button
+          key={d.id}
+          onClick={() => openWindow(d.id)}
+          aria-pressed={windows.some((w) => w.id === d.id)}
+          className={`absolute flex flex-col items-start gap-1 border border-card-line bg-card p-4 text-left text-link shadow-card transition-colors duration-200 ease-(--ease) hover:bg-selected ${
+            windows.some((w) => w.id === d.id) ? 'outline-2 outline-offset-4 outline-brand' : ''
+          }`}
+          style={{ left: d.x, top: d.y, width: DESK_W, height: DESK_H }}
+        >
+          <span className="flex size-10 items-center justify-center rounded-full bg-brand text-on-brand">
+            <Icon name={d.icon} size={20} />
+          </span>
+          <span className="mt-2 type-heading-m">{d.name}</span>
+          <span className="type-caption text-dim">{d.note}</span>
+        </button>
+      ))}
+      {windows.map((w) => (
+        <Card
+          key={w.id}
+          card={{
+            ...WINDOW[w.id],
+            id: w.id,
+            x: w.x,
+            y: w.y,
+            onClose: () => setWindows(windows.filter((o) => o.id !== w.id)),
+            body: w.id === 'agents' ? <Agents /> : w.id === 'mcps' ? <Connections /> : <Settings />
+          }}
+          z={cam.camera.z}
+          tidying={false}
+          onMove={(x, y) => setWindows(windows.map((o) => (o.id === w.id ? { ...o, x, y } : o)))}
+          onResize={() => {}}
+          onCollapse={() => {}}
         />
       ))}
     </Canvas>
@@ -269,6 +322,73 @@ function ShelfCover({
       <button className="sr-only" onClick={() => ref.current && onEnter(ref.current)}>
         Open {info.name}
       </button>
+    </div>
+  )
+}
+
+type Desk = 'agents' | 'mcps' | 'settings'
+const DESK_W = 216
+const DESK_H = 156
+const DESK: { id: Desk; name: string; note: string; icon: string }[] = [
+  { id: 'agents', name: 'Agents', note: 'The Ensemble: who plays what', icon: 'team-line' },
+  { id: 'mcps', name: 'MCPs', note: 'Providers and the tools agents use', icon: 'shapes-line' },
+  { id: 'settings', name: 'Settings', note: 'You, and this machine', icon: 'settings-3-line' }
+]
+// the windows the desk opens, on the board below it
+// shortcut: their places last for the session only; save them in studio.json if people move them
+const WINDOW: Record<Desk, Omit<CardSpec, 'id' | 'x' | 'y' | 'body'>> = {
+  agents: { title: 'Agents · the Ensemble', w: 1152, h: 720 },
+  mcps: { title: 'MCPs and providers', w: 528 },
+  settings: { title: 'Settings', w: 480 }
+}
+
+/** Who agents can run on, and the tool servers they can reach. */
+function Connections(): React.JSX.Element {
+  const [status, setStatus] = useState<Record<
+    ProviderId,
+    { connected: boolean; via: string }
+  > | null>(null)
+  useEffect(() => {
+    void window.api.providerStatus().then(setStatus, () => {})
+  }, [])
+  return (
+    <div className="p-5">
+      <h3 className="type-label-mono text-link">Providers</h3>
+      <ul className="mt-2 divide-y divide-hair">
+        {PROVIDERS.map((p) => {
+          const s = status?.[p.id]
+          return (
+            <li key={p.id} className="flex items-center justify-between gap-4 py-3">
+              <span>
+                <span className="block type-body-m-strong text-link">{p.name}</span>
+                <span className="type-caption text-dim">{s?.via ?? '…'}</span>
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 type-label-s ${s?.connected ? 'bg-success-subtle text-success-fg' : 'border border-dashed border-wire text-link'}`}
+              >
+                {s?.connected ? 'Connected' : 'Not connected'}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      <h3 className="mt-5 type-label-mono text-link">MCP servers</h3>
+      <p className="mt-2 type-body-s text-dim">
+        Figma first, then Blender and Fusion: connecting tool servers for agents is next on the
+        build plan. Until then agents work in files.
+      </p>
+    </div>
+  )
+}
+
+function Settings(): React.JSX.Element {
+  return (
+    <div className="p-5">
+      <p className="type-body-s text-dim">
+        Theme, account and shortcuts come here. For now: / jumps to the Orchestrator, Esc steps out,
+        1 2 3 move between the movements, and the mouse&apos;s back and forward buttons retrace your
+        steps.
+      </p>
     </div>
   )
 }

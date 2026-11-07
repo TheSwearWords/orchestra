@@ -54,6 +54,8 @@ type EventBody =
 export type ChatEvent = { project: string; chat: string } & EventBody
 
 export const GENERAL = 'general'
+// the chat above every project, in the Studio; no project folder can be called this
+export const STUDIO = '_studio'
 const ID = /^[a-z0-9][a-z0-9-]*$/
 const READ_TOOLS = ['Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch']
 // agents lead through Orchestra's own hierarchy, never Claude subagents, and have no shell yet
@@ -175,7 +177,7 @@ export interface ConductorOptions {
   /** Instructions for a Musician or Instrument: its library prompt, house rules, how to work. */
   agentPrompt: (project: string, key: string) => Promise<string>
   /** Folders outside the project agents may read (the agent library). */
-  extraDirs: string[]
+  extraDirs: (project: string) => string[] // more folders its sessions may read
   /** Writes an approved proposal into the library. */
   adopt: (p: Proposal) => Promise<void>
   /** Adds a newly approved Musician to the project's deliverables. */
@@ -286,7 +288,7 @@ export class Conductor implements Hub {
         sessionFile: chatFile(dir, chat, 'session.json'),
         model: await this.opts.orchestratorModel(),
         systemPrompt: await this.opts.orchestratorPrompt(project, chat),
-        addDirs: this.opts.extraDirs,
+        addDirs: this.opts.extraDirs(project),
         mcpConfig: this.mcp.configFor(project, chat, 'orchestrator'),
         allowedTools: [...READ_TOOLS, 'mcp__orchestra'],
         disallowedTools: NOT_ALLOWED
@@ -648,7 +650,7 @@ export class Conductor implements Hub {
         sessionFile: join(orchestra(dir), 'agents', key, 'session.json'),
         model: doc.model,
         systemPrompt: await this.opts.agentPrompt(project, key),
-        addDirs: this.opts.extraDirs,
+        addDirs: this.opts.extraDirs(project),
         // Instruments get no Orchestra tools: their closing message is their report
         mcpConfig: role === 'musician' ? this.mcp.configFor(project, chat, key) : undefined,
         allowedTools: role === 'musician' ? [...READ_TOOLS, 'mcp__orchestra'] : READ_TOOLS,

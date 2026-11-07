@@ -14,7 +14,8 @@ import { foundationOrder } from '../../../main/plan'
 import { Board, type CardSpec } from '../canvas/Board'
 import { Wire } from '../canvas/Wire'
 import type { Frame } from '../canvas/Book'
-import { GENERAL, STUDIO, pendingFocus } from '../canvas/shared'
+import { GENERAL, STUDIO, pendingFocus, type AgentFileRef, type MenuItem } from '../canvas/shared'
+import { AgentFile } from './Agents'
 import {
   PODIUM,
   PREREQS,
@@ -58,6 +59,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const [general, setGeneral] = useState<ChatMessage[]>([]) // the Orchestrator's chat
   const [error, setError] = useState('')
   const [hover, setHover] = useState<string | null>(null) // a foundation pointed at
+  // agent files opened as windows, each wired to the card it was opened from
+  const [files, setFiles] = useState<{ ref: AgentFileRef; from: string }[]>([])
+  // where a card added by right-click first appears (until it's dragged and saved)
+  const [dropped, setDropped] = useState<Record<string, { x: number; y: number }>>({})
   // shortcut: confirmed is per viewer (localStorage); move it into deliverables.md if it
   // should follow the project to other machines
   const [confirmed, setConfirmed] = useState(() => remembered(`confirmed:${project}`).length > 0)
@@ -73,7 +78,11 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   }, [project])
 
   useEffect(() => {
-    window.api.loadCreate(project).then(setPlan)
+    const load = (): void => void window.api.loadCreate(project).then(setPlan)
+    load()
+    // an agent file saved: names, jobs and crews come from the library
+    addEventListener('orchestra:agents-changed', load)
+    return () => removeEventListener('orchestra:agents-changed', load)
   }, [project])
   useEffect(() => {
     const load = (): void => {
@@ -125,8 +134,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   async function seatMenu(id: string): Promise<void> {
     const chosen = plan!.selected.includes(id)
     const c = await window.api.menu([
-      { id: 'toggle', label: chosen ? 'Take off the stage' : 'Choose' }
+      { id: 'toggle', label: chosen ? 'Take off the stage' : 'Choose' },
+      ...(chosen && confirmed ? [{ id: 'instrument', label: 'Add an Instrument' }] : [])
     ])
+    if (c === 'instrument') return void addInstrument(id)
     if (c !== 'toggle') return
     if (!chosen) return void choose([...plan!.selected, id])
     const started = chats.find((x) => x.id === id)?.count
@@ -142,6 +153,38 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     const chosen = plan!.selected.includes(id)
     if (confirmed && chosen) return setFocus(`chat-${id}`)
     void choose(chosen ? plan!.selected.filter((s) => s !== id) : [...plan!.selected, id])
+  }
+
+  const instCard = (m: string, i: string): string => `inst--${m}--${i}`
+  /** A blank Instrument in a deliverable's crew: its card appears (where you right-clicked,
+   * else under the deliverable) with its file open beside it, to name it and give it a job. */
+  async function addInstrument(m: string, at?: { x: number; y: number }): Promise<void> {
+    setError('')
+    try {
+      const id = await window.api.newInstrument(m)
+      if (at) setDropped((d) => ({ ...d, [instCard(m, id)]: at }))
+      setPlan(await window.api.loadCreate(project))
+      openFile({ role: 'instrument', id, name: 'New Instrument' }, instCard(m, id))
+    } catch (e) {
+      setError(reason(e))
+    }
+  }
+  async function removeFromCrew(m: Musician, i: string): Promise<void> {
+    setError('')
+    try {
+      await window.api.setCrew(
+        m.id,
+        m.instruments.filter((x) => x !== i)
+      )
+      setFiles((f) => f.filter((x) => x.from !== instCard(m.id, i)))
+      setPlan(await window.api.loadCreate(project))
+    } catch (e) {
+      setError(reason(e))
+    }
+  }
+  function openFile(ref: AgentFileRef, from: string): void {
+    setFiles((f) => (f.some((x) => x.ref.id === ref.id) ? f : [...f, { ref, from }]))
+    setFocus(`file-${ref.role}-${ref.id}`)
   }
 
   const seats = seatRow(plan.musicians)
@@ -511,7 +554,59 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           w: WINDOW_W,
           link: 'orchestrator',
           needsYou: pending(id),
+          menu: [
+            { label: 'Add an Instrument', run: () => void addInstrument(id) },
+            {
+              label: 'Open its file',
+              run: () => openFile({ role: 'musician', id, name: musician(id)!.name }, `chat-${id}`)
+            }
+          ],
           body: <ChatPanel project={project} chat={id} plan={plan} view="work" />
+        })),
+        // each deliverable's crew, one window per Instrument, under it and wired to it
+        ...chosen.flatMap((id, i) => {
+          const m = musician(id)!
+          return m.instruments.map((iid, j): CardSpec => {
+            const inst = plan.instruments.find((x) => x.id === iid)
+            const card = instCard(id, iid)
+            const state = agents[`${id}--${iid}`]
+            const file: AgentFileRef = { role: 'instrument', id: iid, name: inst?.name ?? iid }
+            return {
+              id: card,
+              title: inst?.name ?? iid,
+              count: state ? STATUS[state.status].label : undefined,
+              ...(dropped[card] ?? {
+                x: windowX(i, chosen.length) + (j % 2) * (INST_W + 24),
+                y: WINDOWS_Y + 1800 + Math.floor(j / 2) * 300
+              }),
+              w: INST_W,
+              link: `chat-${id}`,
+              menu: [
+                { label: 'Open its file', run: () => openFile(file, card) },
+                { label: `Remove from ${m.name}`, run: () => void removeFromCrew(m, iid) }
+              ],
+              body: (
+                <InstrumentCard
+                  job={inst?.job}
+                  output={inst?.output}
+                  model={inst?.model}
+                  missing={!inst}
+                  onOpen={() => openFile(file, card)}
+                />
+              )
+            }
+          })
+        }),
+        // agent files opened from a card, beside it
+        ...files.map(({ ref, from }): CardSpec => ({
+          id: `file-${ref.role}-${ref.id}`,
+          title: `${[...plan.instruments, ...plan.musicians].find((x) => x.id === ref.id)?.name ?? ref.name} · file`,
+          x: 0,
+          y: WINDOWS_Y + 2600,
+          w: 640,
+          link: from,
+          onClose: () => setFiles((f) => f.filter((x) => x.ref.id !== ref.id)),
+          body: <AgentFile file={ref} />
         }))
       ]
 
@@ -527,6 +622,24 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       worldRect={extent}
       obstacles={obstacles}
       focus={focus}
+      addMenu={(at, sel): MenuItem[] => {
+        if (!confirmed) return [{ label: 'Confirm your deliverables to add Instruments' }]
+        // a deliverable's window, or one of its Instruments, selected: the menu is about it
+        const id = /^chat-(.+)$/.exec(sel ?? '')?.[1] ?? /^inst--(.+?)--/.exec(sel ?? '')?.[1]
+        const m = id && chosen.includes(id) ? musician(id) : undefined
+        if (m)
+          return [
+            { label: `New Instrument for ${m.name}`, run: () => void addInstrument(m.id, at) },
+            {
+              label: `Open ${m.name}'s file`,
+              run: () => openFile({ role: 'musician', id: m.id, name: m.name }, `chat-${m.id}`)
+            }
+          ]
+        return chosen.map((d) => ({
+          label: `New Instrument for ${musician(d)!.name}`,
+          run: () => void addInstrument(d, at)
+        }))
+      }}
       top={
         error && (
           <p
@@ -565,6 +678,38 @@ const ORCH_W = 640
 // the Orchestrator's chat can run forever, so it alone scrolls: capped at 1920×3240's shape
 const ORCH_CAP = Math.round((ORCH_W * 3240) / 1920)
 const ASK_W = 432
+const INST_W = 248 // two Instrument windows sit under each deliverable's
+
+/** An Instrument's window under its deliverable: its one job, what it writes, its model. */
+function InstrumentCard({
+  job,
+  output,
+  model,
+  missing,
+  onOpen
+}: {
+  job?: string
+  output?: string
+  model?: string
+  missing: boolean
+  onOpen: () => void
+}): React.JSX.Element {
+  if (missing) return <p className="p-4 type-body-s text-signal-fg">Not in the library any more.</p>
+  return (
+    <div className="flex flex-col gap-2 p-4">
+      <p className={`type-body-s ${job ? 'text-link' : 'text-dim'}`}>
+        {job || 'No job yet. Open its file to give it one.'}
+      </p>
+      {output && <p className="font-mono text-[11px] break-all text-dim">→ {output}</p>}
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <span className="type-caption text-dim">{model}</span>
+        <button onClick={onOpen} className="type-label-s text-link hover:underline">
+          Open its file
+        </button>
+      </div>
+    </div>
+  )
+}
 
 /** One choice in the Action box: the question, its options (with swatches when they are
  * colours), and a line to refine them. Picking answers it and it leaves the box; either way

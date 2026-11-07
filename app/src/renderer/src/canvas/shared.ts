@@ -109,3 +109,26 @@ export interface AgentFileRef {
   name: string
 }
 export const AgentFileOpener = createContext<((f: AgentFileRef) => void) | null>(null)
+
+/** A right-click menu entry: what it says and what it does. With no `run` it shows greyed. */
+export interface MenuItem {
+  label: string
+  run?: () => void
+  enabled?: boolean
+  separator?: boolean
+}
+/** Shows a native right-click menu and runs whatever is picked. */
+export async function popMenu(items: MenuItem[]): Promise<void> {
+  const id = await window.api.menu(
+    items.map((it, i) => ({
+      id: String(i),
+      label: it.label,
+      enabled: it.enabled ?? !!it.run,
+      separator: it.separator
+    }))
+  )
+  if (id !== null) items[Number(id)]?.run?.()
+}
+/** The Orchestrator bar's field, when this screen has the bar. */
+export const barInput = (): HTMLInputElement | null =>
+  document.querySelector<HTMLInputElement>('input[aria-label^="Message the Orchestrator"]')

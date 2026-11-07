@@ -11,6 +11,7 @@ import { CoverEditor } from './canvas/CoverEditor'
 import { Opening } from './canvas/Opening'
 import { OrchestratorBar, type BarTarget } from './canvas/OrchestratorBar'
 import { Studio } from './canvas/Studio'
+import { Setup } from './canvas/Setup'
 
 // Per-viewer UI memory; storage can be unavailable, so every access is guarded.
 function rememberedJson<T>(key: string, fallback: T): T {
@@ -47,6 +48,7 @@ const shelfRect = (id: string): DOMRect | undefined =>
 function App(): React.JSX.Element {
   const [projects, setProjects] = useState<Project[] | null>(null)
   const [layout, setLayout] = useState<StudioLayout | null>(null)
+  const [setUp, setSetUp] = useState<boolean | null>(null) // first-time setup finished
   const [view, setView] = useState<View>(startingView)
   const [history, setHistory] = useState<{ back: View[]; forward: View[] }>({
     back: [],
@@ -76,6 +78,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     refresh()
     void window.api.loadStudio().then(setLayout)
+    void window.api.loadSetup().then((s) => setSetUp(s.setup.done))
     // another window may have created or deleted a project; catch up when this one comes forward
     addEventListener('focus', refresh)
     const keys = (e: KeyboardEvent): void => {
@@ -162,7 +165,8 @@ function App(): React.JSX.Element {
     }
   }, [step])
 
-  if (!projects || !layout) return <div className="bg-dots h-full" />
+  if (!projects || !layout || setUp === null) return <div className="bg-dots h-full" />
+  if (!setUp) return <Setup onDone={() => setSetUp(true)} />
 
   const saveLayout = (l: StudioLayout): void => {
     setLayout(l)

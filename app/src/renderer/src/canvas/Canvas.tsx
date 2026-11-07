@@ -18,6 +18,7 @@ interface Props {
   scrollable?: string
   onBackground?: (e: React.MouseEvent) => void // double-click or context menu on empty board
   onContextMenu?: (e: React.MouseEvent) => void
+  onPress?: () => void // a left press on empty board, e.g. to clear a selection
   className?: string
 }
 
@@ -30,6 +31,7 @@ export function Canvas({
   scrollable,
   onBackground,
   onContextMenu,
+  onPress,
   className = ''
 }: Props): React.JSX.Element {
   const { camera, set, ref } = cam
@@ -83,6 +85,7 @@ export function Canvas({
 
   function pointerDown(e: React.PointerEvent): void {
     const onBoard = e.target === e.currentTarget || (e.target as HTMLElement).dataset.board
+    if (e.button === 0 && onBoard) onPress?.()
     if (!(e.button === 1 || (e.button === 0 && (onBoard || space.current)))) return
     e.preventDefault()
     const start = { x: e.clientX, y: e.clientY, cam: live.current }

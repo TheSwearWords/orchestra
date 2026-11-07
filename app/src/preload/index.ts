@@ -4,6 +4,7 @@ import type { Project } from '../main/projects'
 import type { AgentState, ChatEvent, ChatMessage, LogEntry } from '../main/conductor'
 import type { EditKey, Instrument, Library, Musician, Role } from '../main/library'
 import type { ProviderStatus } from '../main/providers'
+import type { Setup } from '../main/setup'
 import type { Output } from '../main/outputs'
 import type { Proposal } from '../main/proposals'
 import type { Ask } from '../main/asks'
@@ -13,6 +14,7 @@ export type {
   AgentState,
   EditKey,
   ProviderStatus,
+  Setup,
   ChatEvent,
   ChatMessage,
   Instrument,
@@ -192,6 +194,9 @@ const api = {
   editAgent: (role: Role, id: string, key: EditKey, value: string): Promise<void> =>
     ipcRenderer.invoke('agents:set', role, id, key, value),
   providerStatus: (): Promise<ProviderStatus> => ipcRenderer.invoke('providers:status'),
+  loadSetup: (): Promise<{ setup: Setup; home: string; gh: boolean; obsidian: boolean }> =>
+    ipcRenderer.invoke('setup:load'),
+  saveSetup: (s: Setup): Promise<Setup> => ipcRenderer.invoke('setup:save', s),
   // a blank Instrument in a Musician's crew; returns its id
   newInstrument: (musician: string): Promise<string> =>
     ipcRenderer.invoke('agents:newInstrument', musician),

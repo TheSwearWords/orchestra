@@ -9,7 +9,8 @@ import { Conductor, GENERAL, STUDIO, readChat, readLog } from './conductor'
 import { agentPrompt, orchestratorPrompt, studioPrompt } from './prompts'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
-import { providerStatus } from './connections'
+import { onPath, providerStatus } from './connections'
+import { readSetup, saveSetup } from './setup'
 import {
   agentFile,
   checkLibrary,
@@ -365,7 +366,9 @@ app.whenReady().then(async () => {
   // it is collapsed. One file per board, so boards saved at once never overwrite each other.
   const boardFile = (project: string, board: string): string => {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(board)) throw new Error('Unknown board.')
-    return join(projectDir(project), 'boards', `${board}.json`)
+    // the Studio's own boards (first-time setup) live in studio/, beside its chat
+    const dir = project === STUDIO ? join(ORCHESTRA_HOME, 'studio') : projectDir(project)
+    return join(dir, 'boards', `${board}.json`)
   }
   ipcMain.handle('board:load', async (_, project: string, board: string) => {
     try {
@@ -487,6 +490,16 @@ app.whenReady().then(async () => {
     await writeFile(file, editAgent(md, role, key as EditKey, String(value)))
   })
   ipcMain.handle('providers:status', () => providerStatus())
+  // first-time setup, plus what this machine already has, so the cards can say so
+  ipcMain.handle('setup:load', async () => ({
+    setup: await readSetup(ORCHESTRA_HOME),
+    home: ORCHESTRA_HOME,
+    gh: onPath('gh'),
+    obsidian:
+      onPath('obsidian') ||
+      existsSync(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Obsidian', 'Obsidian.exe'))
+  }))
+  ipcMain.handle('setup:save', (_, v: unknown) => saveSetup(ORCHESTRA_HOME, v))
   ipcMain.handle('agents:newInstrument', (_, musician: string) =>
     newInstrument(ORCHESTRA_HOME, String(musician))
   )

@@ -9,7 +9,7 @@ import type { BoardLayout } from '../../../preload'
 import { snap, fit, type Rect } from './camera'
 import { Canvas } from './Canvas'
 import { Minimap, Shell, ZoomChip, barButton, type Step } from './Chrome'
-import { TOP_BAR, fitBelow } from './shared'
+import { TOP_BAR, barInput, fitBelow, popMenu, type MenuItem } from './shared'
 import { freeSpot, settle } from './place'
 import { Wire } from './Wire'
 import { useCamera } from './useCamera'
@@ -29,6 +29,7 @@ export interface CardSpec {
   // the one exception to growing with its content: a chat, which could run forever. Its body
   // starts this tall and scrolls inside; dragging the corner makes it taller or shorter too.
   height?: number
+  menu?: MenuItem[] // right-click on the card's header
 }
 
 const HEADER = 44
@@ -48,6 +49,11 @@ interface Props {
   top?: React.ReactNode // screen-space note under the top bar, e.g. an error
   focus?: string // a card to bring into view, e.g. one just opened
   preview?: boolean // the book's small live copy: no chrome, nothing saved
+  right?: React.ReactNode // more controls in the top bar, before Tidy
+  // right-click on empty board: what can be added here, at that spot in board px, for the
+  // selected card if there is one (click a card to select it: its border goes bold). Every
+  // board's menu ends with Ask the Orchestrator… when the screen has the bar.
+  addMenu?: (at: { x: number; y: number }, selected?: string) => MenuItem[]
 }
 
 export function Board({
@@ -62,7 +68,9 @@ export function Board({
   obstacles = [],
   top,
   focus,
-  preview
+  preview,
+  right,
+  addMenu
 }: Props): React.JSX.Element {
   const [layout, setLayout] = useState<BoardLayout | null>(null)
   const [tidying, setTidying] = useState(false)
@@ -130,6 +138,17 @@ export function Board({
     const spot = freeSpot({ x: next.x, y: next.y, w: next.w, h: c.h }, others)
     save({ ...layout, [id]: { ...next, x: spot.x, y: spot.y } })
   }
+  // the card you're working with: clicking a card selects it, clicking empty board or Escape
+  // lets go; right-click on the board then offers what pertains to it
+  const [selected, setSelected] = useState<string>()
+  useEffect(() => {
+    const key = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setSelected(undefined)
+    }
+    addEventListener('keydown', key)
+    return () => removeEventListener('keydown', key)
+  }, [])
+
   function tidy(): void {
     setTidying(true)
     save({})
@@ -140,12 +159,35 @@ export function Board({
     <Canvas
       cam={cam}
       className={preview ? '' : 'animate-[area-in_550ms_var(--ease)_both]'}
+      onPress={() => setSelected(undefined)}
+      onContextMenu={
+        addMenu &&
+        ((e) => {
+          const box = e.currentTarget.getBoundingClientRect()
+          const { x, y, z } = cam.camera
+          const sel = placed.find((c) => c.id === selected)
+          const items = addMenu(
+            { x: snap(x + (e.clientX - box.left) / z), y: snap(y + (e.clientY - box.top) / z) },
+            sel?.id
+          )
+          // the menu says what it's for: the selected card's name, greyed, on top
+          if (sel) items.unshift({ label: sel.title }, { label: '', separator: true })
+          const field = barInput()
+          if (field)
+            items.push(
+              { label: '', separator: true },
+              { label: 'Ask the Orchestrator…', run: () => field.focus() }
+            )
+          void popMenu(items)
+        })
+      }
       chrome={
         !preview && (
           <Shell
             crumbs={crumbs}
             right={
               <>
+                {right}
                 {layout && Object.keys(layout).length > 0 && (
                   <button onClick={tidy} className={barButton}>
                     Tidy
@@ -215,6 +257,8 @@ export function Board({
             }
             z={cam.camera.z}
             tidying={tidying}
+            selected={selected === c.id}
+            onSelect={() => setSelected(c.id)}
             onMove={(x, y) => change(c.id, { x, y })}
             onResize={(w, h) => change(c.id, h ? { w, h } : { w })}
             onCollapse={() => change(c.id, { collapsed: !c.collapsed })}
@@ -230,6 +274,8 @@ export function Card({
   onHeight,
   z,
   tidying,
+  selected,
+  onSelect,
   onMove,
   onResize,
   onCollapse
@@ -239,6 +285,8 @@ export function Card({
   onHeight?: (h: number) => void // its rendered height in board px, so others can keep clear
   z: number
   tidying: boolean
+  selected?: boolean // the card right-click on the board is about: a bold blue border
+  onSelect?: () => void
   onMove: (x: number, y: number) => void
   onResize: (w: number, h?: number) => void
   onCollapse: () => void
@@ -310,7 +358,8 @@ export function Card({
             ? // waiting on you: an orange dotted frame around it, with the tag on its edge
               'shadow-card outline-2 outline-offset-8 outline-needs-you outline-dashed'
             : 'shadow-card'
-      }`}
+      } ${selected && !dragging ? 'ring-[3px] ring-brand' : ''}`}
+      onPointerDownCapture={onSelect}
       style={{
         left: 0,
         top: 0,
@@ -320,6 +369,12 @@ export function Card({
       }}
     >
       <header
+        onContextMenu={(e) => {
+          if (!card.menu) return
+          e.preventDefault()
+          e.stopPropagation()
+          void popMenu(card.menu)
+        }}
         onPointerDown={(e) =>
           track(
             e,

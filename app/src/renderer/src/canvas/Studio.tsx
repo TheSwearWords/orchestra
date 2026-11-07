@@ -4,12 +4,22 @@ import type { Project, StudioLayout } from '../../../preload'
 import { Canvas } from './Canvas'
 import { useCamera } from './useCamera'
 import { fit, snap, type Rect } from './camera'
-import { COVER, ROW_Y, fitBelow, coverInfo, studioPlace, type Area, type CoverInfo } from './shared'
+import {
+  AgentFileOpener,
+  type AgentFileRef,
+  COVER,
+  ROW_Y,
+  fitBelow,
+  coverInfo,
+  studioPlace,
+  type Area,
+  type CoverInfo
+} from './shared'
 import { Minimap, Shell, ZoomChip, barButton } from './Chrome'
 import { CoverFace } from './Cover'
 import { Card, type CardSpec } from './Board'
 import { settle } from './place'
-import { Agents } from '../components/Agents'
+import { AgentFile, Agents } from '../components/Agents'
 import { Icon } from '../components/Icon'
 import { PROVIDERS, type ProviderId } from '../../../main/providers'
 
@@ -47,12 +57,29 @@ export function Studio({
   // the desk, under the shelf: what every project shares
   const deskY = ROW_Y + COVER.h + 120
   const desk = DESK.map((d, i) => ({ ...d, x: 96 + i * (DESK_W + 24), y: deskY }))
-  const [windows, setWindows] = useState<{ id: Desk; x: number; y: number; w?: number }[]>([])
+  // the desk's windows, and agent files opened from the Agents window (id "file-<role>-<id>")
+  const [windows, setWindows] = useState<
+    { id: string; x: number; y: number; w?: number; file?: AgentFileRef }[]
+  >([])
+  const look = (w: { id: string; file?: AgentFileRef }): (typeof WINDOW)[Desk] =>
+    w.file ? { title: `${w.file.name} · file`, w: 760, guess: 900 } : WINDOW[w.id as Desk]
+  function openFile(f: AgentFileRef): void {
+    const id = `file-${f.role}-${f.id}`
+    const agents = windows.find((o) => o.id === 'agents')
+    const spot = windows.find((o) => o.id === id) ?? {
+      id,
+      file: f,
+      x: agents ? agents.x + (agents.w ?? WINDOW.agents.w) + 48 : 96,
+      y: agents ? agents.y : deskY + DESK_H + 48
+    }
+    if (!windows.some((o) => o.id === id)) setWindows([...windows, spot])
+    void cam.fly(fitBelow({ ...spot, w: 760, h: 900 }), 450)
+  }
   // with no projects yet, the board still has the desk to look at
   const everything: Rect[] = [
     ...rects,
     ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H })),
-    ...windows.map((w) => ({ x: w.x, y: w.y, w: w.w ?? WINDOW[w.id].w, h: WINDOW[w.id].guess }))
+    ...windows.map((w) => ({ x: w.x, y: w.y, w: w.w ?? look(w).w, h: look(w).guess }))
   ]
   const bounds = (): Rect => {
     const x = Math.min(...everything.map((r) => r.x))
@@ -72,6 +99,16 @@ export function Studio({
     if (!windows.some((w) => w.id === id)) setWindows([...windows, spot])
     void cam.fly(fitBelow({ ...spot, w: WINDOW[id].w, h: WINDOW[id].guess + 44 }), 450)
   }
+  // "/agents", "/mcps" and "/settings" in the bar open these from anywhere
+  const opener = useRef<(id: Desk) => void>(() => {})
+  useEffect(() => {
+    opener.current = openWindow
+  })
+  useEffect(() => {
+    const open = (e: Event): void => opener.current((e as CustomEvent<Desk>).detail)
+    addEventListener('orchestra:desk', open)
+    return () => removeEventListener('orchestra:desk', open)
+  }, [])
 
   function tidy(): void {
     setTidying(true)
@@ -185,19 +222,29 @@ export function Studio({
         </button>
       ))}
       {settle(
-        windows.map((w) => ({ ...w, w: w.w ?? WINDOW[w.id].w, h: WINDOW[w.id].guess })),
+        windows.map((w) => ({ ...w, w: w.w ?? look(w).w, h: look(w).guess })),
         [...rects, ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H }))]
       ).map((w) => (
         <Card
           key={w.id}
           card={{
-            ...WINDOW[w.id],
+            ...look(w),
             w: w.w,
             id: w.id,
             x: w.x,
             y: w.y,
             onClose: () => setWindows(windows.filter((o) => o.id !== w.id)),
-            body: w.id === 'agents' ? <Agents /> : w.id === 'mcps' ? <Connections /> : <Settings />
+            body: w.file ? (
+              <AgentFile file={w.file} />
+            ) : w.id === 'agents' ? (
+              <AgentFileOpener.Provider value={openFile}>
+                <Agents />
+              </AgentFileOpener.Provider>
+            ) : w.id === 'mcps' ? (
+              <Connections />
+            ) : (
+              <Settings />
+            )
           }}
           z={cam.camera.z}
           tidying={false}

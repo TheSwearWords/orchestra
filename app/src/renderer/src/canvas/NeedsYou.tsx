@@ -98,6 +98,12 @@ export function NeedsYou({
     }
   }, [projects])
 
+  useEffect(() => {
+    const show = (): void => setOpen(true)
+    addEventListener('orchestra:needs', show)
+    return () => removeEventListener('orchestra:needs', show)
+  }, [])
+
   const unread = needs.filter((n) => !seen.has(n.key)).length
   const name = (id: string): string => projects.find((p) => p.id === id)?.name ?? id
   return (

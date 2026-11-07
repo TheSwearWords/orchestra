@@ -10,16 +10,23 @@ import type {
   Proposal
 } from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
-import { Board } from '../canvas/Board'
+import { Board, type CardSpec } from '../canvas/Board'
 import type { Frame } from '../canvas/Book'
-import { typing } from '../canvas/shared'
-import { PODIUM, PREREQS, SEAT, filesFor, outputPaths, ring, seatArc } from '../canvas/stage'
+import { GENERAL, STUDIO } from '../canvas/shared'
+import {
+  PODIUM,
+  PREREQS,
+  SEAT,
+  besideSeat,
+  filesFor,
+  outputPaths,
+  ring,
+  seatArc
+} from '../canvas/stage'
 import { splitDecision, type Decision } from '../decide'
 import { splitSuggestion } from '../suggest'
 import { Icon } from './Icon'
 import { Markdown } from './Research'
-
-const GENERAL = 'general' // the whole-project chat (conductor.ts)
 
 // Electron prefixes IPC errors with the channel name; show only the reason
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
@@ -31,88 +38,25 @@ const solidButton =
 const outlineButton =
   'flex h-9 shrink-0 items-center gap-2 border border-line-strong bg-canvas px-4 type-label-m transition-[background-color,scale] duration-150 hover:bg-muted active:scale-[0.97]'
 
-/** II · Create as its own artboard. With no deliverable open it is the stage: every deliverable
- * a seat around the podium, and the foundations they share. A chosen seat opens its own board:
- * the chat, its Instruments and the files it made. */
-export function Create({
-  project,
-  frame,
-  chat,
-  onChat
-}: {
-  project: string
-  frame: Frame
-  chat: string | null // null: the stage
-  onChat: (chat: string | null) => void
-}): React.JSX.Element {
+/** II · Create, one artboard: the stage (every deliverable a seat around the Deliverables
+ * podium, the foundations they need ringing the Prerequisites circle), and the windows you
+ * open on it. Clicking a chosen seat opens its chat, agents and files in a card beside it;
+ * clicking the podium does the same for the whole project (General). Nothing navigates away. */
+export function Create({ project, frame }: { project: string; frame: Frame }): React.JSX.Element {
   const [plan, setPlan] = useState<CreateState | null>(null)
-
-  useEffect(() => {
-    window.api.loadCreate(project).then(setPlan)
-  }, [project])
-
-  // inside a deliverable, Esc goes back to the stage before the book sees it
-  useEffect(() => {
-    if (chat === null || frame.preview) return
-    const key = (e: globalThis.KeyboardEvent): void => {
-      if (e.key !== 'Escape' || typing(e)) return
-      e.preventDefault()
-      onChat(null)
-    }
-    addEventListener('keydown', key, true)
-    return () => removeEventListener('keydown', key, true)
-  }, [chat, frame.preview, onChat])
-
-  if (!plan) return <div className="bg-dots h-full" />
-  if (chat === null || frame.preview)
-    return <Stage project={project} plan={plan} frame={frame} onPlan={setPlan} onOpen={onChat} />
-
-  const name = plan.musicians.find((m) => m.id === chat)?.name ?? 'General'
-  return (
-    <ChatView
-      key={chat}
-      project={project}
-      chat={chat}
-      plan={plan}
-      frame={{
-        ...frame,
-        crumbs: [
-          ...frame.crumbs.slice(0, -1),
-          { ...frame.crumbs[frame.crumbs.length - 1], onClick: () => onChat(null) },
-          { label: name }
-        ]
-      }}
-      onSelected={(ids) => {
-        // a Musician approved in the chat is new to the library too, so reload it
-        if (ids.every((id) => plan.musicians.some((m) => m.id === id)))
-          setPlan({ ...plan, selected: ids })
-        else void window.api.loadCreate(project).then(setPlan)
-      }}
-    />
-  )
-}
-
-/** The stage: the podium, every deliverable on the arc above it, the foundations below. */
-function Stage({
-  project,
-  plan,
-  frame,
-  onPlan,
-  onOpen
-}: {
-  project: string
-  plan: CreateState
-  frame: Frame
-  onPlan: (p: CreateState) => void
-  onOpen: (chat: string) => void
-}): React.JSX.Element {
   const [chats, setChats] = useState<ChatInfo[]>([])
   const [outputs, setOutputs] = useState<Output[]>([])
   const [agents, setAgents] = useState<Record<string, AgentState>>({})
   const [proposals, setProposals] = useState<Record<string, Proposal>>({})
   const [error, setError] = useState('')
-  const [hover, setHover] = useState<string | null>(null) // a foundation being pointed at
+  const [hover, setHover] = useState<string | null>(null) // a seat or foundation pointed at
+  // the cards open on the stage, kept per project for next time
+  const [open, setOpen] = useState<string[]>(() => remembered(`open:${project}`))
+  const [focus, setFocus] = useState<string | undefined>(undefined)
 
+  useEffect(() => {
+    window.api.loadCreate(project).then(setPlan)
+  }, [project])
   useEffect(() => {
     const load = (): void => {
       void window.api.listChats(project).then(setChats, () => {})
@@ -124,29 +68,42 @@ function Stage({
     return window.api.onChatEvent((e) => {
       if (e.project === project && e.kind !== 'live' && e.kind !== 'log') load()
     })
-  }, [project, plan.selected])
+  }, [project, plan?.selected])
+
+  if (!plan) return <div className="bg-dots h-full" />
+
+  function show(ids: string[]): void {
+    setOpen(ids)
+    remember(`open:${project}`, ids)
+  }
+  const openCard = (id: string): void => {
+    if (!open.includes(id)) show([...open, id])
+    setFocus(id)
+  }
+  const closeCard = (id: string): void => show(open.filter((o) => o !== id))
 
   async function choose(ids: string[]): Promise<void> {
     setError('')
     try {
-      onPlan({ ...plan, selected: await window.api.saveDeliverables(project, ids) })
+      setPlan({ ...plan!, selected: await window.api.saveDeliverables(project, ids) })
     } catch (e) {
       setError(reason(e))
     }
   }
   async function seatMenu(id: string): Promise<void> {
-    const chosen = plan.selected.includes(id)
+    const chosen = plan!.selected.includes(id)
     const c = await window.api.menu([
       { id: 'open', label: 'Open', enabled: chosen },
-      { id: 'chat', label: chosen ? 'Remove from the project' : 'Add to the project' }
+      { id: 'toggle', label: chosen ? 'Remove from the project' : 'Add to the project' }
     ])
-    if (c === 'open') onOpen(id)
-    if (c !== 'chat') return
-    if (!chosen) return void choose([...plan.selected, id])
+    if (c === 'open') openCard(id)
+    if (c !== 'toggle') return
+    if (!chosen) return void choose([...plan!.selected, id])
     const started = chats.find((x) => x.id === id)?.count
-    if (started && !confirm('Its chat and files stay in the project. Remove it from the stage?'))
+    if (started && !confirm('Its chat and files stay in the project. Take it off the stage?'))
       return
-    void choose(plan.selected.filter((s) => s !== id))
+    closeCard(id)
+    void choose(plan!.selected.filter((s) => s !== id))
   }
 
   const seats = seatArc(plan.musicians)
@@ -162,11 +119,16 @@ function Stage({
     outputPaths(output).some((p) => outputs.some((o) => o.path === p || o.path.startsWith(p)))
   const making = (id: string): boolean =>
     Object.entries(agents).some(([k, a]) => k.endsWith(`--${id}`) && a.status === 'working')
-  const needs = (fid: string): string[] =>
-    plan.selected.filter((s) => plan.musicians.find((m) => m.id === s)?.prerequisites.includes(fid))
+  const musician = (id: string): Musician | undefined => plan.musicians.find((m) => m.id === id)
+  // wires show only what you point at: a seat's foundations, or a foundation's seats
+  const wired = foundations.flatMap((f, i) =>
+    plan.selected
+      .filter((sid) => musician(sid)?.prerequisites.includes(f.id))
+      .filter((sid) => hover === f.id || hover === sid)
+      .map((sid) => ({ key: f.id + sid, from: spots[i], to: at.get(sid)! }))
+  )
 
-  const extent = { x: -1180, y: -820, w: 2360, h: 1700 }
-  const wire = 'fill-none stroke-wire [stroke-dasharray:5_5] [stroke-width:1.4]'
+  const extent = { x: -1200, y: -1560, w: 2400, h: 1760 }
   const world = (
     <>
       <svg
@@ -174,37 +136,23 @@ function Stage({
         className="pointer-events-none absolute overflow-visible"
         style={{ left: 0, top: 0, width: 1, height: 1 }}
       >
-        {plan.selected.map((id) => {
-          const s = at.get(id)
-          return (
-            s && <line key={id} x1={PODIUM.x} y1={PODIUM.y} x2={s.x} y2={s.y} className={wire} />
-          )
-        })}
-        {foundations.map((f, i) =>
-          needs(f.id).map((sid) => {
-            const s = at.get(sid)
-            const p = spots[i]
-            return (
-              s && (
-                <line
-                  key={f.id + sid}
-                  x1={p.x}
-                  y1={p.y}
-                  x2={s.x}
-                  y2={s.y + SEAT.h / 2}
-                  className={`${wire} transition-opacity duration-200 ${hover && hover !== f.id ? 'opacity-15' : ''}`}
-                />
-              )
-            )
-          })
-        )}
+        {wired.map((w) => (
+          <line
+            key={w.key}
+            x1={w.from.x}
+            y1={w.from.y}
+            x2={w.to.x}
+            y2={w.to.y - SEAT.h / 2}
+            className="fill-none stroke-wire [stroke-dasharray:5_5] [stroke-width:1.4]"
+          />
+        ))}
       </svg>
 
-      {/* the podium: the Orchestrator, at the centre of everything chosen */}
+      {/* the podium: the Orchestrator, with every deliverable seated round it */}
       <button
-        onClick={() => onOpen(GENERAL)}
+        onClick={() => openCard(GENERAL)}
         title="Talk to the Orchestrator about the whole project"
-        className="bg-poster-dots group absolute flex flex-col items-center justify-center gap-2 rounded-full shadow-card"
+        className="bg-poster-dots absolute flex flex-col items-center justify-center gap-2 rounded-full shadow-card"
         style={{
           left: PODIUM.x - PODIUM.r,
           top: PODIUM.y - PODIUM.r,
@@ -217,11 +165,11 @@ function Stage({
         </span>
         <span className="type-heading-m">Deliverables</span>
         <span className="type-label-s text-poster-dim">
-          {plan.selected.length} chosen · talk to the Orchestrator
+          {plan.selected.length} chosen · General
         </span>
       </button>
 
-      {/* the Prerequisites circle and its foundations */}
+      {/* the Prerequisites circle, ringed by every foundation; lit when a chosen seat needs it */}
       <div
         className="absolute flex flex-col items-center justify-center rounded-full border border-card-line bg-card text-center shadow-card"
         style={{
@@ -232,12 +180,13 @@ function Stage({
         }}
       >
         <span className="type-label-serif-l text-link">Prerequisites</span>
-        <span className="mt-1 type-caption text-dim">{lit.size} needed</span>
+        <span className="mt-1 type-caption text-dim">
+          {lit.size} of {foundations.length} needed
+        </span>
       </div>
       {foundations.map((f, i) => {
         const on = lit.has(f.id)
         const state = !on ? '' : exists(f.output) ? 'Ready' : making(f.id) ? 'Making' : 'To make'
-        const shared = needs(f.id).length
         return (
           <span
             key={f.id}
@@ -245,95 +194,101 @@ function Stage({
             onPointerLeave={() => setHover(null)}
             title={`${f.job}\n→ ${f.output}`}
             className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full px-3 py-1.5 type-label-s whitespace-nowrap ${
-              on
-                ? state === 'Ready'
+              !on
+                ? 'border border-dashed border-wire/40 bg-card text-placeholder'
+                : state === 'Ready'
                   ? 'bg-success-subtle text-success-fg'
                   : 'border border-brand bg-card text-link shadow-float'
-                : 'border border-dashed border-wire/40 bg-card text-placeholder'
             }`}
             style={{ left: spots[i].x, top: spots[i].y }}
           >
             {f.name}
             {on && <span className="type-caption normal-case">{state}</span>}
-            {hover === f.id && shared > 1 && (
-              <span className="type-caption normal-case">· shared ×{shared}</span>
-            )}
           </span>
         )
       })}
 
       {seats.map((s) => {
+        const style = {
+          left: s.x - SEAT.w / 2,
+          top: s.y - SEAT.h / 2,
+          width: SEAT.w,
+          height: SEAT.h
+        }
         if (s.id === 'add')
           return (
             <button
               key="add"
-              onClick={() => onOpen(GENERAL)}
+              onClick={() => openCard(GENERAL)}
               title="Ask the Orchestrator for a deliverable the library doesn't have"
               className="absolute flex flex-col items-center justify-center gap-1 border border-dashed border-wire bg-card/70 text-link"
-              style={{
-                left: s.x - SEAT.w / 2,
-                top: s.y - SEAT.h / 2,
-                width: SEAT.w,
-                height: SEAT.h
-              }}
+              style={style}
             >
               <span className="font-mono text-xl text-link/40">+</span>
-              <span className="serif-on type-label-m">Add deliverable</span>
+              <span className="serif-on type-heading-m">Add a seat</span>
               <span className="type-caption text-dim">Ask the Orchestrator</span>
             </button>
           )
-        const m = plan.musicians.find((x) => x.id === s.id)!
+        const m = musician(s.id)!
         const chosen = plan.selected.includes(m.id)
         const c = chats.find((x) => x.id === m.id)
-        const playing = c?.busy
         // an approval waiting in its chat
         const needsYou = Object.values(proposals).some(
           (p) => p.chat === m.id && p.status === 'pending'
         )
-        const lights = hover ? m.prerequisites.includes(hover) && chosen : false
+        const status = !chosen
+          ? 'Add'
+          : needsYou
+            ? 'Needs you'
+            : c?.busy
+              ? 'Playing'
+              : c?.count
+                ? 'Started'
+                : 'Not started'
         return (
           <button
             key={m.id}
-            onClick={() => (chosen ? onOpen(m.id) : void choose([...plan.selected, m.id]))}
+            onClick={() => (chosen ? openCard(m.id) : void choose([...plan.selected, m.id]))}
+            onPointerEnter={() => setHover(m.id)}
+            onPointerLeave={() => setHover(null)}
             onContextMenu={(e) => {
               e.preventDefault()
               e.stopPropagation()
               void seatMenu(m.id)
             }}
             title={chosen ? `Open ${m.name}` : `Add ${m.name}: ${m.deliverable}`}
-            className={`group absolute flex flex-col items-start p-4 text-left transition-[background-color,box-shadow] duration-200 ease-(--ease) ${
+            aria-pressed={open.includes(m.id)}
+            className={`absolute flex flex-col items-center px-4 pt-5 pb-4 text-center transition-[background-color,outline-color] duration-200 ease-(--ease) ${
               chosen
                 ? 'bg-poster-dots shadow-card'
                 : 'border border-card-line bg-card text-link shadow-card hover:bg-selected'
-            } ${lights ? 'outline-2 outline-offset-4 outline-brand' : ''}`}
-            style={{ left: s.x - SEAT.w / 2, top: s.y - SEAT.h / 2, width: SEAT.w, height: SEAT.h }}
+            } ${open.includes(m.id) ? 'outline-2 outline-offset-4 outline-brand' : ''}`}
+            style={style}
           >
             {needsYou && (
-              <span className="absolute -top-3 left-4 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
+              <span className="absolute -top-3 right-4 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
                 Needs you
               </span>
             )}
-            <span className="flex w-full items-center justify-between">
-              <span
-                className={`flex size-10 items-center justify-center rounded-full ${chosen ? 'bg-white text-link' : 'bg-brand text-on-brand'}`}
-              >
-                <Icon name={m.icon} size={20} />
-              </span>
-              <span
-                className={`rounded-full px-2 py-0.5 type-label-s ${
-                  !chosen
-                    ? 'border border-dashed border-wire text-link'
-                    : playing
-                      ? 'bg-white text-link'
-                      : 'border border-white/70'
-                }`}
-              >
-                {!chosen ? 'Add' : playing ? 'Playing' : c?.count ? 'Started' : 'Not started'}
-              </span>
+            <span
+              className={`flex size-14 shrink-0 items-center justify-center rounded-full ${chosen ? 'bg-white text-link' : 'bg-brand text-on-brand'}`}
+            >
+              <Icon name={m.icon} size={26} />
             </span>
-            <span className="mt-3 type-label-serif-l">{m.name}</span>
-            <span className={`mt-1 type-label-s ${chosen ? 'text-poster-dim' : 'text-dim'}`}>
+            <span className="mt-3 type-heading-m leading-none">{m.name}</span>
+            <span className={`mt-1.5 type-label-s ${chosen ? 'text-poster-dim' : 'text-dim'}`}>
               {m.category}
+            </span>
+            <span
+              className={`mt-2 rounded-full px-2.5 py-0.5 type-label-s ${
+                !chosen
+                  ? 'border border-dashed border-wire'
+                  : needsYou
+                    ? 'bg-needs-you text-on-needs-you'
+                    : 'bg-white text-link'
+              }`}
+            >
+              {status}
             </span>
             <span
               className={`mt-2 line-clamp-2 type-caption ${chosen ? 'text-poster-dim' : 'text-dim'}`}
@@ -346,16 +301,51 @@ function Stage({
     </>
   )
 
+  // each open card sits beside its seat (General: beside the podium), until it is moved
+  const W = 520
+  const cards: CardSpec[] = open
+    .filter((id) => id === GENERAL || plan.selected.includes(id))
+    .map((id) => {
+      const spot =
+        id === GENERAL
+          ? { x: PODIUM.x + PODIUM.r + 48, y: PODIUM.y - 360 }
+          : besideSeat(at.get(id)!, W)
+      return {
+        id: `chat-${id}`,
+        title: id === GENERAL ? 'General' : musician(id)!.name,
+        count: chats.find((c) => c.id === id)?.busy ? 'playing' : undefined,
+        x: spot.x,
+        y: spot.y,
+        w: W,
+        h: 800,
+        onClose: () => closeCard(id),
+        body: (
+          <ChatPanel
+            project={project}
+            chat={id}
+            plan={plan}
+            onSelected={(ids) => {
+              // a Musician approved in the chat is new to the library too, so reload it
+              if (ids.every((x) => plan.musicians.some((m) => m.id === x)))
+                setPlan({ ...plan, selected: ids })
+              else void window.api.loadCreate(project).then(setPlan)
+            }}
+          />
+        )
+      }
+    })
+
   return (
     <Board
       project={project}
       board="create"
       label="II · Create"
       crumbs={frame.crumbs}
-      aside={frame.aside}
+      pages={frame.pages}
       preview={frame.preview}
       world={world}
       worldRect={extent}
+      focus={focus && `chat-${focus}`}
       top={
         error && (
           <p
@@ -366,34 +356,48 @@ function Stage({
           </p>
         )
       }
-      cards={[
-        {
-          id: 'files',
-          title: 'Created files',
-          count: `${outputs.length} file${outputs.length === 1 ? '' : 's'}`,
-          x: 1272,
-          y: -96,
-          w: 384,
-          body: <Files project={project} outputs={outputs} />
-        }
-      ]}
+      cards={cards}
     />
   )
 }
 
-function ChatView({
+// Per-viewer memory of which cards are open; storage can be unavailable, so it is guarded.
+function remembered(key: string): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) ?? '[]')
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+function remember(key: string, value: string[]): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // the app works the same without it
+  }
+}
+
+const NO_PLAN: CreateState = { musicians: [], instruments: [], selected: [] }
+
+/** One conversation with the Orchestrator, laid out as C7: the chat (or the agent channel),
+ * then the agents' status and the files made, then the reply box. It is the card a seat opens
+ * on the stage and the panel above the Orchestrator bar (which brings its own input, so
+ * `composer` is off there). In the Studio there are no agents or files, only the chat. */
+export function ChatPanel({
   project,
   chat,
-  plan,
-  frame,
-  onSelected
+  plan = NO_PLAN,
+  composer = true,
+  onSelected = () => {}
 }: {
   project: string
   chat: string
-  plan: CreateState
-  frame: Frame
-  onSelected: (ids: string[]) => void
+  plan?: CreateState
+  composer?: boolean
+  onSelected?: (ids: string[]) => void
 }): React.JSX.Element {
+  const studio = project === STUDIO
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [log, setLog] = useState<LogEntry[]>([])
   const [busy, setBusy] = useState(false)
@@ -410,11 +414,13 @@ function ChatView({
       setLog(c.log)
       setBusy(c.busy)
     })
-    const loadProposals = (): void => void window.api.listProposals(project).then(setProposals)
+    const loadProposals = (): void =>
+      void (studio || window.api.listProposals(project).then(setProposals))
     loadProposals()
-    const loadOutputs = (): void => void window.api.listOutputs(project).then(setOutputs)
+    const loadOutputs = (): void =>
+      void (studio || window.api.listOutputs(project).then(setOutputs))
     loadOutputs()
-    const loadAgents = (): void => void window.api.agentStates(project).then(setAgents)
+    const loadAgents = (): void => void (studio || window.api.agentStates(project).then(setAgents))
     loadAgents()
     return window.api.onChatEvent((e) => {
       if (e.project === project && e.kind === 'agents') {
@@ -438,7 +444,7 @@ function ChatView({
       }
       if (e.kind === 'error') setError(e.text)
     })
-  }, [project, chat])
+  }, [project, chat, studio])
 
   async function send(text: string): Promise<boolean> {
     setError('')
@@ -474,54 +480,46 @@ function ChatView({
   }
 
   const focus = plan.musicians.find((m) => m.id === chat)
-  const title = focus?.name ?? 'General'
   // Musicians and Instruments busy on this chat's behalf
   const working = Object.values(agents).filter(
     (a) => a.chat === chat && a.status === 'working'
   ).length
   const files = focus ? filesFor(focus, plan.instruments, outputs) : outputs
 
-  const talk = (
-    <div className="flex h-full min-h-0 flex-col px-5 pb-5">
-      <div className="flex items-start justify-between gap-6 border-b border-hair py-4">
-        <div className="flex gap-3">
-          <Icon
-            name={focus?.icon ?? 'chat-3-line'}
-            size={20}
-            className={`mt-1.5 ${focus ? 'text-link' : ''}`}
-          />
-          <div>
-            <h3 className="type-heading-m text-link">{title}</h3>
-            <p className="mt-1 type-caption text-fg-2">
-              {focus ? focus.deliverable : 'The whole project, with the Orchestrator'}
-            </p>
-          </div>
-        </div>
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-hair px-5 py-3">
+        <p className="line-clamp-2 type-caption text-fg-2">
+          {studio
+            ? 'Every project, with the Orchestrator'
+            : focus
+              ? focus.deliverable
+              : 'The whole project, with the Orchestrator'}
+        </p>
         <div role="radiogroup" aria-label="View" className="flex shrink-0 border border-line">
           {(
             [
-              [false, 'Conversation', 'chat-3-line'],
-              [true, 'Agent channel', 'terminal-box-line']
+              [false, 'Conversation'],
+              [true, 'Agent channel']
             ] as const
-          ).map(([on, label, icon]) => (
+          ).map(([on, label]) => (
             <button
               key={label}
               role="radio"
               aria-checked={channel === on}
               onClick={() => setChannel(on)}
-              className={`flex h-8 items-center gap-1.5 px-3 transition-colors duration-150 ${channel === on ? 'bg-muted type-current-s' : 'type-label-s text-fg-2 hover:text-fg'}`}
+              className={`flex h-7 items-center px-2.5 transition-colors duration-150 ${channel === on ? 'bg-selected type-current-s text-link' : 'type-label-s text-fg-2 hover:text-link'}`}
             >
-              <Icon name={icon} size={14} />
               {label}
             </button>
           ))}
         </div>
       </div>
 
-      {channel ? (
-        <AgentChannel log={log} busy={busy || working > 0} onStop={stop} plan={plan} />
-      ) : (
-        <>
+      <div className="flex min-h-[220px] flex-1 flex-col px-5">
+        {channel ? (
+          <AgentChannel log={log} busy={busy || working > 0} onStop={stop} plan={plan} />
+        ) : (
           <Conversation
             messages={messages}
             busy={busy}
@@ -533,61 +531,38 @@ function ChatView({
             onAnswer={send}
             onDecide={decide}
           />
-          {error && (
-            <p
-              role="alert"
-              className="mt-4 border-l-2 border-signal bg-signal-subtle px-3 py-2 type-body-s text-signal-fg"
-            >
-              {error}
-            </p>
-          )}
-          <Composer busy={busy} working={working} onSend={send} onStop={stop} />
-        </>
-      )}
-    </div>
-  )
+        )}
+        {error && (
+          <p
+            role="alert"
+            className="mb-3 border-l-2 border-signal bg-signal-subtle px-3 py-2 type-body-s text-signal-fg"
+          >
+            {error}
+          </p>
+        )}
+      </div>
 
-  return (
-    <Board
-      project={project}
-      board={`deliverable-${chat}`}
-      label={`II · ${title}`}
-      crumbs={frame.crumbs}
-      aside={frame.aside}
-      cards={[
-        {
-          id: 'chat',
-          title: focus ? `${title} · chat` : 'General · the Orchestrator',
-          count: busy || working ? 'playing' : undefined,
-          x: 0,
-          y: 0,
-          w: 720,
-          h: 720,
-          body: talk
-        },
-        {
-          id: 'score',
-          title: focus ? 'Instruments' : 'The score',
-          x: 768,
-          y: 0,
-          w: 432,
-          body: (
-            <div className="p-4">
+      {!studio && (
+        <>
+          <section className="max-h-56 shrink-0 overflow-y-auto border-t border-hair px-5 py-3">
+            <h3 className="type-label-mono text-link">Agent status</h3>
+            <div className="mt-2">
               <Score plan={plan} focus={focus?.id} busy={busy} outputs={outputs} agents={agents} />
             </div>
-          )
-        },
-        {
-          id: 'files',
-          title: focus ? `Made for ${title}` : 'Created files',
-          count: `${files.length} file${files.length === 1 ? '' : 's'}`,
-          x: 768,
-          y: 480,
-          w: 432,
-          body: <Files project={project} outputs={files} />
-        }
-      ]}
-    />
+          </section>
+          <section className="max-h-44 shrink-0 overflow-y-auto border-t border-hair">
+            <h3 className="px-5 pt-3 type-label-mono text-link">Created files · {files.length}</h3>
+            <Files project={project} outputs={files} />
+          </section>
+        </>
+      )}
+
+      {composer && (
+        <div className="shrink-0 border-t border-hair px-5">
+          <Composer busy={busy} working={working} onSend={send} onStop={stop} />
+        </div>
+      )}
+    </div>
   )
 }
 

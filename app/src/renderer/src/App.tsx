@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Project, StudioLayout } from '../../preload'
-import { Agents } from './components/Agents'
 import { Create } from './components/Create'
+import { Icon } from './components/Icon'
 import { Research } from './components/Research'
 import { Board } from './canvas/Board'
 import { Book, type Frame } from './canvas/Book'
-import { coverInfo, type Area } from './canvas/shared'
-import { Breadcrumb } from './canvas/Chrome'
+import { GENERAL, STUDIO, TOP_BAR, chip, coverInfo, type Area } from './canvas/shared'
 import { CoverEditor } from './canvas/CoverEditor'
 import { Opening } from './canvas/Opening'
+import { OrchestratorBar, type BarTarget } from './canvas/OrchestratorBar'
 import { Studio } from './canvas/Studio'
 
 // Per-viewer UI memory; storage can be unavailable, so every access is guarded.
@@ -27,17 +27,17 @@ function remember(key: string, value: unknown): void {
   }
 }
 
-// Where you are: the Studio, inside a book, a cover being made or edited, or the Ensemble.
+// Where you are: the Studio, inside a book (on one of its areas, or the whole book), or a cover
+// being made or edited. Back and forward step through these.
 type View =
   | { at: 'studio' }
-  | { at: 'book'; id: string }
+  | { at: 'book'; id: string; area: Area | null }
   | { at: 'cover'; id: string | null }
-  | { at: 'ensemble' }
 
 /** A window opened on a project (#project=…) starts inside that book; otherwise the Studio. */
 function startingView(): View {
   const id = new URLSearchParams(location.hash.slice(1)).get('project')
-  return id ? { at: 'book', id } : { at: 'studio' }
+  return id ? { at: 'book', id, area: null } : { at: 'studio' }
 }
 
 const shelfRect = (id: string): DOMRect | undefined =>
@@ -47,11 +47,12 @@ function App(): React.JSX.Element {
   const [projects, setProjects] = useState<Project[] | null>(null)
   const [layout, setLayout] = useState<StudioLayout | null>(null)
   const [view, setView] = useState<View>(startingView)
-  // each book's area (null: the whole book) and each project's open chat in Create
+  const [history, setHistory] = useState<{ back: View[]; forward: View[] }>({
+    back: [],
+    forward: []
+  })
+  // the area each book was last left on: its cover's ribbon, and where it opens next time
   const [areas, setAreas] = useState<Record<string, Area | null>>(() => rememberedJson('areas', {}))
-  const [openChats, setOpenChats] = useState<Record<string, string | null>>(() =>
-    rememberedJson('chats', {})
-  )
   const [opening, setOpening] = useState<{
     id: string
     shelf: DOMRect
@@ -65,9 +66,7 @@ function App(): React.JSX.Element {
         setProjects(list)
         // a project deleted, maybe in another window, can't stay open here
         setView((v) =>
-          (v.at === 'book' || v.at === 'cover') && v.id && !list.some((p) => p.id === v.id)
-            ? { at: 'studio' }
-            : v
+          v.at !== 'studio' && v.id && !list.some((p) => p.id === v.id) ? { at: 'studio' } : v
         )
       }),
     []
@@ -91,42 +90,78 @@ function App(): React.JSX.Element {
     }
   }, [refresh])
 
-  useEffect(() => {
-    remember('areas', areas)
-    remember('chats', openChats)
-  }, [areas, openChats])
+  useEffect(() => remember('areas', areas), [areas])
 
   const current = view.at === 'book' ? projects?.find((p) => p.id === view.id) : undefined
   useEffect(() => {
     document.title = current ? `${current.name} · Orchestra` : 'Orchestra' // names each window
   }, [current])
 
-  const toStudio = useCallback(() => setView({ at: 'studio' }), [])
-  // Esc in the Ensemble goes back to the Studio
+  /** Shows a view. Between the Studio and a book it plays the opening (or the closing). */
+  const show = useCallback((from: View, to: View): void => {
+    if (to.at === 'book') setAreas((all) => ({ ...all, [to.id]: to.area }))
+    const enteringBook = from.at !== 'book' && to.at === 'book'
+    const leavingBook = from.at === 'book' && to.at === 'studio'
+    const id = enteringBook ? (to as { id: string }).id : leavingBook ? from.id : null
+    const shelf = id ? shelfRect(id) : undefined
+    if (id && shelf && from.at !== 'cover')
+      return setOpening({ id, shelf, dir: enteringBook ? 'open' : 'close', then: to })
+    setView(to)
+  }, [])
+  // the latest view and history, for the listeners below
+  const now = useRef({ view, history })
+  useLayoutEffect(() => {
+    now.current = { view, history }
+  })
+
+  /** Goes somewhere new: the place you were becomes the one Back returns to. */
+  const go = useCallback(
+    (to: View): void => {
+      const { view: from, history: h } = now.current
+      if (JSON.stringify(from) === JSON.stringify(to)) return
+      setHistory({ back: [...h.back, from].slice(-50), forward: [] })
+      show(from, to)
+    },
+    [show]
+  )
+  const step = useCallback(
+    (dir: 'back' | 'forward'): void => {
+      const { view: from, history: h } = now.current
+      const list = h[dir]
+      if (!list.length) return
+      const to = list[list.length - 1]
+      setHistory(
+        dir === 'back'
+          ? { back: h.back.slice(0, -1), forward: [...h.forward, from] }
+          : { forward: h.forward.slice(0, -1), back: [...h.back, from] }
+      )
+      show(from, to)
+    },
+    [show]
+  )
+
+  // the mouse's back and forward buttons, and Alt+← / Alt+→
   useEffect(() => {
-    if (view.at !== 'ensemble') return
-    const key = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[aria-modal=true]'))
-        toStudio()
+    const mouse = (e: MouseEvent): void => {
+      if (e.button === 3 || e.button === 4) {
+        e.preventDefault()
+        step(e.button === 3 ? 'back' : 'forward')
+      }
     }
-    addEventListener('keydown', key)
-    return () => removeEventListener('keydown', key)
-  }, [view.at, toStudio])
+    const keys = (e: KeyboardEvent): void => {
+      if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
+      e.preventDefault()
+      step(e.key === 'ArrowLeft' ? 'back' : 'forward')
+    }
+    addEventListener('mouseup', mouse)
+    addEventListener('keydown', keys)
+    return () => {
+      removeEventListener('mouseup', mouse)
+      removeEventListener('keydown', keys)
+    }
+  }, [step])
 
   if (!projects || !layout) return <div className="bg-dots h-full" />
-
-  /** Plays the opening from the cover's place on the shelf into its book. */
-  function enter(id: string, from?: DOMRect): void {
-    const shelf = from ?? shelfRect(id)
-    if (!shelf) return setView({ at: 'book', id })
-    setOpening({ id, shelf, dir: 'open', then: { at: 'book', id } })
-  }
-  /** Closes the book back into its place on the shelf. */
-  function close(id: string): void {
-    const shelf = shelfRect(id)
-    if (!shelf) return toStudio()
-    setOpening({ id, shelf, dir: 'close', then: { at: 'studio' } })
-  }
 
   const saveLayout = (l: StudioLayout): void => {
     setLayout(l)
@@ -136,19 +171,16 @@ function App(): React.JSX.Element {
     Object.entries(areas).flatMap(([id, a]) => (a ? [[id, a]] : []))
   ) as Record<string, Area>
   const project = (id: string | null): Project | undefined => projects.find((p) => p.id === id)
+  const enter = (id: string): void => go({ at: 'book', id, area: areas[id] ?? null })
+
+  // the bar talks to the Orchestrator of wherever you are
+  const to: BarTarget = current
+    ? { project: current.id, chat: GENERAL, label: `To ${current.name}` }
+    : { project: STUDIO, chat: GENERAL, label: 'To the Studio' }
 
   function area(p: Project, a: Area, frame: Frame): React.ReactNode {
     if (a === 'research') return <Research key={p.id} project={p.id} frame={frame} />
-    if (a === 'create')
-      return (
-        <Create
-          key={p.id}
-          project={p.id}
-          frame={frame}
-          chat={openChats[p.id] ?? null}
-          onChat={(c) => setOpenChats((all) => ({ ...all, [p.id]: c }))}
-        />
-      )
+    if (a === 'create') return <Create key={p.id} project={p.id} frame={frame} />
     return (
       <Board
         key={p.id}
@@ -156,7 +188,7 @@ function App(): React.JSX.Element {
         board="refine"
         label="III · Refine"
         crumbs={frame.crumbs}
-        aside={frame.aside}
+        pages={frame.pages}
         preview={frame.preview}
         cards={[
           {
@@ -189,23 +221,22 @@ function App(): React.JSX.Element {
           layout={layout}
           onLayout={saveLayout}
           movements={movements}
-          onEnter={enter}
-          onEdit={(id) => setView({ at: 'cover', id })}
-          onNew={() => setView({ at: 'cover', id: null })}
-          onEnsemble={() => setView({ at: 'ensemble' })}
+          onEnter={(id) => enter(id)}
+          onEdit={(id) => go({ at: 'cover', id })}
+          onNew={() => go({ at: 'cover', id: null })}
           onChanged={refresh}
           hidden={opening?.id}
         />
       </div>
 
-      {current && (
+      {current && view.at === 'book' && (
         <div className="absolute inset-0">
           <Book
             key={current.id}
             name={current.name}
-            area={areas[current.id] ?? null}
-            onArea={(a) => setAreas((all) => ({ ...all, [current.id]: a }))}
-            onStudio={() => close(current.id)}
+            area={view.area}
+            onArea={(a) => go({ at: 'book', id: current.id, area: a })}
+            onStudio={() => go({ at: 'studio' })}
             render={(a, frame) => area(current, a, frame)}
           />
         </div>
@@ -217,32 +248,35 @@ function App(): React.JSX.Element {
             key={view.id ?? 'new'}
             project={project(view.id) ?? null}
             no={view.id ? projects.findIndex((p) => p.id === view.id) + 1 : projects.length + 1}
-            onDone={toStudio}
+            onDone={() => go({ at: 'studio' })}
             onSaved={refresh}
             onEnter={(id) => {
-              toStudio()
+              go({ at: 'studio' })
               requestAnimationFrame(() => enter(id))
             }}
             onCreated={(p, open) => {
               const list = [...projects, p].sort((a, b) => a.name.localeCompare(b.name))
               setProjects(list)
-              toStudio()
+              go({ at: 'studio' })
               if (open) requestAnimationFrame(() => enter(p.id))
             }}
           />
         </div>
       )}
 
-      {view.at === 'ensemble' && (
-        <div className="bg-dots absolute inset-0 overflow-y-auto px-10 pt-[74px] pb-10 animate-[area-in_550ms_var(--ease)_both]">
-          <div className="fixed top-3.5 left-3.5 z-10">
-            <Breadcrumb steps={[{ label: 'Studio', onClick: toStudio }, { label: 'Ensemble' }]} />
-          </div>
-          <div className="mx-auto max-w-[1280px] border border-card-line bg-card shadow-card">
-            <Agents />
-          </div>
-        </div>
-      )}
+      {/* the window's own chrome: Back under the breadcrumb, the Orchestrator at the foot */}
+      <button
+        onClick={() => step('back')}
+        disabled={history.back.length === 0}
+        aria-label="Back"
+        title="Back (mouse back button, Alt+←)"
+        className={`${chip} serif-on absolute left-3.5 z-30 h-9 gap-2 px-3 type-label-s disabled:opacity-40`}
+        style={{ top: TOP_BAR + 10 }}
+      >
+        <Icon name="arrow-left-line" size={14} />
+        Back
+      </button>
+      <OrchestratorBar to={to} />
 
       {opening && project(opening.id) && (
         <Opening

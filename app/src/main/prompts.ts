@@ -148,3 +148,29 @@ You are the ${inst.name} Instrument, working for the ${m.name} Musician. ${where
     .filter(Boolean)
     .join('\n\n')
 }
+
+/** The Studio's Orchestrator: above every project, with all of them in view. */
+export async function studioPrompt(home: string, projectsDir: string): Promise<string> {
+  const [lib, rules, projects] = await Promise.all([
+    loadLibrary(home),
+    readFile(join(home, 'library', 'house-rules.md'), 'utf8').catch(() => ''),
+    listProjects(projectsDir)
+  ])
+  const list = projects
+    .map(
+      (p) =>
+        `- ${p.name} (folder ${p.id})${p.client ? `, for ${p.client}` : ''}: ${p.concept.replace(/\s+/g, ' ').slice(0, 280) || 'no concept yet'}`
+    )
+    .join('\n')
+  return [
+    lib.orchestrator?.prompt ?? '',
+    rules,
+    `## This chat: the Studio
+You are talking with the user in Orchestra's Studio, above every project, so you can see all of their work. Each project is a folder in ${projectsDir}: concept.md, research.md (the interpreted direction), deliverables.md, prereqs/ (shared foundations such as brand-spec.md and tokens.json) and exports/. Read them when a question needs it. Use them to compare projects, notice what the user keeps coming back to (typefaces, palettes, references, decisions) and answer questions across their work.
+
+You can't brief Musicians or change a project from here, so don't use Orchestra's project tools in this chat. When the user wants something made, say which project it belongs in and that they can open it (or start a new project from the blank cover). ${NO_EXTERNAL_TOOLS}`,
+    `## Projects\n${list || 'No projects yet.'}`
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}

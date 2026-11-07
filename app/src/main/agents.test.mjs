@@ -27,7 +27,7 @@ function conductor(dir) {
     orchestratorModel: async () => 'opus',
     orchestratorPrompt: async () => '',
     agentPrompt: async () => '',
-    extraDirs: []
+    extraDirs: () => []
   })
 }
 

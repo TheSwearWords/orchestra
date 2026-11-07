@@ -1,11 +1,11 @@
-// Pure layout for the Create stage (canvas spec §6): every deliverable is a seat on an arc
-// above the Deliverables podium, grouped by category; foundations ring the Prerequisites circle.
-// No DOM, so it is tested in node.
+// Pure layout for the Create stage (canvas spec §6): the Deliverables podium at the bottom
+// centre with every deliverable seated on the arc around it, grouped by category, and the
+// Prerequisites circle at the top centre, ringed by the foundations. No DOM, so it is tested.
 
-export const SEAT = { w: 216, h: 156 }
+export const SEAT = { w: 208, h: 208 }
 export const PODIUM = { x: 0, y: 0, r: 150 }
-export const PREREQS = { x: 0, y: 560, r: 96, ring: 250 }
-const ARC = { rx: 940, ry: 620 }
+export const PREREQS = { x: 0, y: -1240, r: 110, ring: 270 }
+const ARC = { rx: 1040, ry: 760 }
 
 // Categories in the order a project usually needs them; unknown ones follow alphabetically.
 const CATEGORY_ORDER = ['Brand', 'Web', 'Product', 'Motion', '3D', 'Code']
@@ -20,7 +20,7 @@ export interface Seated {
   y: number
 }
 
-/** Seats along the upper arc, left to right, category by category, then the Add seat. */
+/** Seats on the arc over the podium, left to right, category by category, then the Add seat. */
 export function seatArc(musicians: { id: string; category: string; name: string }[]): Seated[] {
   const ordered = [...musicians].sort(
     (a, b) =>
@@ -29,9 +29,9 @@ export function seatArc(musicians: { id: string; category: string; name: string 
       a.name.localeCompare(b.name)
   )
   const ids = [...ordered.map((m) => m.id), 'add']
-  // from just below the left horizon, over the top, to just below the right
-  const from = Math.PI + 0.12
-  const to = -0.12
+  // from level with the podium on the left, over the top, to level on the right
+  const from = Math.PI
+  const to = 0
   return ids.map((id, i) => {
     const t = ids.length === 1 ? 0.5 : i / (ids.length - 1)
     const a = from + (to - from) * t
@@ -45,6 +45,13 @@ export function ring(n: number, cx: number, cy: number, r: number): { x: number;
     const a = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2
     return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
   })
+}
+
+/** Where a seat's card opens: beside the seat, on the side away from the podium. */
+export function besideSeat(s: { x: number; y: number }, w: number): { x: number; y: number } {
+  const gap = 48
+  const x = s.x < PODIUM.x ? s.x - SEAT.w / 2 - gap - w : s.x + SEAT.w / 2 + gap
+  return { x: Math.round(x / 24) * 24, y: Math.round((s.y - SEAT.h / 2) / 24) * 24 }
 }
 
 /** The project paths an Instrument's `output` names (prereqs/… or exports/), if any. */

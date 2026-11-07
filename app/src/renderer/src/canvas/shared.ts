@@ -1,6 +1,7 @@
 // What the canvas components share: constants, types and small pure helpers.
 import type { Project, StudioLayout } from '../../../preload'
 import type { AsciiName } from '../components/Ascii'
+import { fit, type Camera, type Rect } from './camera'
 
 export const reducedMotion = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -73,4 +74,18 @@ export function typing(e: KeyboardEvent): boolean {
     !!t.closest?.('input, textarea, select, [contenteditable=true]') ||
     !!document.querySelector('dialog[open], [aria-modal=true]')
   )
+}
+
+// Chats the bar and the stage address (conductor.ts): a project's whole-project chat, and the
+// one above every project, in the Studio (no project folder can have this name).
+export const GENERAL = 'general'
+export const STUDIO = '_studio'
+
+export const TOP_BAR = 52 // the breadcrumb strip's height
+const BOTTOM = 96 // the Orchestrator bar and the pages, under a board
+
+/** The camera that shows `r` in the space between the top bar and the bottom row. */
+export function fitBelow(r: Rect, maxZ = 1): Camera {
+  const c = fit(r, innerWidth, innerHeight - TOP_BAR - BOTTOM, 56, maxZ)
+  return { ...c, y: c.y - TOP_BAR / c.z }
 }

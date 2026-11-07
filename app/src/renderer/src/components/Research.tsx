@@ -6,16 +6,14 @@ import { Icon } from './Icon'
 
 const field =
   'w-full border border-line bg-canvas px-3 type-body-s outline-none placeholder:text-fg-2 focus:border-focus'
-const outlineButton =
-  'flex h-9 shrink-0 items-center gap-2 border border-line-strong bg-canvas px-4 type-label-m transition-[background-color,scale] duration-150 hover:bg-muted active:scale-[0.97]'
 const solidButton =
   'h-9 shrink-0 bg-brand px-4 type-label-m text-on-brand transition-[background-color,scale] duration-150 hover:bg-brand-hover active:scale-[0.97] active:bg-brand-pressed disabled:bg-muted disabled:text-fg-disabled'
 
 // Electron prefixes IPC errors with the channel name; show only the reason
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 
-/** I · Research as its own artboard: the source sites, links, files and the interpretation,
- * each a card you can arrange. */
+/** I · Research as one artboard (C4): reference links, inspiration and usable assets as
+ * cards, the sites to look further, and the interpretation they feed. */
 export function Research({ project, frame }: { project: string; frame: Frame }): React.JSX.Element {
   const [data, setData] = useState<ResearchState | null>(null)
   const [error, setError] = useState('')
@@ -47,7 +45,11 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
   if (!data) return <div className="bg-dots h-full" />
   const links = data.references.filter((r) => r.kind === 'link')
   const files = data.references.filter((r) => r.kind === 'file')
-  const n = (k: number, noun: string): string => `${k} ${noun}${k === 1 ? '' : 's'}`
+  const inspiration = files.filter((r) => r.tag === 'inspiration')
+  const assets = files.filter((r) => r.tag === 'asset')
+  const tiles = (refs: Reference[], tag: Tag): React.ReactNode => (
+    <Tiles project={project} refs={refs} tag={tag} run={run} />
+  )
 
   return (
     <Board
@@ -55,7 +57,7 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
       board="research"
       label="I · Research"
       crumbs={frame.crumbs}
-      aside={frame.aside}
+      pages={frame.pages}
       preview={frame.preview}
       top={
         error && (
@@ -69,52 +71,64 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
       }
       cards={[
         {
-          id: 'sites',
-          title: 'Look further',
-          count: n(data.sites.length, 'site'),
-          x: 0,
-          y: 0,
-          w: 624,
-          body: <Sites sites={data.sites} onAdd={(site) => run(() => window.api.addSite(site))} />
-        },
-        {
           id: 'links',
           title: 'Reference links',
-          count: n(links.length, 'reference'),
-          x: 672,
+          count: String(links.length),
+          x: 0,
           y: 0,
-          w: 816,
-          body: (
-            <LinkSection
-              refs={links}
-              project={project}
-              onAdd={(input) => run(() => window.api.addLink(project, input))}
-              run={run}
-            />
-          )
+          w: 432,
+          body: <Links project={project} refs={links} run={run} />
         },
         {
-          id: 'files',
-          title: 'Reference files',
-          count: n(files.length, 'file'),
-          // under the sites, whose card is short and never grows much
-          x: 0,
-          y: 336,
-          w: 624,
-          body: <FileSection refs={files} project={project} run={run} />
+          id: 'inspiration',
+          title: 'Inspiration',
+          count: String(inspiration.length),
+          x: 480,
+          y: 0,
+          w: 576,
+          body: tiles(inspiration, 'inspiration')
+        },
+        {
+          id: 'assets',
+          title: 'Usable assets',
+          count: String(assets.length),
+          x: 1104,
+          y: 0,
+          w: 432,
+          body: tiles(assets, 'asset')
         },
         {
           id: 'interpretation',
           title: 'research.md',
           count: data.interpretation ? undefined : 'not written yet',
-          x: 1536,
+          x: 1584,
           y: 0,
           w: 672,
           tone: 'paper',
+          body: <Interpretation text={data.interpretation} />
+        },
+        {
+          id: 'sites',
+          title: 'Look further',
+          count: String(data.sites.length),
+          x: 0,
+          y: 720,
+          w: 432,
+          body: <Sites sites={data.sites} onAdd={(site) => run(() => window.api.addSite(site))} />
+        },
+        {
+          id: 'interpret',
+          title: 'Interpret',
+          x: 480,
+          y: 720,
+          w: 576,
+          tone: 'blue',
           body: (
-            <Interpretation
-              text={data.interpretation}
-              count={data.references.length}
+            <Ready
+              links={links.length}
+              inspiration={inspiration.length}
+              assets={assets.length}
+              written={!!data.interpretation}
               busy={interpreting}
               onRun={interpret}
             />
@@ -125,6 +139,190 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
   )
 }
 
+/** A stack of link blocks (Board/Link block), with a field to paste the next one. */
+function Links({
+  project,
+  refs,
+  run
+}: {
+  project: string
+  refs: Reference[]
+  run: Run
+}): React.JSX.Element {
+  const [url, setUrl] = useState('')
+
+  async function add(e: FormEvent): Promise<void> {
+    e.preventDefault()
+    if (!url.trim()) return
+    if (await run(() => window.api.addLink(project, { url, note: '', tag: 'inspiration' })))
+      setUrl('')
+  }
+
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      {refs.map((r) => {
+        const host = r.source.replace(/^https?:\/\/(www\.)?/, '')
+        return (
+          <div key={r.id} className="group flex gap-3 border border-card-line p-3">
+            <span className="flex size-[46px] shrink-0 items-center justify-center bg-brand font-display text-[24px] font-extrabold text-on-brand italic">
+              {host[0]?.toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <a
+                href={r.source}
+                target="_blank"
+                rel="noreferrer"
+                title={r.source}
+                className="block truncate type-body-m-strong text-link hover:underline"
+              >
+                {host}
+              </a>
+              <NoteField
+                key={r.note}
+                value={r.note}
+                onSave={(note) => run(() => window.api.updateReference(project, r.id, { note }))}
+              />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <a
+                href={r.source}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${host}`}
+                className="flex size-7 items-center justify-center bg-brand/15 text-link hover:bg-brand hover:text-on-brand"
+              >
+                <Icon name="arrow-right-up-line" size={14} />
+              </a>
+              <Remove onRemove={() => run(() => window.api.removeReference(project, r.id))} />
+            </div>
+          </div>
+        )
+      })}
+      <form onSubmit={add}>
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Paste a link, then Enter"
+          aria-label="Add a reference link"
+          className="w-full border border-dashed border-wire bg-transparent px-3 py-2.5 font-mono text-[12px] text-link outline-none placeholder:text-dim focus:border-solid focus:border-brand"
+        />
+      </form>
+    </div>
+  )
+}
+
+/** Image tiles (Board/Tile) for one use: Inspiration or Usable assets. Drop files on the card
+ * to add them here; a tile moves to the other card with its "Move" button. */
+function Tiles({
+  project,
+  refs,
+  tag,
+  run
+}: {
+  project: string
+  refs: Reference[]
+  tag: Tag
+  run: Run
+}): React.JSX.Element {
+  const [over, setOver] = useState(false)
+  const other: Tag = tag === 'asset' ? 'inspiration' : 'asset'
+
+  async function adopt(added: Reference[]): Promise<void> {
+    // new files arrive as inspiration; ones dropped on Usable assets are retagged straight away
+    if (tag === 'asset')
+      await Promise.all(added.map((r) => window.api.updateReference(project, r.id, { tag })))
+  }
+  function drop(e: DragEvent): void {
+    e.preventDefault()
+    setOver(false)
+    const dropped = [...e.dataTransfer.files]
+    if (dropped.length) void run(async () => adopt(await window.api.addFiles(project, dropped)))
+  }
+
+  return (
+    <div
+      data-scroll
+      onDragOver={(e) => {
+        e.preventDefault()
+        setOver(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false)
+      }}
+      onDrop={drop}
+      className={`grid grid-cols-2 gap-3 p-4 transition-colors duration-150 ${over ? 'bg-selected' : ''}`}
+    >
+      {refs.map((r) => (
+        <figure key={r.id} className="group m-0 flex flex-col border border-card-line">
+          <button
+            onClick={() => run(() => window.api.openReferenceFile(project, r.source))}
+            title={`Open ${r.source}`}
+            className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-brand"
+          >
+            {r.source.endsWith('.pdf') ? (
+              <span className="font-display text-[28px] font-extrabold text-on-brand italic">
+                PDF
+              </span>
+            ) : (
+              <img
+                src={`orchestra://ref/${project}/${encodeURIComponent(r.source)}`}
+                alt=""
+                className="size-full object-cover mix-blend-screen grayscale"
+              />
+            )}
+          </button>
+          <figcaption className="flex flex-col px-2.5 pt-2 pb-1">
+            <span className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate type-label-s text-link" title={r.source}>
+                {r.source}
+              </span>
+              <button
+                onClick={() => run(() => window.api.updateReference(project, r.id, { tag: other }))}
+                title={`Move to ${other === 'asset' ? 'Usable assets' : 'Inspiration'}`}
+                className="type-caption text-dim opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-link focus-visible:opacity-100"
+              >
+                Move
+              </button>
+              <Remove onRemove={() => run(() => window.api.removeReference(project, r.id))} />
+            </span>
+            <NoteField
+              key={r.note}
+              value={r.note}
+              onSave={(note) => run(() => window.api.updateReference(project, r.id, { note }))}
+            />
+          </figcaption>
+        </figure>
+      ))}
+      <button
+        onClick={() => run(async () => adopt(await window.api.pickFiles(project)))}
+        className="flex aspect-[4/3] flex-col items-center justify-center gap-1 border border-dashed border-wire text-link hover:bg-selected"
+      >
+        <span className="font-mono text-xl text-link/50">+</span>
+        <span className="serif-on type-label-s">
+          {over ? 'Drop to add' : 'Drop files or browse'}
+        </span>
+        <span className="type-caption text-dim">Images or PDFs, up to 25 MB</span>
+      </button>
+    </div>
+  )
+}
+
+function Remove({ onRemove }: { onRemove: () => void }): React.JSX.Element {
+  return (
+    <button
+      onClick={() => {
+        if (confirm('Remove this reference from the project?')) onRemove()
+      }}
+      aria-label="Remove reference"
+      title="Remove"
+      className="flex size-7 items-center justify-center text-dim opacity-0 transition-[opacity,color] duration-150 group-hover:opacity-100 hover:text-danger-fg focus-visible:opacity-100"
+    >
+      <Icon name="close-line" size={14} />
+    </button>
+  )
+}
+
+/** The sites to look further, as chips; one more can be added. */
 function Sites({
   sites,
   onAdd
@@ -145,36 +343,32 @@ function Sites({
     }
   }
 
+  const chipStyle =
+    'flex items-center gap-1.5 rounded-full border border-card-line px-3 py-1 type-label-s text-link transition-colors duration-150 hover:bg-brand hover:text-on-brand'
   return (
-    <div>
-      <ul className="grid grid-cols-2">
+    <div className="p-4">
+      <ul className="flex flex-wrap gap-2">
         {sites.map((s) => (
-          <li key={s.url} className="border-r border-b border-line [&:nth-child(2n)]:border-r-0">
-            <a
-              href={s.url}
-              target="_blank"
-              rel="noreferrer"
-              title={s.url}
-              className="flex h-12 items-center justify-center gap-2 bg-subtle type-label-m transition-colors duration-150 hover:bg-muted"
-            >
+          <li key={s.url}>
+            <a href={s.url} target="_blank" rel="noreferrer" title={s.url} className={chipStyle}>
               {s.name}
-              <Icon name="arrow-right-up-line" className="text-fg-2" />
+              <Icon name="arrow-right-up-line" size={12} />
             </a>
           </li>
         ))}
-        <li className="border-b border-line">
+        <li>
           <button
             onClick={() => setAdding(!adding)}
             aria-expanded={adding}
-            className={`flex h-12 w-full items-center justify-center gap-2 transition-colors duration-150 hover:bg-muted ${adding ? 'bg-muted type-current-m' : 'bg-canvas type-label-m text-link'}`}
+            className={`${chipStyle} border-dashed`}
           >
-            <Icon name="add-line" />
+            <Icon name="add-line" size={12} />
             Add site
           </button>
         </li>
       </ul>
       {adding && (
-        <form onSubmit={submit} className="stagger flex items-center gap-3 bg-subtle px-6 py-3">
+        <form onSubmit={submit} className="mt-3 flex items-center gap-2">
           <input
             autoFocus
             required
@@ -182,7 +376,7 @@ function Sites({
             onChange={(e) => setName(e.target.value)}
             placeholder="Name"
             aria-label="Site name"
-            className={`h-9 max-w-48 ${field}`}
+            className={`h-9 max-w-32 ${field}`}
           />
           <input
             required
@@ -193,272 +387,79 @@ function Sites({
             className={`h-9 ${field}`}
           />
           <button type="submit" className={solidButton}>
-            Save site
-          </button>
-          <button type="button" onClick={() => setAdding(false)} className="type-label-m text-fg-2">
-            Cancel
+            Save
           </button>
         </form>
       )}
-    </div>
-  )
-}
-
-/** A card's first row: what to do in it. The card header carries the title and count. */
-function SectionHeader({ hint, action }: { hint: string; action: ReactNode }): React.JSX.Element {
-  return (
-    <div className="flex items-center justify-between gap-6">
-      <p className="type-caption text-fg-2">{hint}</p>
-      {action}
     </div>
   )
 }
 
 type Run = (change: () => Promise<unknown>) => Promise<boolean>
 
-function LinkSection({
-  refs,
-  project,
-  onAdd,
-  run
-}: {
-  refs: Reference[]
-  project: string
-  onAdd: (input: { url: string; note: string; tag: Tag }) => Promise<boolean>
-  run: Run
-}): React.JSX.Element {
-  const [adding, setAdding] = useState(false)
-  const [url, setUrl] = useState('')
-  const [note, setNote] = useState('')
-  const [tag, setTag] = useState<Tag>('inspiration')
-
-  async function submit(e: FormEvent): Promise<void> {
-    e.preventDefault()
-    if (await onAdd({ url, note, tag })) {
-      setAdding(false)
-      setUrl('')
-      setNote('')
-      setTag('inspiration')
-    }
-  }
-
-  return (
-    <div className="p-5">
-      <SectionHeader
-        hint="Links to anything that catches your eye."
-        action={
-          <button
-            onClick={() => setAdding(!adding)}
-            aria-expanded={adding}
-            className={outlineButton}
-          >
-            <Icon name="add-line" />
-            Add reference
-          </button>
-        }
-      />
-
-      {adding && (
-        <form
-          onSubmit={submit}
-          className="stagger mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto_auto] items-start gap-3 border border-line bg-subtle p-4"
-        >
-          <input
-            autoFocus
-            required
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste a link"
-            aria-label="Link"
-            className={`h-9 ${field}`}
-          />
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="What do you like about it?"
-            aria-label="What I like about it"
-            rows={1}
-            className={`min-h-9 resize-y py-2 ${field}`}
-          />
-          <TagToggle value={tag} onChange={setTag} />
-          <button type="submit" className={solidButton}>
-            Save
-          </button>
-        </form>
-      )}
-
-      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] gap-x-6 bg-subtle px-3 py-2.5 type-caption text-fg-2">
-        <span>Reference and source</span>
-        <span>What I like about it</span>
-        <span className="w-[178px]">Use</span>
-      </div>
-      {refs.length === 0 && (
-        <p className="border-b border-line px-3 py-6 type-body-s text-fg-2">
-          Paste a link to anything that catches your eye, then say what you like about it.
-        </p>
-      )}
-      <ul>
-        {refs.map((r) => (
-          <li
-            key={r.id}
-            className="group grid grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] items-center gap-x-6 border-b border-line px-3 py-3"
-          >
-            <a
-              href={r.source}
-              target="_blank"
-              rel="noreferrer"
-              className="flex min-w-0 items-center gap-3 type-body-s text-link hover:underline"
-            >
-              <LinkThumb url={r.source} />
-              <span className="truncate">{r.source.replace(/^https?:\/\/(www\.)?/, '')}</span>
-            </a>
-            <NoteField
-              key={r.note}
-              value={r.note}
-              onSave={(note) => run(() => window.api.updateReference(project, r.id, { note }))}
-            />
-            <RowEnd
-              tag={r.tag}
-              onTag={(tag) => run(() => window.api.updateReference(project, r.id, { tag }))}
-              onRemove={() => run(() => window.api.removeReference(project, r.id))}
-            />
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function FileSection({
-  refs,
-  project,
-  run
-}: {
-  refs: Reference[]
-  project: string
-  run: Run
-}): React.JSX.Element {
-  const [over, setOver] = useState(false)
-
-  function drop(e: DragEvent): void {
-    e.preventDefault()
-    setOver(false)
-    const dropped = [...e.dataTransfer.files]
-    if (dropped.length) void run(() => window.api.addFiles(project, dropped))
-  }
-
-  return (
-    <div
-      className="p-5"
-      onDragOver={(e) => {
-        e.preventDefault()
-        setOver(true)
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false)
-      }}
-      onDrop={drop}
-    >
-      <SectionHeader
-        hint="Images and PDFs, kept in the project."
-        action={
-          <button
-            onClick={() => run(() => window.api.pickFiles(project))}
-            className={outlineButton}
-          >
-            <Icon name="upload-2-line" />
-            Upload files
-          </button>
-        }
-      />
-      <ul className="mt-4 flex flex-col gap-3">
-        {refs.map((r) => (
-          <li
-            key={r.id}
-            className="group grid grid-cols-[auto_minmax(0,0.8fr)_minmax(0,1.3fr)_auto] items-center gap-x-6 border border-line bg-subtle p-3"
-          >
-            <FileThumb project={project} file={r.source} />
-            <div className="min-w-0">
-              <p className="truncate type-label-m">{r.source}</p>
-              <p className="mt-1 type-caption text-fg-2">
-                {r.source.endsWith('.pdf') ? 'PDF' : 'Image'} · {bytes(r.size ?? 0)} · added{' '}
-                {ago(r.added)}
-              </p>
-              <button
-                onClick={() => run(() => window.api.openReferenceFile(project, r.source))}
-                className="mt-1 type-caption text-link hover:underline"
-              >
-                Open
-              </button>
-            </div>
-            <NoteField
-              key={r.note}
-              value={r.note}
-              onSave={(note) => run(() => window.api.updateReference(project, r.id, { note }))}
-            />
-            <RowEnd
-              tag={r.tag}
-              onTag={(tag) => run(() => window.api.updateReference(project, r.id, { tag }))}
-              onRemove={() => run(() => window.api.removeReference(project, r.id))}
-            />
-          </li>
-        ))}
-      </ul>
-      <div
-        className={`mt-3 border border-dashed px-4 py-5 transition-colors duration-150 ${over ? 'border-focus bg-brand-subtle' : 'border-line-strong bg-subtle'}`}
-      >
-        <p className="flex items-center gap-3 type-label-m">
-          <Icon name="add-line" />
-          {over ? 'Drop to add them' : 'Drop images or PDFs here'}
-        </p>
-        <p className="mt-1 pl-7 type-caption text-fg-2">
-          PNG, JPG, GIF, WebP, SVG or PDF, up to 25 MB each. A copy is kept in the project.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function Interpretation({
-  text,
-  count,
+/** The blue card: what Interpret will read, and the button. */
+function Ready({
+  links,
+  inspiration,
+  assets,
+  written,
   busy,
   onRun
 }: {
-  text: string | null
-  count: number
+  links: number
+  inspiration: number
+  assets: number
+  written: boolean
   busy: boolean
   onRun: () => void
 }): React.JSX.Element {
+  const total = links + inspiration + assets
+  return (
+    <div className="flex items-center gap-5 px-5 pt-1 pb-5">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white text-link">
+        <Icon name="logo-mark" size={28} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="type-heading-m">
+          {busy
+            ? 'Reading…'
+            : total === 0
+              ? 'Add references first'
+              : written
+                ? 'Interpreted'
+                : 'Ready to interpret'}
+        </p>
+        <p className="mt-1 font-mono text-[12px] text-poster-dim">
+          {busy
+            ? `The Orchestrator is reading ${total} reference${total === 1 ? '' : 's'}. A minute or two.`
+            : `${links} links · ${inspiration} inspiration · ${assets} assets`}
+        </p>
+      </div>
+      <button
+        onClick={onRun}
+        disabled={busy || total === 0}
+        className="serif-on h-11 shrink-0 bg-white px-5 type-label-m text-link hover:bg-inverse hover:text-on-brand disabled:opacity-50"
+      >
+        {written ? 'Interpret again' : 'Interpret'}
+      </button>
+    </div>
+  )
+}
+
+/** research.md on paper (Board/Paper card): its direction and themes, as written. */
+function Interpretation({ text }: { text: string | null }): React.JSX.Element {
   return (
     <div className="p-6">
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <h3 className="type-heading-l text-link">Direction</h3>
-          <p className="mt-1 type-caption text-fg-2">
-            Interpret writes research.md from your references and notes.
-          </p>
-        </div>
-        <button onClick={onRun} disabled={busy || count === 0} className={solidButton}>
-          {busy ? 'Reading…' : text ? 'Interpret again' : 'Interpret references'}
-        </button>
-      </div>
-      {busy && (
-        <p className="mt-4 border-l-2 border-agent bg-agent-subtle px-3 py-2 type-body-s text-agent-fg">
-          Orchestrator is reading {count} reference{count === 1 ? '' : 's'}. This can take a minute
-          or two.
-        </p>
-      )}
       {text ? (
         <Markdown text={text} />
       ) : (
-        !busy && (
-          <p className="mt-4 border border-line px-4 py-6 type-body-s text-fg-2">
-            {count === 0
-              ? 'Add a few references and notes first.'
-              : 'Nothing yet. Interpret once your references say what you want.'}
+        <>
+          <h3 className="type-heading-xl text-link">Direction</h3>
+          <p className="mt-3 type-body-m text-dim">
+            Not written yet. Interpret writes research.md from your links, inspiration and assets,
+            and every Musician reads it as its brief.
           </p>
-        )
+        </>
       )}
     </div>
   )
@@ -486,93 +487,6 @@ function NoteField({
       rows={Math.min(4, Math.max(1, Math.ceil(draft.length / 60)))}
       className="w-full resize-none border border-transparent bg-transparent px-2 py-1.5 type-body-s outline-none transition-colors duration-150 placeholder:text-fg-2 hover:border-line focus:border-focus focus:bg-canvas"
     />
-  )
-}
-
-function TagToggle({
-  value,
-  onChange
-}: {
-  value: Tag
-  onChange: (t: Tag) => void
-}): React.JSX.Element {
-  return (
-    <div role="radiogroup" aria-label="Use" className="flex h-9 border border-line bg-canvas">
-      {(
-        [
-          ['inspiration', 'Inspiration'],
-          ['asset', 'Usable asset']
-        ] as const
-      ).map(([t, label]) => (
-        <button
-          key={t}
-          type="button"
-          role="radio"
-          aria-checked={value === t}
-          onClick={() => onChange(t)}
-          className={`px-3 transition-colors duration-150 ${value === t ? 'bg-muted type-current-s' : 'type-label-s text-fg-2 hover:text-fg'}`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function RowEnd({
-  tag,
-  onTag,
-  onRemove
-}: {
-  tag: Tag
-  onTag: (t: Tag) => void
-  onRemove: () => void
-}): React.JSX.Element {
-  return (
-    <div className="flex items-center gap-2">
-      <TagToggle value={tag} onChange={onTag} />
-      <button
-        onClick={() => {
-          if (confirm('Remove this reference from the project?')) onRemove()
-        }}
-        aria-label="Remove reference"
-        title="Remove"
-        className="flex size-8 items-center justify-center text-fg-2 opacity-0 transition-[opacity,color] duration-150 group-hover:opacity-100 hover:text-danger-fg focus-visible:opacity-100"
-      >
-        <Icon name="close-line" />
-      </button>
-    </div>
-  )
-}
-
-const IMAGE_URL = /\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i
-
-function LinkThumb({ url }: { url: string }): React.JSX.Element {
-  const host = new URL(url).hostname.replace(/^www\./, '')
-  return (
-    <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden border border-line bg-subtle">
-      {IMAGE_URL.test(url) ? (
-        <img src={url} alt="" className="size-full object-cover" />
-      ) : (
-        <span className="font-display text-[26px] text-fg-2 italic">{host[0].toUpperCase()}</span>
-      )}
-    </span>
-  )
-}
-
-function FileThumb({ project, file }: { project: string; file: string }): React.JSX.Element {
-  return (
-    <span className="flex h-16 w-22 items-center justify-center overflow-hidden border border-line bg-canvas">
-      {file.endsWith('.pdf') ? (
-        <span className="font-display text-[22px] text-fg-2 italic">PDF</span>
-      ) : (
-        <img
-          src={`orchestra://ref/${project}/${encodeURIComponent(file)}`}
-          alt=""
-          className="size-full object-cover"
-        />
-      )}
-    </span>
   )
 }
 
@@ -705,18 +619,4 @@ function inline(s: string): ReactNode[] {
       part
     )
   )
-}
-
-function bytes(n: number): string {
-  return n >= 1024 * 1024
-    ? `${(n / 1024 / 1024).toFixed(1)} MB`
-    : `${Math.max(1, Math.round(n / 1024))} KB`
-}
-
-function ago(iso: string): string {
-  const mins = Math.round((Date.parse(iso) - Date.now()) / 60000)
-  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-  if (Math.abs(mins) < 60) return rtf.format(mins, 'minute')
-  if (Math.abs(mins) < 60 * 24) return rtf.format(Math.round(mins / 60), 'hour')
-  return rtf.format(Math.round(mins / 60 / 24), 'day')
 }

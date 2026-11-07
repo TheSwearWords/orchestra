@@ -1,19 +1,20 @@
-// C8 · The book: one project, its three areas side by side as pages of a spread. Clicking an
-// area flies into its page, then opens the area's own artboard; Esc flies back out.
+// C8 · The book: one project, its three areas side by side as pages of a spread. Choosing an
+// area flies into its page, then opens the area's artboard; leaving flies back out. The area
+// comes from App (so back and forward can move it); the book only plays the camera.
 import { useEffect, useRef, useState } from 'react'
 import { Canvas } from './Canvas'
 import { useCamera } from './useCamera'
 import { fit, type Rect } from './camera'
 import { AREAS, chip, typing, type Area } from './shared'
-import { AreaSwitch, Breadcrumb, Minimap, ZoomChip, type Step } from './Chrome'
+import { AreaSwitch, Minimap, Shell, ZoomChip, type Step } from './Chrome'
 
 const GAP = 160 // between areas, in world px
 
-/** What an area needs to frame its board: the breadcrumb so far and the area switch. A preview
+/** What an area needs to frame its board: the breadcrumb so far and the pages switch. A preview
  * is the small live copy on the book's page, with no chrome. */
 export interface Frame {
   crumbs: Step[]
-  aside: React.ReactNode
+  pages: React.ReactNode
   preview: boolean
 }
 
@@ -35,88 +36,93 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
     y: 0,
     z: 1
   })
-  const overview = (): ReturnType<typeof fit> => fit(whole, w, h, 40, 1)
+  const overview = (): ReturnType<typeof fit> => fit(whole, w, h - 150, 40, 1)
 
-  // the area whose board is open; it lags `area` while the camera flies in
+  // the area whose board is showing; it lags `area` while the camera flies in
   const [open, setOpen] = useState<Area | null>(area)
+  const [seen, setSeen] = useState(area)
+  const [leaving, setLeaving] = useState<Area | null>(null) // the board last closed
+  if (seen !== area) {
+    // the area changed (here, or by back/forward): switch boards at once, or start the flight
+    setSeen(area)
+    if (area && open) setOpen(area)
+    if (!area && open) {
+      setLeaving(open)
+      setOpen(null)
+    }
+  }
   const first = useRef(true)
   useEffect(() => {
-    first.current = false
-    cam.set(area ? page(area) : overview())
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- where the book opens, once
-  }, [])
-
-  /** Moves between the book and its areas: flies into a page before its board opens, and
-   * out from the page when a board closes. */
-  function go(a: Area | null): void {
-    onArea(a)
-    if (a && open) return setOpen(a) // switching areas: straight to the other board
-    if (a) return void cam.fly(page(a), 420).then(() => setOpen(a))
-    if (!open) return
-    cam.set(page(open))
-    setOpen(null)
-    void cam.fly(overview())
-  }
-
-  // a resized window refits the book view
-  useEffect(() => {
-    if (!first.current && !open) cam.set(overview())
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refit on size only
-  }, [w, h])
+    if (first.current) {
+      first.current = false
+      cam.set(area ? page(area) : overview())
+      return
+    }
+    if (area && !open) {
+      let live = true
+      void cam.fly(page(area), 420).then(() => live && setOpen(area))
+      return () => {
+        live = false
+      }
+    }
+    if (!area && leaving) {
+      // leaving a board: start on its page, then fly out to the whole book
+      cam.set(page(leaving))
+      void cam.fly(overview())
+    }
+    return undefined
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the chosen area only
+  }, [area])
 
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
       if (typing(e)) return
       if (e.key === 'Escape') {
         e.preventDefault()
-        if (area) go(null)
+        if (area) onArea(null)
         else onStudio()
       }
       const n = ['1', '2', '3'].indexOf(e.key)
-      if (n >= 0) go(AREAS[n].id)
+      if (n >= 0) onArea(AREAS[n].id)
     }
     addEventListener('keydown', key)
     return () => removeEventListener('keydown', key)
-  })
+  }, [area, onArea, onStudio])
 
   const base: Step[] = [
     { label: 'Studio', onClick: onStudio },
-    { label: name, onClick: () => go(null) }
+    { label: name, onClick: () => onArea(null) }
   ]
   const current = AREAS.find((a) => a.id === open)
+  const pages = (on: Area | null): React.ReactNode => <AreaSwitch current={on} onGo={onArea} />
   return (
     <div className="relative h-full w-full">
       <div className="absolute inset-0" style={{ visibility: open ? 'hidden' : 'visible' }}>
         <Canvas
           cam={cam}
-          onBackground={() => go(null)}
+          onBackground={() => onArea(null)}
           chrome={
-            <>
-              <div className="absolute top-3.5 left-3.5 flex gap-2.5">
-                <Breadcrumb steps={[base[0], { label: name }]} />
-                <AreaSwitch current={area} onGo={go} />
-              </div>
-              <div className="absolute top-3.5 right-3.5">
+            <Shell
+              crumbs={[base[0], { label: name }]}
+              right={
                 <ZoomChip
                   camera={cam.camera}
                   viewport={cam.viewport}
                   onZoom={(c) => void cam.fly(c, 200)}
                   note="whole book"
                 />
-              </div>
-              <p className="pointer-events-none absolute bottom-5 left-5 font-mono text-[12px] text-dim">
-                Click an area to fly in · 1 / 2 / 3 jump straight there · Esc closes the book
-              </p>
-              <div className="absolute right-3.5 bottom-3.5">
+              }
+              pages={pages(area)}
+              minimap={
                 <Minimap
                   label="Book"
-                  blocks={panels}
+                  blocks={panels.map((p, i) => ({ ...p, name: AREAS[i].numeral }))}
                   camera={cam.camera}
                   viewport={cam.viewport}
                   onMove={cam.set}
                 />
-              </div>
-            </>
+              }
+            />
           }
         >
           {/* the spine, down the left of the spread */}
@@ -134,12 +140,12 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
                 className="absolute overflow-hidden border border-card-line shadow-card"
                 style={{ left: p.x, top: p.y, width: p.w, height: p.h }}
               >
-                {/* a live, low-detail copy of the area's board; only one is mounted at a time */}
+                {/* a live, low-detail copy of the area's board; only while no board is open */}
                 <div inert className="pointer-events-none absolute inset-0">
-                  {!open && render(a.id, { crumbs: [], aside: null, preview: true })}
+                  {!open && render(a.id, { crumbs: [], pages: null, preview: true })}
                 </div>
                 <button
-                  onClick={() => go(a.id)}
+                  onClick={() => onArea(a.id)}
                   aria-label={`Open ${a.numeral} ${a.name}`}
                   className="group absolute inset-0 flex items-start p-16 transition-colors duration-200 ease-(--ease) hover:bg-selected"
                 >
@@ -166,7 +172,7 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
         <div key={open} className="absolute inset-0">
           {render(open, {
             crumbs: [...base, { label: `${current.numeral} ${current.name}` }],
-            aside: <AreaSwitch current={open} onGo={go} />,
+            pages: pages(open),
             preview: false
           })}
         </div>

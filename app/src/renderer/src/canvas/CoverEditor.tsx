@@ -2,7 +2,7 @@
 // at once). The cover on the left is the result, updating as you type.
 import { useEffect, useRef, useState } from 'react'
 import type { Project } from '../../../preload'
-import { Breadcrumb } from './Chrome'
+import { Shell } from './Chrome'
 import { CoverFace } from './Cover'
 
 type Field = 'name' | 'client' | 'concept'
@@ -96,15 +96,13 @@ export function CoverEditor({
 
   return (
     <div className="bg-dots relative flex h-full w-full items-center justify-center gap-[clamp(32px,6vw,120px)] px-10 animate-[area-in_550ms_var(--ease)_both]">
-      <div className="absolute top-3.5 left-3.5">
-        <Breadcrumb
-          steps={[
-            { label: 'Studio', onClick: onDone },
-            ...(project ? [{ label: project.name, onClick: () => onEnter(project.id) }] : []),
-            { label: project ? 'Edit' : 'New project' }
-          ]}
-        />
-      </div>
+      <Shell
+        crumbs={[
+          { label: 'Studio', onClick: onDone },
+          ...(project ? [{ label: project.name, onClick: () => onEnter(project.id) }] : []),
+          { label: project ? 'Edit' : 'New project' }
+        ]}
+      />
 
       {/* the cover, at about 500×680 */}
       <div

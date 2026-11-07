@@ -26,6 +26,9 @@ export interface CardSpec {
   onClose?: () => void // a window opened on the board, rather than one of its sections
   link?: string // another card's id: a wire runs between them (a window and its Orchestrator)
   needsYou?: boolean // waiting on the user: an orange tab on its top edge
+  // the one exception to growing with its content: a chat, which could run forever. Its body
+  // starts this tall and scrolls inside; dragging the corner makes it taller or shorter too.
+  height?: number
 }
 
 const HEADER = 44
@@ -113,7 +116,15 @@ export function Board({
   }
   const change = (id: string, patch: Partial<BoardLayout[string]>): void => {
     const c = placed.find((p) => p.id === id)!
-    const next = { x: c.x, y: c.y, w: c.w, collapsed: c.collapsed, ...patch }
+    const kept = layout?.[id]?.h
+    const next = {
+      x: c.x,
+      y: c.y,
+      w: c.w,
+      ...(kept ? { h: kept } : {}),
+      collapsed: c.collapsed,
+      ...patch
+    }
     // dropped on top of something: it moves to the nearest free spot beside it
     const others = [...placed.filter((p) => p.id !== id).map(rectOf), ...obstacles]
     const spot = freeSpot({ x: next.x, y: next.y, w: next.w, h: c.h }, others)
@@ -198,13 +209,14 @@ export function Board({
           <Card
             key={c.id}
             card={c}
+            savedH={layout?.[c.id]?.h}
             onHeight={(hh) =>
               setHeights((all) => (all[c.id] === hh ? all : { ...all, [c.id]: hh }))
             }
             z={cam.camera.z}
             tidying={tidying}
             onMove={(x, y) => change(c.id, { x, y })}
-            onResize={(w) => change(c.id, { w })}
+            onResize={(w, h) => change(c.id, h ? { w, h } : { w })}
             onCollapse={() => change(c.id, { collapsed: !c.collapsed })}
           />
         ))}
@@ -214,6 +226,7 @@ export function Board({
 
 export function Card({
   card,
+  savedH,
   onHeight,
   z,
   tidying,
@@ -222,23 +235,26 @@ export function Card({
   onCollapse
 }: {
   card: CardSpec & { collapsed?: boolean }
+  savedH?: number // a tall card's body height, as the user last dragged it
   onHeight?: (h: number) => void // its rendered height in board px, so others can keep clear
   z: number
   tidying: boolean
   onMove: (x: number, y: number) => void
-  onResize: (w: number) => void
+  onResize: (w: number, h?: number) => void
   onCollapse: () => void
 }): React.JSX.Element {
   // while dragging, the card follows the pointer locally; it is saved once, on release
-  const [live, setLive] = useState<{ x: number; y: number; w: number } | null>(null)
+  const [live, setLive] = useState<{ x: number; y: number; w: number; h?: number } | null>(null)
   const x = live?.x ?? card.x
   const y = live?.y ?? card.y
   const w = live?.w ?? card.w
+  // a tall card's body height: dragged now, else saved, else its starting height
+  const bodyH = card.height ? (live?.h ?? savedH ?? card.height) : undefined
 
   function track(
     e: React.PointerEvent,
-    apply: (dx: number, dy: number) => { x: number; y: number; w: number },
-    done: (r: { x: number; y: number; w: number }) => void
+    apply: (dx: number, dy: number) => { x: number; y: number; w: number; h?: number },
+    done: (r: { x: number; y: number; w: number; h?: number }) => void
   ): void {
     if (e.button !== 0) return
     e.preventDefault()
@@ -287,7 +303,14 @@ export function Card({
           : card.tone === 'paper'
             ? 'border-2 border-brand bg-card'
             : 'border border-card-line bg-card'
-      } ${dragging ? 'z-10 shadow-lift outline-2 outline-brand' : 'shadow-card'}`}
+      } ${
+        dragging
+          ? 'z-10 shadow-lift outline-2 outline-brand'
+          : card.needsYou
+            ? // waiting on you: an orange dotted frame around it, with the tag on its edge
+              'shadow-card outline-2 outline-offset-8 outline-needs-you outline-dashed'
+            : 'shadow-card'
+      }`}
       style={{
         left: 0,
         top: 0,
@@ -310,7 +333,7 @@ export function Card({
         style={{ height: HEADER }}
       >
         {card.needsYou && (
-          <span className="absolute -top-3 right-4 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
+          <span className="absolute -top-[22px] right-2 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
             Needs you
           </span>
         )}
@@ -341,19 +364,28 @@ export function Card({
           </button>
         )}
       </header>
-      {!card.collapsed && <div className="select-text">{card.body}</div>}
+      {!card.collapsed && (
+        <div className="flex flex-col select-text" style={bodyH ? { height: bodyH } : undefined}>
+          {card.body}
+        </div>
+      )}
       {!card.collapsed && (
         <span
           aria-hidden
           onPointerDown={(e) =>
             track(
               e,
-              (dx) => ({ x, y, w: Math.max(280, w + dx) }),
-              (r) => onResize(snap(r.w))
+              (dx, dy) => ({
+                x,
+                y,
+                w: Math.max(280, w + dx),
+                ...(bodyH ? { h: Math.max(240, bodyH + dy) } : {})
+              }),
+              (r) => onResize(snap(r.w), r.h && snap(r.h))
             )
           }
-          title="Drag to widen"
-          className="absolute -right-1 -bottom-1 size-4 cursor-ew-resize"
+          title={bodyH ? 'Drag to resize' : 'Drag to widen'}
+          className={`absolute -right-1 -bottom-1 size-4 ${bodyH ? 'cursor-nwse-resize' : 'cursor-ew-resize'}`}
         >
           <span className="absolute right-1 bottom-1 size-2 border-r-2 border-b-2 border-current opacity-50" />
         </span>

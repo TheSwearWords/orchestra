@@ -68,7 +68,7 @@ export function NeedsYou({
               .map((a) => ({
                 key: `${p.id}/ask/${a.id}/${a.t}`,
                 project: p.id,
-                card: `ask-${a.id}`,
+                card: 'actions',
                 title: a.title,
                 what: a.question,
                 t: a.t

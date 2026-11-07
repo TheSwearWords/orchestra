@@ -1,6 +1,6 @@
 import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { answerAsk, openAsk, readAsks, type Ask } from './asks.ts'
+import { answerAsk, openAsk, readAsks, type Ask, type OptionInput } from './asks.ts'
 import type { Instrument, Musician } from './library.ts'
 import { startOrchestraMcp, type Hub, type OrchestraMcp, type Role } from './orchestra-mcp.ts'
 import { foundationOrder } from './plan.ts'
@@ -480,12 +480,12 @@ export class Conductor implements Hub {
   async openWindow(
     project: string,
     chat: string,
-    w: { id: string; title: string; question: string; options: string[]; about?: string }
+    w: { id: string; title: string; question: string; options: OptionInput[]; about?: string }
   ): Promise<string> {
     const a = await openAsk(this.opts.projectDir(project), { ...w, chat })
     await this.log(project, chat, 'orchestrator', 'message', `opened a window: ${a.title}`)
     this.opts.emit({ project, chat, kind: 'asks' })
-    return `The user now sees the "${a.title}" window with your ${a.options.length} options. Keep your chat reply to a sentence, then wait: their answer arrives as a message starting [${a.title}].`
+    return `The user now sees "${a.title}" in the Action box with your ${a.options.length} options. Keep your chat reply to a sentence, then wait: their answer arrives as a message starting [${a.title}].`
   }
 
   /** The user answers a window: a pick closes it, a refinement keeps it open. Either way it

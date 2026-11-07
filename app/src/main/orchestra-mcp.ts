@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
 import type { InstrumentDraft, MusicianDraft } from './proposals.ts'
+import type { OptionInput } from './asks.ts'
 
 // Orchestra's own tools, served to each agent's session over localhost (Pitcrew's pattern). The
 // chain of command is enforced here, by which tools each level gets:
@@ -39,7 +40,7 @@ export interface Hub {
   openWindow(
     project: string,
     chat: string,
-    w: { id: string; title: string; question: string; options: string[]; about?: string }
+    w: { id: string; title: string; question: string; options: OptionInput[]; about?: string }
   ): Promise<string>
   proposeInstrument(
     project: string,
@@ -105,12 +106,23 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
       'open_window',
       {
         description:
-          "Open a window on the user's Create board to ask them one thing, with options to pick from: a colour direction, a type pairing, a logo route. One window per topic; call again with the same id to update it (new options after they refine). The window is wired to the seat or foundation it's about. Their pick, or their refinement, comes back to you as a message starting with the window's title in brackets.",
+          "Put a choice in the Action box beside your window on the user's Create board, only when seeing the options helps them choose (colour palettes, type pairings, logo routes) and only once you know enough from their research and answers to offer good ones. Ask in plain text first; most questions don't need this. Give each option a few words, and colours (hex) for palettes so the box shows swatches. Call again with the same id to replace the options after they refine. Their pick, or their refinement, comes back as a message starting with the title in brackets, and a picked choice leaves the box.",
         inputSchema: {
           id: z.string().describe('lowercase-with-dashes, one per topic, e.g. "colours"'),
           title: z.string().describe('Short, e.g. "Colours"'),
           question: z.string(),
-          options: z.array(z.string()).describe('Two to six concrete options, a few words each'),
+          options: z
+            .array(
+              z.union([
+                z.string(),
+                z.object({
+                  label: z.string(),
+                  colors: z.array(z.string()).optional().describe('Hex swatches, e.g. #0538FF'),
+                  detail: z.string().optional().describe('One short line under the option')
+                })
+              ])
+            )
+            .describe('Two to six concrete options'),
           about: z
             .string()
             .optional()

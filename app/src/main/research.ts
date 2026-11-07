@@ -20,17 +20,46 @@ export interface Reference {
 export interface Site {
   name: string
   url: string
+  about?: string // what the site is for, in a line; names alone don't say
 }
 
 // The seven sources from the project notes; users add their own on top (sites.json).
 export const DEFAULT_SITES: Site[] = [
-  { name: 'Are.na', url: 'https://www.are.na' },
-  { name: 'Visuelle', url: 'https://visuelle.co.uk' },
-  { name: 'Design Reviewed', url: 'https://designreviewed.com' },
-  { name: 'CARI', url: 'https://cari.institute' },
-  { name: 'Public Work', url: 'https://public.work' },
-  { name: 'Artvee', url: 'https://artvee.com' },
-  { name: 'Rawpixel', url: 'https://www.rawpixel.com' }
+  {
+    name: 'Are.na',
+    url: 'https://www.are.na',
+    about: 'Boards of images, links and text that people collect and connect. Good for moodboards.'
+  },
+  {
+    name: 'Visuelle',
+    url: 'https://visuelle.co.uk',
+    about: 'A curated blog of graphic design, branding and typography from studios worldwide.'
+  },
+  {
+    name: 'Design Reviewed',
+    url: 'https://designreviewed.com',
+    about: 'Scans of mid-century graphic design: posters, books, ads and trade journals.'
+  },
+  {
+    name: 'CARI',
+    url: 'https://cari.institute',
+    about: 'Consumer aesthetics by era (Y2K, Frutiger Aero and more), each with image references.'
+  },
+  {
+    name: 'Public Work',
+    url: 'https://public.work',
+    about: 'A search engine for public-domain images: art, photography and illustration.'
+  },
+  {
+    name: 'Artvee',
+    url: 'https://artvee.com',
+    about: 'Public-domain fine art in high resolution, by artist, movement and subject.'
+  },
+  {
+    name: 'Rawpixel',
+    url: 'https://www.rawpixel.com',
+    about: 'Stock images, mockups and public-domain art, much of it free to use.'
+  }
 ]
 
 export const FILE_TYPES = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'pdf']
@@ -196,7 +225,8 @@ export async function listSites(home: string): Promise<Site[]> {
 export async function addSite(home: string, input: Site): Promise<Site[]> {
   const name = oneLine(input.name)
   if (!name) throw new Error('Give the site a name.')
-  const site = { name, url: normalizeUrl(input.url) }
+  const about = oneLine(input.about ?? '').slice(0, 160)
+  const site = { name, url: normalizeUrl(input.url), ...(about ? { about } : {}) }
   const own = (await listSites(home)).slice(DEFAULT_SITES.length)
   await mkdir(home, { recursive: true })
   await writeFile(join(home, 'sites.json'), JSON.stringify([...own, site], null, 2))

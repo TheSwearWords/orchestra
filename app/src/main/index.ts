@@ -24,6 +24,7 @@ import {
 import { runnableOrThrow } from './providers'
 import { listOutputs, outputPath } from './outputs'
 import { adopt } from './proposals'
+import { graphs } from './graph'
 import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
 import { createProject, editProject, listProjects, renameProject, type Project } from './projects'
 import {
@@ -42,11 +43,21 @@ import {
 
 // Create's agents: each chat's Orchestrator, and the Musicians and Instruments it sets to work.
 // Their events go to every window; each window filters by project and chat.
+// Each project's knowledge graph and the vault's, rebuilt in the background as work happens
+const knowledge = graphs({
+  home: ORCHESTRA_HOME,
+  projectDir: (id) => projectDir(id),
+  projects: async () => (await listProjects(PROJECTS_DIR)).map((p) => p.id)
+})
+
 const conductor = new Conductor({
   emit: (e) => {
     for (const w of BrowserWindow.getAllWindows())
       if (!w.isDestroyed()) w.webContents.send('chat:event', e)
+    // a turn ended: the project may have new notes or files for its graph
+    if (e.kind === 'busy' && !e.busy && e.project !== STUDIO) knowledge.touch(e.project)
   },
+  queryGraph: (project, question) => knowledge.query(project, question),
   projectDir: (id) => chatHome(id),
   library: () => loadLibrary(ORCHESTRA_HOME),
   selected: (dir) => readSelection(dir),
@@ -416,7 +427,15 @@ app.whenReady().then(async () => {
     const error = await shell.openPath(referenceFilePath(projectDir(project), file))
     if (error) throw new Error(error)
   })
-  ipcMain.handle('research:interpret', (_, project: string) => interpret(projectDir(project)))
+  ipcMain.handle('research:interpret', async (_, project: string) => {
+    const result = await interpret(projectDir(project))
+    knowledge.touch(project) // research.md is the graph's best source
+    return result
+  })
+  ipcMain.handle('graph:status', (_, project: string) => {
+    projectDir(project)
+    return knowledge.status(project)
+  })
   ipcMain.handle('sites:add', (_, site: Site) => addSite(ORCHESTRA_HOME, site))
 
   ipcMain.handle('create:load', async (_, project: string) => {
@@ -424,9 +443,11 @@ app.whenReady().then(async () => {
     const [lib, selected] = await Promise.all([loadLibrary(ORCHESTRA_HOME), readSelection(dir)])
     return { musicians: lib.musicians, instruments: lib.instruments, selected }
   })
-  ipcMain.handle('create:save', async (_, project: string, ids: string[]) =>
-    saveSelection(projectDir(project), await loadLibrary(ORCHESTRA_HOME), ids)
-  )
+  ipcMain.handle('create:save', async (_, project: string, ids: string[]) => {
+    const saved = await saveSelection(projectDir(project), await loadLibrary(ORCHESTRA_HOME), ids)
+    knowledge.touch(project)
+    return saved
+  })
 
   // The Agents screen: the whole library, raw agent files, and the fields it edits in place.
   ipcMain.handle('agents:load', async () => {

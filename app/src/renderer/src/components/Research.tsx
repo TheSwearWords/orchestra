@@ -109,11 +109,11 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
         },
         {
           id: 'sites',
-          title: 'Look further',
+          title: 'Reference library',
           count: String(data.sites.length),
           x: 0,
           y: 720,
-          w: 432,
+          w: 624,
           body: <Sites sites={data.sites} onAdd={(site) => run(() => window.api.addSite(site))} />
         },
         {
@@ -321,53 +321,60 @@ function Remove({ onRemove }: { onRemove: () => void }): React.JSX.Element {
   )
 }
 
-/** The sites to look further, as chips; one more can be added. */
+/** The reference library: the sites worth looking through, each a tile with what it's for;
+ * your own can be added. */
 function Sites({
   sites,
   onAdd
 }: {
   sites: ResearchState['sites']
-  onAdd: (site: { name: string; url: string }) => Promise<boolean>
+  onAdd: (site: { name: string; url: string; about: string }) => Promise<boolean>
 }): React.JSX.Element {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
+  const [about, setAbout] = useState('')
 
   async function submit(e: FormEvent): Promise<void> {
     e.preventDefault()
-    if (await onAdd({ name, url })) {
+    if (await onAdd({ name, url, about })) {
       setAdding(false)
       setName('')
       setUrl('')
+      setAbout('')
     }
   }
 
-  const chipStyle =
-    'flex items-center gap-1.5 rounded-full border border-card-line px-3 py-1 type-label-s text-link transition-colors duration-150 hover:bg-brand hover:text-on-brand'
   return (
-    <div className="p-4">
-      <ul className="flex flex-wrap gap-2">
-        {sites.map((s) => (
-          <li key={s.url}>
-            <a href={s.url} target="_blank" rel="noreferrer" title={s.url} className={chipStyle}>
-              {s.name}
-              <Icon name="arrow-right-up-line" size={12} />
-            </a>
-          </li>
-        ))}
-        <li>
-          <button
-            onClick={() => setAdding(!adding)}
-            aria-expanded={adding}
-            className={`${chipStyle} border-dashed`}
-          >
-            <Icon name="add-line" size={12} />
-            Add site
-          </button>
-        </li>
-      </ul>
-      {adding && (
-        <form onSubmit={submit} className="mt-3 flex items-center gap-2">
+    <div className="grid grid-cols-2 gap-3 p-4">
+      {sites.map((s) => (
+        <a
+          key={s.url}
+          href={s.url}
+          target="_blank"
+          rel="noreferrer"
+          title={s.url}
+          className="group flex flex-col gap-2 border border-card-line p-4 text-link transition-colors duration-150 hover:border-brand hover:bg-selected"
+        >
+          <span className="flex items-start justify-between">
+            <span className="flex size-11 items-center justify-center bg-brand font-display text-[22px] font-extrabold text-on-brand italic">
+              {s.name[0]}
+            </span>
+            <Icon
+              name="arrow-right-up-line"
+              size={16}
+              className="text-link/60 group-hover:text-link"
+            />
+          </span>
+          <span className="type-heading-m">{s.name}</span>
+          <span className="font-mono text-[11px] text-dim">
+            {s.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+          </span>
+          {s.about && <span className="type-body-s text-fg">{s.about}</span>}
+        </a>
+      ))}
+      {adding ? (
+        <form onSubmit={submit} className="flex flex-col gap-2 border border-brand p-4">
           <input
             autoFocus
             required
@@ -375,7 +382,7 @@ function Sites({
             onChange={(e) => setName(e.target.value)}
             placeholder="Name"
             aria-label="Site name"
-            className={`h-9 max-w-32 ${field}`}
+            className={`h-9 ${field}`}
           />
           <input
             required
@@ -385,10 +392,35 @@ function Sites({
             aria-label="Site address"
             className={`h-9 ${field}`}
           />
-          <button type="submit" className={solidButton}>
-            Save
-          </button>
+          <input
+            value={about}
+            onChange={(e) => setAbout(e.target.value)}
+            placeholder="What it's good for"
+            aria-label="What the site is for"
+            className={`h-9 ${field}`}
+          />
+          <span className="flex gap-2">
+            <button type="submit" className={solidButton}>
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdding(false)}
+              className="px-2 type-label-m text-dim"
+            >
+              Cancel
+            </button>
+          </span>
         </form>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="flex min-h-40 flex-col items-center justify-center gap-1 border border-dashed border-wire text-link hover:bg-selected"
+        >
+          <span className="font-mono text-xl text-link/50">+</span>
+          <span className="serif-on type-label-m">Add a site</span>
+          <span className="type-caption text-dim">One you keep going back to</span>
+        </button>
       )}
     </div>
   )

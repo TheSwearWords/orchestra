@@ -8,6 +8,7 @@ import { COVER, ROW_Y, fitBelow, coverInfo, studioPlace, type Area, type CoverIn
 import { Minimap, Shell, ZoomChip, barButton } from './Chrome'
 import { CoverFace } from './Cover'
 import { Card, type CardSpec } from './Board'
+import { settle } from './place'
 import { Agents } from '../components/Agents'
 import { Icon } from '../components/Icon'
 import { PROVIDERS, type ProviderId } from '../../../main/providers'
@@ -46,12 +47,12 @@ export function Studio({
   // the desk, under the shelf: what every project shares
   const deskY = ROW_Y + COVER.h + 120
   const desk = DESK.map((d, i) => ({ ...d, x: 96 + i * (DESK_W + 24), y: deskY }))
-  const [windows, setWindows] = useState<{ id: Desk; x: number; y: number }[]>([])
+  const [windows, setWindows] = useState<{ id: Desk; x: number; y: number; w?: number }[]>([])
   // with no projects yet, the board still has the desk to look at
   const everything: Rect[] = [
     ...rects,
     ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H })),
-    ...windows.map((w) => ({ x: w.x, y: w.y, w: WINDOW[w.id].w, h: WINDOW[w.id].h ?? 400 }))
+    ...windows.map((w) => ({ x: w.x, y: w.y, w: w.w ?? WINDOW[w.id].w, h: WINDOW[w.id].guess }))
   ]
   const bounds = (): Rect => {
     const x = Math.min(...everything.map((r) => r.x))
@@ -69,7 +70,7 @@ export function Studio({
     const d = desk.find((x) => x.id === id)!
     const spot = windows.find((w) => w.id === id) ?? { id, x: d.x, y: d.y + DESK_H + 48 }
     if (!windows.some((w) => w.id === id)) setWindows([...windows, spot])
-    void cam.fly(fitBelow({ ...spot, w: WINDOW[id].w, h: (WINDOW[id].h ?? 400) + 44 }), 450)
+    void cam.fly(fitBelow({ ...spot, w: WINDOW[id].w, h: WINDOW[id].guess + 44 }), 450)
   }
 
   function tidy(): void {
@@ -183,11 +184,15 @@ export function Studio({
           <span className="type-caption text-dim">{d.note}</span>
         </button>
       ))}
-      {windows.map((w) => (
+      {settle(
+        windows.map((w) => ({ ...w, w: w.w ?? WINDOW[w.id].w, h: WINDOW[w.id].guess })),
+        [...rects, ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H }))]
+      ).map((w) => (
         <Card
           key={w.id}
           card={{
             ...WINDOW[w.id],
+            w: w.w,
             id: w.id,
             x: w.x,
             y: w.y,
@@ -197,7 +202,9 @@ export function Studio({
           z={cam.camera.z}
           tidying={false}
           onMove={(x, y) => setWindows(windows.map((o) => (o.id === w.id ? { ...o, x, y } : o)))}
-          onResize={() => {}}
+          onResize={(width) =>
+            setWindows(windows.map((o) => (o.id === w.id ? { ...o, w: width } : o)))
+          }
           onCollapse={() => {}}
         />
       ))}
@@ -336,10 +343,11 @@ const DESK: { id: Desk; name: string; note: string; icon: string }[] = [
 ]
 // the windows the desk opens, on the board below it
 // shortcut: their places last for the session only; save them in studio.json if people move them
-const WINDOW: Record<Desk, Omit<CardSpec, 'id' | 'x' | 'y' | 'body'>> = {
-  agents: { title: 'Agents · the Ensemble', w: 1152, h: 720 },
-  mcps: { title: 'MCPs and providers', w: 528 },
-  settings: { title: 'Settings', w: 480 }
+// (guess: about how tall each grows, for bringing it into view)
+const WINDOW: Record<Desk, Omit<CardSpec, 'id' | 'x' | 'y' | 'body'> & { guess: number }> = {
+  agents: { title: 'Agents · the Ensemble', w: 1152, guess: 1100 },
+  mcps: { title: 'MCPs and providers', w: 528, guess: 360 },
+  settings: { title: 'Settings', w: 480, guess: 160 }
 }
 
 /** Who agents can run on, and the tool servers they can reach. */

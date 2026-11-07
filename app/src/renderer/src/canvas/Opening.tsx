@@ -1,5 +1,5 @@
-// C3 · Opening the book, 700ms in three beats (brand spec §6): the cover grows to the centre,
-// swings open on its spine, then the camera pushes through the first page into the book.
+// C3 · Opening the book, 1.6s: the cover comes to the centre, swings all the way open on its
+// spine, rests a beat, then its first page grows to fill the window and becomes the book.
 // Closing plays the same in reverse, back into the cover's place on the shelf.
 import { useLayoutEffect, useRef } from 'react'
 import { COVER, reducedMotion, type CoverInfo } from './shared'
@@ -26,38 +26,45 @@ export function Opening({ info, shelf, dir, onSwap, onDone }: Props): React.JSX.
     }
     const vw = innerWidth
     const vh = innerHeight
+    const T = 1600
+    const at = (ms: number): number => ms / T
+    const ease = 'cubic-bezier(.2,.7,.2,1)'
     const s0 = shelf.height / COVER.h
-    const s1 = Math.min((vh * 0.82) / COVER.h, (vw * 0.5) / COVER.w)
+    const s1 = Math.min((vh * 0.7) / COVER.h, (vw * 0.34) / COVER.w)
+    // the first page grows until it covers the window
+    const fill = Math.max(vw / COVER.w, vh / COVER.h) * 1.04
     const place = (cx: number, cy: number, s: number): string =>
       `translate(${cx - COVER.w / 2}px, ${cy - COVER.h / 2}px) scale(${s})`
     const shelfAt = place(shelf.x + shelf.width / 2, shelf.y + shelf.height / 2, s0)
-    const centre = place(vw / 2, vh / 2, s1)
-    // the push lands on the page's centre, so the book appears to come out of it
-    const through = place(vw / 2 - COVER.w * s1 * 0.6, vh / 2, s1 * 3.2)
+    const closed = place(vw / 2, vh / 2, s1)
+    // open, the spread is centred: the spine sits in the middle of the window
+    const open = place(vw / 2 + (COVER.w * s1) / 2, vh / 2, s1)
+    const filled = place(vw / 2, vh / 2, fill)
 
-    const ease = 'cubic-bezier(.2,.7,.2,1)'
+    // 1. to the centre  2. swings all the way open  3. a breath  4. the page fills the window
     const moves: Keyframe[] = [
-      { offset: 0, transform: shelfAt, opacity: 1 },
-      { offset: 200 / 700, transform: centre, opacity: 1 },
-      { offset: 500 / 700, transform: centre, opacity: 1 },
-      { offset: 1, transform: through, opacity: 0 }
+      { offset: 0, transform: shelfAt, opacity: 1, easing: ease },
+      { offset: at(380), transform: closed, opacity: 1, easing: ease },
+      { offset: at(1020), transform: open, opacity: 1 },
+      { offset: at(1160), transform: open, opacity: 1, easing: ease },
+      { offset: at(1500), transform: filled, opacity: 1 },
+      { offset: 1, transform: filled, opacity: 0 }
     ]
     const swing: Keyframe[] = [
       { offset: 0, transform: 'rotateY(0deg)' },
-      { offset: 200 / 700, transform: 'rotateY(0deg)' },
-      { offset: 500 / 700, transform: 'rotateY(-160deg)' },
-      { offset: 1, transform: 'rotateY(-160deg)' }
+      { offset: at(380), transform: 'rotateY(0deg)', easing: ease },
+      { offset: at(1020), transform: 'rotateY(-180deg)' },
+      { offset: 1, transform: 'rotateY(-180deg)' }
     ]
     const opts: KeyframeAnimationOptions = {
-      duration: 700,
-      easing: ease,
+      duration: T,
       fill: 'both',
       direction: dir === 'open' ? 'normal' : 'reverse'
     }
     const a = book.current!.animate(moves, opts)
     front.current!.animate(swing, opts)
-    // opening swaps once the page fills the view; closing swaps right away, under the page
-    const swap = setTimeout(onSwap, dir === 'open' ? 500 : 0)
+    // opening swaps once the page covers the window; closing swaps at once, under the page
+    const swap = setTimeout(onSwap, dir === 'open' ? 1480 : 0)
     a.finished.then(onDone, () => {})
     return () => {
       clearTimeout(swap)
@@ -75,11 +82,15 @@ export function Opening({ info, shelf, dir, onSwap, onDone }: Props): React.JSX.
       >
         {/* the first page */}
         <div className="bg-dots absolute inset-0 border border-card-line shadow-book" />
-        <div
-          ref={front}
-          className="absolute inset-0 origin-left shadow-book [backface-visibility:hidden]"
-        >
-          <CoverFace info={info} />
+        <div ref={front} className="absolute inset-0 origin-left [transform-style:preserve-3d]">
+          <div className="absolute inset-0 shadow-book [backface-visibility:hidden]">
+            <CoverFace info={info} />
+          </div>
+          {/* the inside of the cover, seen once it has swung past the spine */}
+          <div className="absolute inset-0 flex flex-col justify-end border border-card-line bg-card p-6 text-link [backface-visibility:hidden] [transform:rotateY(180deg)]">
+            <p className="type-label-mono">Orchestra presents</p>
+            <p className="mt-1 type-heading-m">{info.name}</p>
+          </div>
         </div>
       </div>
     </div>

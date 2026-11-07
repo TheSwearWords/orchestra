@@ -109,7 +109,8 @@ body {
     background-color 200ms var(--ease);
   &:hover,
   &:focus-visible,
-  &[aria-current]:not([aria-current='false']) {
+  &[aria-current]:not([aria-current='false']),
+  &.serif-measure {
     font-family: var(--font-display);
     font-style: italic;
     font-weight: 800;
@@ -184,6 +185,21 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   @keyframes area-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+/* Viewport chrome rising out of the bar (the conversation, the mode menu). */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes rise-in {
     from {
       opacity: 0;
     }

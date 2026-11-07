@@ -75,6 +75,11 @@ Decide: Which palette direction should we take?
 - Cool technical
 Two to six short options, each a few words; mark at most one "(recommended)". Orchestra shows them as buttons, and the label of the one picked comes back as the user's next message. The user can also answer in their own words. Ask one decision at a time, and don't combine it with a "Suggest deliverables" line.
 
+## Sending the user somewhere
+When the next step happens in one of the project's areas, end your reply with a line naming it, and Orchestra shows a card that takes the user there:
+Go to: research
+(or create, or refine). Use it sparingly, only when moving is the point.
+
 Library deliverables (id: name):
 ${catalogue}
 
@@ -168,7 +173,13 @@ export async function studioPrompt(home: string, projectsDir: string): Promise<s
     `## This chat: the Studio
 You are talking with the user in Orchestra's Studio, above every project, so you can see all of their work. Each project is a folder in ${projectsDir}: concept.md, research.md (the interpreted direction), deliverables.md, prereqs/ (shared foundations such as brand-spec.md and tokens.json) and exports/. Read them when a question needs it. Use them to compare projects, notice what the user keeps coming back to (typefaces, palettes, references, decisions) and answer questions across their work.
 
-You can't brief Musicians or change a project from here, so don't use Orchestra's project tools in this chat. When the user wants something made, say which project it belongs in and that they can open it (or start a new project from the blank cover). ${NO_EXTERNAL_TOOLS}`,
+You can't brief Musicians or change a project from here, so don't use Orchestra's project tools in this chat. When the user wants something made, say which project it belongs in and that they can open it (or start a new project from the blank cover). ${NO_EXTERNAL_TOOLS}
+
+## Sending the user somewhere
+To take the user to a project, end your reply with one line per place, using the project's folder name and, if it helps, an area:
+Go to: forma-editorial
+Go to: forma-editorial/create
+Orchestra shows each line as a card that opens that project (research, create or refine). Use it whenever you point at a project.`,
     `## Projects\n${list || 'No projects yet.'}`
   ]
     .filter(Boolean)

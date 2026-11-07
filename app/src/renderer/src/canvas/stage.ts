@@ -1,11 +1,15 @@
-// Pure layout for the Create stage (canvas spec §6): the Deliverables podium at the bottom
-// centre with every deliverable seated on the arc around it, grouped by category, and the
-// Prerequisites circle at the top centre, ringed by the foundations. No DOM, so it is tested.
+// Pure layout for the Create stage. Top to bottom: the Prerequisites circle ringed by every
+// foundation, one row of deliverable seats (grouped by category), the Deliverables circle
+// where you confirm, and once confirmed, each chosen deliverable's window in a row below it.
+// No DOM, so it is tested in node.
 
 export const SEAT = { w: 208, h: 208 }
-export const PODIUM = { x: 0, y: 0, r: 150 }
-export const PREREQS = { x: 0, y: -1240, r: 110, ring: 270 }
-const ARC = { rx: 1040, ry: 760 }
+const SEAT_GAP = 32
+export const PREREQS = { x: 0, y: -660, r: 110, ring: 290 }
+export const PODIUM = { x: 0, y: 470, r: 150 } // the Deliverables circle
+export const WINDOW_W = 520
+const WINDOW_GAP = 48
+export const WINDOWS_Y = PODIUM.y + PODIUM.r + 120
 
 // Categories in the order a project usually needs them; unknown ones follow alphabetically.
 const CATEGORY_ORDER = ['Brand', 'Web', 'Product', 'Motion', '3D', 'Code']
@@ -20,8 +24,8 @@ export interface Seated {
   y: number
 }
 
-/** Seats on the arc over the podium, left to right, category by category, then the Add seat. */
-export function seatArc(musicians: { id: string; category: string; name: string }[]): Seated[] {
+/** Every seat in one row, centred, category by category, then the Add seat. */
+export function seatRow(musicians: { id: string; category: string; name: string }[]): Seated[] {
   const ordered = [...musicians].sort(
     (a, b) =>
       rank(a.category) - rank(b.category) ||
@@ -29,14 +33,9 @@ export function seatArc(musicians: { id: string; category: string; name: string 
       a.name.localeCompare(b.name)
   )
   const ids = [...ordered.map((m) => m.id), 'add']
-  // from level with the podium on the left, over the top, to level on the right
-  const from = Math.PI
-  const to = 0
-  return ids.map((id, i) => {
-    const t = ids.length === 1 ? 0.5 : i / (ids.length - 1)
-    const a = from + (to - from) * t
-    return { id, x: PODIUM.x + ARC.rx * Math.cos(a), y: PODIUM.y - ARC.ry * Math.sin(a) }
-  })
+  const step = SEAT.w + SEAT_GAP
+  const start = -((ids.length - 1) * step) / 2
+  return ids.map((id, i) => ({ id, x: start + i * step, y: 0 }))
 }
 
 /** Points evenly round a ring, starting at the top. */
@@ -47,11 +46,10 @@ export function ring(n: number, cx: number, cy: number, r: number): { x: number;
   })
 }
 
-/** Where a seat's card opens: beside the seat, on the side away from the podium. */
-export function besideSeat(s: { x: number; y: number }, w: number): { x: number; y: number } {
-  const gap = 48
-  const x = s.x < PODIUM.x ? s.x - SEAT.w / 2 - gap - w : s.x + SEAT.w / 2 + gap
-  return { x: Math.round(x / 24) * 24, y: Math.round((s.y - SEAT.h / 2) / 24) * 24 }
+/** The left edge of the i-th of n windows, in a centred row under the Deliverables circle. */
+export function windowX(i: number, n: number): number {
+  const step = WINDOW_W + WINDOW_GAP
+  return Math.round((-((n - 1) * step) / 2 - WINDOW_W / 2 + i * step) / 24) * 24
 }
 
 /** The project paths an Instrument's `output` names (prereqs/… or exports/), if any. */

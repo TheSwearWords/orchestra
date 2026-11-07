@@ -59,6 +59,7 @@ export function OrchestratorBar({
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
   const [picking, setPicking] = useState(false) // the mode menu
+  const [agents, setAgents] = useState(false) // the Agents pop-out
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [plan, setPlan] = useState<CreateState | undefined>(undefined)
@@ -150,7 +151,8 @@ export function OrchestratorBar({
   const mode = MODES[0]
   const current = threads.find((t) => t.id === chat)
   const side = `fixed z-30 flex flex-col border border-chip-line bg-card animate-[rise-in_240ms_var(--ease)_both]`
-  const sideBox = { top: TOP_BAR + 58, bottom: 14 }
+  // the Conversations panel stands on the bottom edge, a little shorter than the window
+  const sideBox = { bottom: 14, height: 'min(64vh, 640px)' }
   return (
     <div ref={here}>
       {open && (
@@ -196,32 +198,41 @@ export function OrchestratorBar({
             </ul>
           </aside>
 
-          {/* the agents: how they stand, and what the Orchestrator says to them */}
-          <aside
-            aria-label="Agents"
-            className={side}
-            style={{ ...sideBox, right: 14, width: SIDE_W }}
-          >
-            <header className="flex h-11 shrink-0 items-center border-b border-hair px-4 text-link">
-              <span className="type-label-serif-l">Agents</span>
-            </header>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {to.project === STUDIO ? (
-                <p className="p-4 type-body-s text-dim">
-                  Agents work inside projects. Open one to see them here.
-                </p>
-              ) : (
-                <ChatPanel
-                  key={`agents-${to.project}/${chat}`}
-                  project={to.project}
-                  chat={chat}
-                  plan={plan}
-                  composer={false}
-                  view="agents"
-                />
-              )}
-            </div>
-          </aside>
+          {/* the agents, popped out on request: how they stand, and what the Orchestrator says */}
+          {agents && (
+            <aside
+              aria-label="Agents"
+              className={side}
+              style={{ top: TOP_BAR + 58, bottom: 14, right: 14, width: SIDE_W }}
+            >
+              <header className="flex h-11 shrink-0 items-center justify-between border-b border-hair px-4 text-link">
+                <span className="type-label-serif-l">Agents</span>
+                <button
+                  onClick={() => setAgents(false)}
+                  aria-label="Close the agents"
+                  className="flex size-7 items-center justify-center font-mono text-[13px] hover:bg-selected"
+                >
+                  ✕
+                </button>
+              </header>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {to.project === STUDIO ? (
+                  <p className="p-4 type-body-s text-dim">
+                    Agents work inside projects. Open one to see them here.
+                  </p>
+                ) : (
+                  <ChatPanel
+                    key={`agents-${to.project}/${chat}`}
+                    project={to.project}
+                    chat={chat}
+                    plan={plan}
+                    composer={false}
+                    view="agents"
+                  />
+                )}
+              </div>
+            </aside>
+          )}
         </>
       )}
 
@@ -229,7 +240,9 @@ export function OrchestratorBar({
       <div
         className="absolute bottom-3.5 z-30"
         style={
-          open ? { left: SIDE_W + 26, right: SIDE_W + 26 } : { left: BAR_LEFT, right: BAR_RIGHT }
+          open
+            ? { left: SIDE_W + 26, right: agents ? SIDE_W + 26 : BAR_RIGHT }
+            : { left: BAR_LEFT, right: BAR_RIGHT }
         }
       >
         {open && (
@@ -243,6 +256,14 @@ export function OrchestratorBar({
               <span className="type-label-serif-l">{current?.title ?? 'New conversation'}</span>
               <span className="type-label-mono text-dim">{to.label}</span>
               <span className="flex-1" />
+              <button
+                onClick={() => setAgents(!agents)}
+                aria-pressed={agents}
+                title="What the agents are doing, and what the Orchestrator tells them"
+                className={`flex h-7 items-center gap-1.5 border border-chip-line px-2.5 type-label-s ${agents ? 'bg-brand text-on-brand' : 'text-link hover:bg-selected'}`}
+              >
+                Agents
+              </button>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close the conversation"

@@ -17,7 +17,10 @@ test('opening again updates the window; a pick answers it, a refinement does not
   const dir = await mkdtemp(join(tmpdir(), 'asks-'))
   await openAsk(dir, { ...base, options: ['Warm', 'Cool'] })
   await openAsk(dir, { ...base, options: ['Warmer', 'Cooler', ' '] })
-  assert.deepEqual((await readAsks(dir)).colours.options, ['Warmer', 'Cooler'])
+  assert.deepEqual(
+    (await readAsks(dir)).colours.options.map((o) => o.label),
+    ['Warmer', 'Cooler']
+  )
   await answerAsk(dir, 'colours', 'less orange', false)
   assert.equal((await readAsks(dir)).colours.status, 'open')
   await answerAsk(dir, 'colours', 'Warmer', true)
@@ -25,4 +28,19 @@ test('opening again updates the window; a pick answers it, a refinement does not
   assert.equal(a.status, 'answered')
   assert.equal(a.answer, 'Warmer')
   await assert.rejects(openAsk(dir, { ...base, options: ['x'] }))
+})
+
+test('options can show swatches; bad colours are dropped', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'asks-'))
+  const a = await openAsk(dir, {
+    ...base,
+    options: [
+      { label: 'Warm', colors: ['#0538FF', 'red', '#ff5a1f'], detail: 'Blue and signal' },
+      'Cool'
+    ]
+  })
+  assert.deepEqual(a.options, [
+    { label: 'Warm', colors: ['#0538FF', '#ff5a1f'], detail: 'Blue and signal' },
+    { label: 'Cool' }
+  ])
 })

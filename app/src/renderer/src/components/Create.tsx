@@ -377,11 +377,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   )
 
   // once confirmed: the Orchestrator's window under the circle, every deliverable's window
-  // below it, and the windows the Orchestrator opens to ask you things beside it; all wired to
-  // the Orchestrator, because it is the only one you talk to
+  // below it, and beside it the Action box, where its choices appear when it needs one; all
+  // wired to the Orchestrator, because it is the only one you talk to
   const pending = (chat: string): boolean =>
     Object.values(proposals).some((p) => p.chat === chat && p.status === 'pending')
-  const asked = Object.values(asks).sort((a, b) => a.t.localeCompare(b.t))
+  // only open choices: once picked, a choice leaves the box
+  const asked = Object.values(asks)
+    .filter((a) => a.status === 'open')
+    .sort((a, b) => a.t.localeCompare(b.t))
   const cards: CardSpec[] = !confirmed
     ? []
     : [
@@ -393,12 +396,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           y: WINDOWS_Y,
           w: ORCH_W,
           tone: 'paper' as const,
+          height: ORCH_CAP - 44, // under its 44px header
           needsYou: pending(GENERAL),
           body: (
             <ChatPanel
               project={project}
               chat={GENERAL}
               plan={plan}
+              fill
               onSelected={(ids) => {
                 // a Musician approved in the chat is new to the library too, so reload it
                 if (ids.every((x) => plan.musicians.some((m) => m.id === x)))
@@ -408,18 +413,28 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             />
           )
         },
-        ...asked.map((a, i) => ({
-          id: `ask-${a.id}`,
-          title: a.title,
-          count: a.status === 'answered' ? 'answered' : undefined,
-          // beside the Orchestrator, alternating sides
-          x: i % 2 ? ORCH_W / 2 + 48 : -ORCH_W / 2 - 48 - ASK_W,
-          y: WINDOWS_Y + Math.floor(i / 2) * 336,
+        {
+          id: 'actions',
+          title: 'Action',
+          count: asked.length ? `${asked.length} to choose` : undefined,
+          x: ORCH_W / 2 + 48,
+          y: WINDOWS_Y,
           w: ASK_W,
           link: 'orchestrator',
-          needsYou: a.status === 'open',
-          body: <AskWindow project={project} ask={a} onError={setError} />
-        })),
+          needsYou: asked.length > 0,
+          body: asked.length ? (
+            <div className="divide-y divide-hair">
+              {asked.map((a) => (
+                <AskWindow key={a.id} project={project} ask={a} onError={setError} />
+              ))}
+            </div>
+          ) : (
+            <p className="p-5 type-body-s text-dim">
+              Nothing to choose right now. When a choice is easier seen than described, the
+              Orchestrator puts it here.
+            </p>
+          )
+        },
         ...chosen.map((id, i) => ({
           id: `chat-${id}`,
           title: musician(id)!.name,
@@ -480,10 +495,13 @@ function remember(key: string, value: string[]): void {
 
 const NO_PLAN: CreateState = { musicians: [], instruments: [], selected: [] }
 const ORCH_W = 640
+// the Orchestrator's chat can run forever, so it alone scrolls: capped at 1920×3240's shape
+const ORCH_CAP = Math.round((ORCH_W * 3240) / 1920)
 const ASK_W = 432
 
-/** A window the Orchestrator opened to ask one thing: its options to pick from, and a line to
- * refine them. Picking answers it; either way the Orchestrator hears back. */
+/** One choice in the Action box: the question, its options (with swatches when they are
+ * colours), and a line to refine them. Picking answers it and it leaves the box; either way
+ * the Orchestrator hears back. */
 function AskWindow({
   project,
   ask,
@@ -506,50 +524,46 @@ function AskWindow({
     }
     setSending(false)
   }
-  const done = ask.status === 'answered'
   return (
     <div className="p-5">
-      <p className="type-body-m text-fg">{ask.question}</p>
+      <p className="type-label-mono text-link">{ask.title}</p>
+      <p className="mt-1.5 type-body-m text-fg">{ask.question}</p>
       <div className="mt-4 flex flex-col gap-2">
-        {ask.options.map((o) => {
-          const picked = done && ask.answer === o
-          return (
-            <button
-              key={o}
-              disabled={sending || done}
-              onClick={() => void answer(o, true)}
-              className={`flex items-center justify-between border px-3 py-2.5 text-left type-label-m ${
-                picked
-                  ? 'border-brand bg-brand text-on-brand'
-                  : done
-                    ? 'border-hair text-dim'
-                    : 'border-card-line text-link hover:bg-selected'
-              }`}
-            >
-              {o}
-              {picked && <Icon name="check-line" size={16} />}
-            </button>
-          )
-        })}
-      </div>
-      {!done && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            void answer(text, false)
-          }}
-          className="mt-4"
-        >
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
+        {ask.options.map((o) => (
+          <button
+            key={o.label}
             disabled={sending}
-            placeholder="Not quite? Say what to change, then Enter"
-            aria-label={`Refine ${ask.title}`}
-            className="w-full border-0 border-b-2 border-brand bg-transparent py-1.5 type-body-s text-link outline-none placeholder:text-placeholder focus-visible:outline-none"
-          />
-        </form>
-      )}
+            onClick={() => void answer(o.label, true)}
+            className="flex flex-col gap-2 border border-card-line px-3 py-2.5 text-left text-link transition-colors duration-150 hover:border-brand hover:bg-selected"
+          >
+            {o.colors && (
+              <span className="flex h-10 w-full">
+                {o.colors.map((c, i) => (
+                  <span key={i} className="flex-1" style={{ background: c }} title={c} />
+                ))}
+              </span>
+            )}
+            <span className="type-label-m">{o.label}</span>
+            {o.detail && <span className="type-caption text-dim">{o.detail}</span>}
+          </button>
+        ))}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          void answer(text, false)
+        }}
+        className="mt-4"
+      >
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={sending}
+          placeholder="Not quite? Say what to change, then Enter"
+          aria-label={`Refine ${ask.title}`}
+          className="w-full border-0 border-b-2 border-brand bg-transparent py-1.5 type-body-s text-link outline-none placeholder:text-placeholder focus-visible:outline-none"
+        />
+      </form>
     </div>
   )
 }
@@ -572,6 +586,7 @@ export function ChatPanel({
   plan = NO_PLAN,
   composer = true,
   view = 'full',
+  fill = false,
   projects = [],
   onGo,
   onSelected = () => {}
@@ -584,6 +599,7 @@ export function ChatPanel({
   // window) · agents: their status and what the Orchestrator says to them (beside the bar) ·
   // work: a deliverable's window, its agents and files, no talking (you talk to the Orchestrator)
   view?: 'full' | 'conversation' | 'agents' | 'work'
+  fill?: boolean // fill a fixed-height window; the conversation scrolls inside it
   projects?: { id: string; name: string }[] // for the cards a "Go to:" line makes
   onGo?: (place: Place) => void
   onSelected?: (ids: string[]) => void
@@ -716,8 +732,9 @@ export function ChatPanel({
     )
 
   const only = view === 'conversation'
+  const scrolls = only || fill
   return (
-    <div className={`flex flex-col ${only ? 'h-full min-h-0' : ''}`}>
+    <div className={`flex flex-col ${scrolls ? 'h-full min-h-0' : ''}`}>
       {!only && (
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-hair px-5 py-3">
           <p className="line-clamp-2 type-caption text-fg-2">
@@ -748,7 +765,7 @@ export function ChatPanel({
         </div>
       )}
 
-      <div className={`flex flex-col px-5 ${only ? 'min-h-0 flex-1' : 'min-h-[220px]'}`}>
+      <div className={`flex flex-col px-5 ${scrolls ? 'min-h-0 flex-1' : 'min-h-[220px]'}`}>
         {channel && !only ? (
           <AgentChannel log={log} busy={busy || working > 0} onStop={stop} plan={plan} />
         ) : (
@@ -762,7 +779,7 @@ export function ChatPanel({
             onAdd={add}
             onAnswer={send}
             onDecide={decide}
-            scroll={only}
+            scroll={scrolls}
             projects={projects}
             here={studio ? undefined : project}
             onGo={onGo}

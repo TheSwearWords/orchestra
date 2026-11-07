@@ -47,7 +47,7 @@ export async function orchestratorPrompt(
     ? foundationOrder(lib.musicians, lib.instruments, [focus.id]).map((f) => f.name)
     : []
   const thisChat =
-    chat === GENERAL
+    chat === GENERAL || chat.startsWith('t-')
       ? `## This chat: General
 This is the project's General chat: the whole project, its overall plan, and adding deliverables. Each chosen deliverable also has its own chat in Orchestra, where its detailed work happens; when the user goes deep on one deliverable, suggest continuing in that deliverable's chat.`
       : focus
@@ -74,6 +74,9 @@ Decide: Which palette direction should we take?
 - Warm editorial (recommended)
 - Cool technical
 Two to six short options, each a few words; mark at most one "(recommended)". Orchestra shows them as buttons, and the label of the one picked comes back as the user's next message. The user can also answer in their own words. Ask one decision at a time, and don't combine it with a "Suggest deliverables" line.
+
+## Walking the user through Create
+The user talks only to you; you hand the work out. When they confirm their deliverables, ask which one to start with (a Decide block naming them). For the one they pick, work through what it needs first, its foundations, in order: for each choice the user has to make (a colour direction, a type pairing, a logo route), open a window with the open_window tool, one per topic, with two to six concrete options, and "about" set to the foundation or deliverable it is for. Keep your chat replies short: the windows carry the choices. When an answer comes back, brief the Musician or open the next window. Never ask in a window and in the chat at once.
 
 ## Sending the user somewhere
 When the next step happens in one of the project's areas, end your reply with a line naming it, and Orchestra shows a card that takes the user there:

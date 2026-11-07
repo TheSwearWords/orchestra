@@ -41,38 +41,45 @@ export function Shell({
 export const barButton =
   'serif-on flex h-9 items-center border border-chip-line px-3.5 type-label-s text-link hover:bg-selected'
 
-/** Where you are, as steps; clicking an earlier step zooms back out to it. */
+/** Where you are, as a row of equal boxes: the same type in every one, the current step
+ * filled blue. Clicking an earlier step goes back out to it. */
 export function Breadcrumb({ steps }: { steps: Step[] }): React.JSX.Element {
+  const box = 'flex h-9 items-center border border-chip-line px-3.5 type-label-s whitespace-nowrap'
   return (
-    <nav aria-label="Where you are" className="flex min-w-0 items-center gap-3 text-link">
-      <span className="flex size-8 items-center justify-center rounded-full bg-brand text-on-brand">
+    <nav aria-label="Where you are" className="flex min-w-0 items-center gap-2 text-link">
+      <span className="mr-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand">
         <Icon name="logo-mark" size={20} />
       </span>
-      {steps.map((s, i) => {
-        const last = i === steps.length - 1
-        return (
-          <span key={i} className="flex items-center gap-3">
-            {i > 0 && <span className="font-mono text-[13px] text-link/35">/</span>}
-            {last ? (
-              <span aria-current="location" className="type-heading-m whitespace-nowrap">
-                {s.label}
-              </span>
-            ) : (
-              <button
-                onClick={s.onClick}
-                className="serif-on min-h-8 type-label-s whitespace-nowrap text-dim hover:text-link"
-              >
-                {s.label}
-              </button>
-            )}
-          </span>
-        )
-      })}
+      <ol className="flex min-w-0 items-center">
+        {steps.map((s, i) => {
+          const last = i === steps.length - 1
+          return (
+            <li key={i} className={i > 0 ? '-ml-px' : ''}>
+              {last ? (
+                <span
+                  aria-current="location"
+                  className={`${box} border-brand bg-brand text-on-brand`}
+                >
+                  {s.label}
+                </span>
+              ) : (
+                <button
+                  onClick={s.onClick}
+                  className={`${box} transition-colors duration-200 ease-(--ease) hover:bg-selected`}
+                >
+                  {s.label}
+                </button>
+              )}
+            </li>
+          )
+        })}
+      </ol>
     </nav>
   )
 }
 
-/** I / II / III: the current area is a blue cell with its name; the others only a numeral. */
+/** The pages, as in C5's viewfinder: a blue label naming where you are, over three page
+ * rectangles, I to III, the current one filled. Click a page to go there. */
 export function AreaSwitch({
   current,
   onGo
@@ -80,26 +87,34 @@ export function AreaSwitch({
   current: Area | null
   onGo: (a: Area) => void
 }): React.JSX.Element {
+  const here = AREAS.find((a) => a.id === current)
   return (
-    <div role="tablist" aria-label="Movements" className={`${chip} items-stretch`}>
-      {AREAS.map((a) => {
-        const on = a.id === current
-        return (
-          <button
-            key={a.id}
-            role="tab"
-            aria-selected={on}
-            title={`${a.numeral} · ${a.name} (${AREAS.indexOf(a) + 1})`}
-            onClick={() => onGo(a.id)}
-            className={`flex min-w-[46px] items-center justify-center gap-2 px-3 transition-colors duration-200 ease-(--ease) ${
-              on ? 'bg-poster-dots' : 'hover:bg-selected'
-            } ${AREAS.indexOf(a) > 0 ? 'border-l border-chip-line' : ''}`}
-          >
-            <span className="font-display text-[15px] font-extrabold italic">{a.numeral}</span>
-            {on && <span className="type-label-serif-l">{a.name}</span>}
-          </button>
-        )
-      })}
+    <div className="flex flex-col border border-chip-line bg-chip shadow-float">
+      <span className="bg-brand px-2.5 py-1 type-label-mono text-on-brand">
+        {here ? `${here.numeral} · ${here.name}` : 'The whole book'}
+      </span>
+      <div role="tablist" aria-label="Movements" className="flex gap-1.5 p-2">
+        {AREAS.map((a, i) => {
+          const on = a.id === current
+          return (
+            <button
+              key={a.id}
+              role="tab"
+              aria-selected={on}
+              aria-label={`${a.numeral} ${a.name}`}
+              title={`${a.numeral} · ${a.name} (${i + 1})`}
+              onClick={() => onGo(a.id)}
+              className={`relative h-14 w-11 border transition-colors duration-200 ease-(--ease) ${
+                on ? 'border-brand bg-brand/30' : 'border-brand/25 bg-brand/8 hover:bg-brand/18'
+              }`}
+            >
+              <span className="absolute top-1 left-1.5 font-mono text-[10px] leading-none text-link">
+                {a.numeral}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

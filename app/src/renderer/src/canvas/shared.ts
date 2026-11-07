@@ -89,3 +89,13 @@ export function fitBelow(r: Rect, maxZ = 1): Camera {
   const c = fit(r, innerWidth, innerHeight - TOP_BAR - BOTTOM, 56, maxZ)
   return { ...c, y: c.y - TOP_BAR / c.z }
 }
+
+/** A card the Needs you list wants shown: App sets it and navigates, the board takes it once
+ * it is mounted (or hears 'orchestra:focus' if it already is). */
+export const pendingFocus: { current: { project: string; card: string } | null } = {
+  current: null
+}
+export function requestFocus(project: string, card: string): void {
+  pendingFocus.current = { project, card }
+  dispatchEvent(new Event('orchestra:focus'))
+}

@@ -54,7 +54,11 @@ test('each level gets only its own tools', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'orchestra-agents-'))
   try {
     const c = conductor(dir)
-    assert.deepEqual(await toolsFor(c, 'orchestrator'), ['brief_musician', 'propose_musician'])
+    assert.deepEqual(await toolsFor(c, 'orchestrator'), [
+      'brief_musician',
+      'open_window',
+      'propose_musician'
+    ])
     assert.deepEqual(await toolsFor(c, 'website'), [
       'propose_instrument',
       'report',

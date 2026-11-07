@@ -6,6 +6,7 @@ import type { EditKey, Instrument, Library, Musician, Role } from '../main/libra
 import type { ProviderStatus } from '../main/providers'
 import type { Output } from '../main/outputs'
 import type { Proposal } from '../main/proposals'
+import type { Ask } from '../main/asks'
 import type { Reference, Site, Tag } from '../main/research'
 
 export type {
@@ -24,7 +25,8 @@ export type {
   Reference,
   Role,
   Site,
-  Tag
+  Tag,
+  Ask
 }
 
 /** One chat in a project: General, or a chosen deliverable's. */
@@ -39,6 +41,15 @@ export type BoardLayout = Record<
   string,
   { x: number; y: number; w: number; h?: number; collapsed?: boolean }
 >
+
+/** One of the bar's conversations with the Orchestrator. */
+export interface Thread {
+  id: string
+  title: string
+  count: number
+  updated: string
+  busy: boolean
+}
 
 export interface ChatInfo {
   id: string
@@ -135,9 +146,14 @@ const api = {
   addSite: (site: Site): Promise<Site[]> => ipcRenderer.invoke('sites:add', site),
 
   loadCreate: (project: string): Promise<CreateState> => ipcRenderer.invoke('create:load', project),
+  listAsks: (project: string): Promise<Record<string, Ask>> =>
+    ipcRenderer.invoke('asks:list', project),
+  answerAsk: (project: string, id: string, text: string, final: boolean): Promise<void> =>
+    ipcRenderer.invoke('ask:answer', project, id, text, final),
   saveDeliverables: (project: string, ids: string[]): Promise<string[]> =>
     ipcRenderer.invoke('create:save', project, ids),
   listChats: (project: string): Promise<ChatInfo[]> => ipcRenderer.invoke('chats:list', project),
+  listThreads: (project: string): Promise<Thread[]> => ipcRenderer.invoke('chats:threads', project),
   loadChat: (
     project: string,
     chat: string

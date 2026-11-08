@@ -44,9 +44,11 @@ const ago = (iso: string): string => {
 
 export function NeedsYou({
   projects,
+  side,
   onOpen
 }: {
   projects: Project[]
+  side: number // how far in to sit, clearing the page-turn strip
   onOpen: (project: string, card: string) => void
 }): React.JSX.Element {
   const [needs, setNeeds] = useState<Need[]>([])
@@ -107,7 +109,7 @@ export function NeedsYou({
   const unread = needs.filter((n) => !seen.has(n.key)).length
   const name = (id: string): string => projects.find((p) => p.id === id)?.name ?? id
   return (
-    <div className="absolute right-3.5 z-30" style={{ top: TOP_BAR + 10 }}>
+    <div className="absolute z-30" style={{ top: TOP_BAR + 10, right: 14 + side }}>
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}

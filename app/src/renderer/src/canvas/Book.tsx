@@ -6,7 +6,7 @@ import { Canvas } from './Canvas'
 import { useCamera } from './useCamera'
 import { fit, type Rect } from './camera'
 import { AREAS, chip, typing, type Area } from './shared'
-import { AreaSwitch, Minimap, Shell, ZoomChip, type Step } from './Chrome'
+import { AreaSwitch, Minimap, PageTurn, SIDE, Shell, ZoomChip, type Step } from './Chrome'
 
 const GAP = 160 // between areas, in world px
 
@@ -96,10 +96,14 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
   const current = AREAS.find((a) => a.id === open)
   const pages = (on: Area | null): React.ReactNode => <AreaSwitch current={on} onGo={onArea} />
   return (
-    <div className="relative h-full w-full">
+    <div
+      className="relative h-full w-full"
+      style={open ? ({ '--side': `${SIDE}px` } as React.CSSProperties) : undefined}
+    >
       <div className="absolute inset-0" style={{ visibility: open ? 'hidden' : 'visible' }}>
         <Canvas
           cam={cam}
+          content={open ? undefined : () => ({ all: whole })}
           onBackground={() => onArea(null)}
           chrome={
             <Shell
@@ -176,6 +180,12 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
             preview: false
           })}
         </div>
+      )}
+      {open && (
+        <>
+          <PageTurn side="left" to={AREAS[AREAS.indexOf(current!) - 1]} onGo={onArea} />
+          <PageTurn side="right" to={AREAS[AREAS.indexOf(current!) + 1]} onGo={onArea} />
+        </>
       )}
     </div>
   )

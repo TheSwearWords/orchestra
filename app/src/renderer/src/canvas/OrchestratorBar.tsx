@@ -5,7 +5,7 @@
 // the bar, your conversations line the left of the window, and the agents (their status, and
 // what the Orchestrator tells them) the right. A click anywhere else puts it all away.
 import { useEffect, useRef, useState } from 'react'
-import type { CreateState, Thread } from '../../../preload'
+import type { CreateState, Thread, Usage } from '../../../preload'
 import { ChatPanel } from '../components/Create'
 import { Icon } from '../components/Icon'
 import type { Place } from '../goto'
@@ -41,12 +41,29 @@ const MODES = [
 
 // room the bar leaves for the bottom-left corner (pages, the Studio title) and the viewfinder
 export const BAR_LEFT = 300
-export const BAR_RIGHT = 186
+export const BAR_RIGHT = 240
 const BAR_H = 58
+const METER_H = 24 // the usage meter under the field
+const STACK = BAR_H + METER_H
+const CHAT_H = 'min(76vh, 840px)' // the opened conversation
+const METERS = [
+  ['five_hour', '5-hour'],
+  ['seven_day', 'Weekly']
+] as const
 const SIDE_W = 288 // the conversations and agents panels beside the open bar
 
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 const newThread = (): string => `t-${Date.now().toString(36)}`
+const THINKING = { text: 'Thinking' }
+
+// the last reading, so the meter isn't empty until the next reply
+function savedUsage(): Usage | null {
+  try {
+    return JSON.parse(localStorage.getItem('usage') ?? 'null')
+  } catch {
+    return null
+  }
+}
 
 export function OrchestratorBar({
   to,
@@ -67,6 +84,8 @@ export function OrchestratorBar({
   const [agents, setAgents] = useState(false) // the Agents pop-out
   const [hi, setHi] = useState(0) // the highlighted slash command
   const [busy, setBusy] = useState(false)
+  const [step, setStep] = useState<{ agent?: string; text: string }>(THINKING)
+  const [usage, setUsage] = useState(savedUsage)
   const [error, setError] = useState('')
   const [plan, setPlan] = useState<CreateState | undefined>(undefined)
   const [threads, setThreads] = useState<Thread[]>([])
@@ -86,7 +105,11 @@ export function OrchestratorBar({
     }
     load()
     window.api.loadChat(to.project, chat).then(
-      (c) => live && setBusy(c.busy),
+      (c) => {
+        if (!live) return
+        setBusy(c.busy)
+        setStep(THINKING)
+      },
       () => {}
     )
     if (to.project !== STUDIO)
@@ -95,8 +118,26 @@ export function OrchestratorBar({
         () => {}
       )
     const off = window.api.onChatEvent((e) => {
+      if (e.kind === 'usage') {
+        setUsage(e.usage)
+        try {
+          localStorage.setItem('usage', JSON.stringify(e.usage))
+        } catch {
+          // only the reading after a restart is lost
+        }
+        return
+      }
       if (e.project !== to.project) return
-      if (e.chat === chat && e.kind === 'busy') setBusy(e.busy)
+      if (e.chat === chat && e.kind === 'busy') {
+        setBusy(e.busy)
+        if (e.busy) setStep(THINKING)
+      }
+      if (e.chat === chat && e.kind === 'live' && e.text) setStep({ text: 'Writing the reply' })
+      if (e.chat === chat && e.kind === 'log' && e.entry.kind === 'tool')
+        setStep({
+          agent: e.entry.agent === 'orchestrator' ? undefined : e.entry.agent,
+          text: e.entry.text
+        })
       if (e.kind === 'message' || e.kind === 'busy') load()
     })
     return () => {
@@ -180,8 +221,35 @@ export function OrchestratorBar({
   const mode = MODES[0]
   const current = threads.find((t) => t.id === chat)
   const side = `fixed z-30 flex flex-col border border-chip-line bg-card animate-[rise-in_240ms_var(--ease)_both]`
-  // the Conversations panel stands on the bottom edge, a little shorter than the window
-  const sideBox = { bottom: 14, height: 'min(64vh, 640px)' }
+  // the Conversations panel stands on the bottom edge, its top level with the opened chat's
+  const sideBox = { bottom: 14, height: `calc(${CHAT_H} + ${STACK}px)` }
+  const stepBy =
+    step.agent &&
+    [...(plan?.musicians ?? []), ...(plan?.instruments ?? [])].find(
+      (a) => a.id === step.agent!.split('--').pop()
+    )?.name
+  const stepText = step.text.charAt(0).toUpperCase() + step.text.slice(1)
+  const working = busy && (
+    <p
+      role="status"
+      className="flex w-fit max-w-full items-center gap-2 bg-brand px-2.5 py-1 type-label-mono text-on-brand"
+    >
+      <span aria-hidden className="flex shrink-0 gap-0.5">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="size-1.5 bg-on-brand motion-safe:animate-[working_900ms_linear_infinite]"
+            style={{ animationDelay: `${i * 150}ms` }}
+          />
+        ))}
+      </span>
+      <span className="shrink-0">Working</span>
+      <span className="min-w-0 truncate">
+        · {stepBy ? `${stepBy}: ` : ''}
+        {stepText}
+      </span>
+    </p>
+  )
   return (
     <div ref={here}>
       {open && (
@@ -278,8 +346,8 @@ export function OrchestratorBar({
           // the bar, opened up: same frame, no shadow of its own
           <section
             aria-label={`Conversation ${to.label}`}
-            className="absolute inset-x-0 flex h-[min(76vh,840px)] origin-bottom flex-col border border-b-0 border-chip-line bg-card animate-[rise-in_240ms_var(--ease)_both]"
-            style={{ bottom: BAR_H }}
+            className="absolute inset-x-0 flex origin-bottom flex-col border border-b-0 border-chip-line bg-card animate-[rise-in_240ms_var(--ease)_both]"
+            style={{ bottom: STACK, height: CHAT_H }}
           >
             <header className="flex h-11 shrink-0 items-center gap-3 border-b border-hair px-4 text-link">
               <span className="type-label-serif-l">{current?.title ?? 'New conversation'}</span>
@@ -317,7 +385,14 @@ export function OrchestratorBar({
                 }}
               />
             </div>
+            {working && <div className="shrink-0">{working}</div>}
           </section>
+        )}
+
+        {!open && working && (
+          <div className="absolute inset-x-0" style={{ bottom: STACK }}>
+            {working}
+          </div>
         )}
 
         {matches.length > 0 && (
@@ -326,7 +401,7 @@ export function OrchestratorBar({
             role="listbox"
             aria-label="Commands"
             className="absolute inset-x-0 border border-chip-line bg-card p-1.5 shadow-lift animate-[rise-in_160ms_var(--ease)_both]"
-            style={{ bottom: BAR_H + 8 }}
+            style={{ bottom: STACK + 8 }}
           >
             {matches.map((c) => (
               <li key={c.id} role="option" aria-selected={c === shown}>
@@ -356,7 +431,7 @@ export function OrchestratorBar({
             role="menu"
             aria-label="Mode"
             className="absolute left-2 w-80 border border-chip-line bg-card p-1.5 shadow-lift animate-[rise-in_200ms_var(--ease)_both]"
-            style={{ bottom: BAR_H + 8 }}
+            style={{ bottom: STACK + 8 }}
           >
             {MODES.map((m) => (
               <li key={m.id}>
@@ -451,11 +526,47 @@ export function OrchestratorBar({
             {to.label}
           </span>
         </form>
+        <div
+          className="flex items-center gap-5 border border-t-0 border-chip-line bg-chip px-3 type-caption text-link"
+          style={{ height: METER_H }}
+        >
+          {usage ? (
+            METERS.map(([key, name]) => {
+              const w = usage[key]
+              if (!w) return null
+              const when = new Date(w.resetsAt * 1000)
+              const pct = when.getTime() < Date.now() ? 0 : Math.round(w.utilization * 100)
+              return (
+                <div
+                  key={key}
+                  role="meter"
+                  aria-label={`${name} usage`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={pct}
+                  title={`Resets ${when.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`}
+                  className="flex min-w-0 flex-1 items-center gap-2"
+                >
+                  <span className="shrink-0">{name}</span>
+                  <span className="h-1.5 min-w-0 flex-1 bg-brand/15">
+                    <span
+                      className={`block h-full ${pct >= 90 ? 'bg-signal' : 'bg-brand'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </span>
+                  <span className="shrink-0 tabular-nums">{pct}%</span>
+                </div>
+              )
+            })
+          ) : (
+            <span className="text-dim">Your Claude plan usage shows after your next message</span>
+          )}
+        </div>
         {error && (
           <p
             role="alert"
             className="absolute left-1/2 -translate-x-1/2 border-l-2 border-signal bg-signal-subtle px-3 py-2 type-body-s text-signal-fg shadow-float"
-            style={{ bottom: BAR_H + 8 }}
+            style={{ bottom: STACK + 8 }}
           >
             {error}
           </p>

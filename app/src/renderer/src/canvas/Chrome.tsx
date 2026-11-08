@@ -30,8 +30,19 @@ export function Shell({
         <Breadcrumb steps={crumbs} />
         <div className="flex items-center gap-2">{right}</div>
       </header>
-      {pages && <div className="absolute bottom-3.5 left-3.5 z-20">{pages}</div>}
-      {minimap && <div className="absolute right-3.5 bottom-3.5 z-20">{minimap}</div>}
+      {pages && (
+        <div className="absolute bottom-3.5 z-20" style={{ left: 'calc(14px + var(--side, 0px))' }}>
+          {pages}
+        </div>
+      )}
+      {minimap && (
+        <div
+          className="absolute bottom-3.5 z-20"
+          style={{ right: 'calc(14px + var(--side, 0px))' }}
+        >
+          {minimap}
+        </div>
+      )}
       {children}
     </>
   )
@@ -116,6 +127,41 @@ export function AreaSwitch({
         })}
       </div>
     </div>
+  )
+}
+
+export const SIDE = 56 // width of the page-turn strips, which the corners move in to clear
+
+/** A full-height strip at the window's edge that goes to the neighbouring area. At the first
+ * and last area it stays as an empty strip, so the frame doesn't change as you go. */
+export function PageTurn({
+  side,
+  to,
+  onGo
+}: {
+  side: 'left' | 'right'
+  to?: (typeof AREAS)[number]
+  onGo: (a: Area) => void
+}): React.JSX.Element {
+  return (
+    <button
+      disabled={!to}
+      aria-hidden={!to}
+      aria-label={to && `Go to ${to.numeral} ${to.name}`}
+      title={to && `${to.numeral} · ${to.name}`}
+      onClick={() => to && onGo(to.id)}
+      className={`absolute bottom-0 z-10 flex flex-col items-center justify-center gap-3 border-chip-line bg-chip text-link transition-colors duration-200 ease-(--ease) enabled:hover:bg-brand enabled:hover:text-on-brand ${side === 'left' ? 'left-0 border-r' : 'right-0 border-l'}`}
+      style={{ top: TOP_BAR, width: SIDE }}
+    >
+      {to && (
+        <>
+          <span className="font-mono text-[18px]">{side === 'left' ? '←' : '→'}</span>
+          <span className="type-label-serif-l [writing-mode:vertical-rl]">
+            {to.numeral} · {to.name}
+          </span>
+        </>
+      )}
+    </button>
   )
 }
 

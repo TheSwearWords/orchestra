@@ -160,6 +160,14 @@ export function Board({
       cam={cam}
       className={preview ? '' : 'animate-[area-in_550ms_var(--ease)_both]'}
       onPress={() => setSelected(undefined)}
+      content={
+        preview
+          ? undefined
+          : () => {
+              const sel = placed.find((c) => c.id === selected)
+              return { all: bounds(), selected: sel && rectOf(sel) }
+            }
+      }
       onContextMenu={
         addMenu &&
         ((e) => {

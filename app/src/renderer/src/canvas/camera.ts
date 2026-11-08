@@ -34,6 +34,23 @@ export function zoomAt(c: Camera, factor: number, sx: number, sy: number): Camer
   return { x: wx - sx / z, y: wy - sy / z, z }
 }
 
+/** Figma's wheel: scroll pans, shift+scroll pans sideways, ctrl+scroll or a pinch zooms. */
+export function wheelCamera(
+  c: Camera,
+  w: { deltaX: number; deltaY: number; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean },
+  sx: number,
+  sy: number
+): Camera {
+  if (w.ctrlKey || w.metaKey) {
+    // a pinch arrives as ctrl with small deltas; a ctrl+wheel notch is around 100
+    const rate = Math.abs(w.deltaY) < 40 ? 0.01 : 0.002
+    return zoomAt(c, Math.exp(-w.deltaY * rate), sx, sy)
+  }
+  const dx = w.shiftKey && !w.deltaX ? w.deltaY : w.deltaX
+  const dy = w.shiftKey ? 0 : w.deltaY
+  return { ...c, x: c.x + dx / c.z, y: c.y + dy / c.z }
+}
+
 export const toWorld = (c: Camera, sx: number, sy: number): { x: number; y: number } => ({
   x: c.x + sx / c.z,
   y: c.y + sy / c.z

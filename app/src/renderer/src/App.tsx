@@ -7,6 +7,7 @@ import { Board } from './canvas/Board'
 import { Book, type Frame } from './canvas/Book'
 import { STUDIO, TOP_BAR, chip, coverInfo, requestFocus, type Area } from './canvas/shared'
 import { NeedsYou } from './canvas/NeedsYou'
+import { SIDE } from './canvas/Chrome'
 import { CoverEditor } from './canvas/CoverEditor'
 import { Opening } from './canvas/Opening'
 import { OrchestratorBar, type BarTarget } from './canvas/OrchestratorBar'
@@ -226,6 +227,8 @@ function App(): React.JSX.Element {
     )
   }
 
+  // Back and Needs you move in to clear the page-turn strips, which only an open area has
+  const side = view.at === 'book' && view.area ? SIDE : 0
   return (
     <div className="relative h-full overflow-hidden">
       {/* the Studio stays laid out underneath, so a closing book knows where its cover sits */}
@@ -287,13 +290,14 @@ function App(): React.JSX.Element {
         disabled={history.back.length === 0}
         aria-label="Back"
         title="Back (mouse back button, Alt+←)"
-        className={`${chip} serif-on absolute left-3.5 z-30 h-9 gap-2 px-3 type-label-s disabled:opacity-40`}
-        style={{ top: TOP_BAR + 10 }}
+        className={`${chip} serif-on absolute z-30 h-9 gap-2 px-3 type-label-s disabled:opacity-40`}
+        style={{ top: TOP_BAR + 10, left: 14 + side }}
       >
         <Icon name="arrow-left-line" size={14} />
         Back
       </button>
       <NeedsYou
+        side={side}
         projects={projects}
         onOpen={(project, card) => {
           requestFocus(project, card)

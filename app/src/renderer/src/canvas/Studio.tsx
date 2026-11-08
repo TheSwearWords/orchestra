@@ -127,6 +127,7 @@ export function Studio({
   return (
     <Canvas
       cam={cam}
+      content={() => ({ all: bounds() })}
       onContextMenu={async () => {
         const c = await window.api.menu([
           { id: 'new', label: 'New project' },

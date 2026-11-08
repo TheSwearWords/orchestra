@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { zoomAt } from './camera'
+import { MAX_ZOOM, wheelCamera, zoomAt, type Rect } from './camera'
+import { fitBelow, typing } from './shared'
 import type { useCamera } from './useCamera'
 
 /** Screen spacing of the dot grid: the 24px grid scaled, doubled or halved to stay readable. */
@@ -19,11 +20,14 @@ interface Props {
   onBackground?: (e: React.MouseEvent) => void // double-click or context menu on empty board
   onContextMenu?: (e: React.MouseEvent) => void
   onPress?: () => void // a left press on empty board, e.g. to clear a selection
+  content?: () => { all: Rect; selected?: Rect } // gives this board the zoom shortcuts
   className?: string
 }
 
-/** The artboard: an infinite dot grid you pan by dragging empty space (or with the middle
- * button, or holding Space) and zoom with the wheel or a pinch. */
+/** The artboard, with Figma's controls: the wheel pans (shift for sideways), ctrl+wheel or a
+ * pinch zooms at the pointer, the middle button or Space+drag pans. Dragging empty space pans
+ * too, because there is no marquee to give it to. Keys: + and - zoom, ctrl or shift+0 is 100%,
+ * shift+1 fits everything, shift+2 fits the selection. */
 export function Canvas({
   cam,
   children,
@@ -32,24 +36,31 @@ export function Canvas({
   onBackground,
   onContextMenu,
   onPress,
+  content,
   className = ''
 }: Props): React.JSX.Element {
-  const { camera, set, ref } = cam
+  const { camera, set, fly, viewport, ref } = cam
   const live = useRef(camera)
   useEffect(() => {
     live.current = camera
   }, [camera])
   const [panning, setPanning] = useState(false)
   const space = useRef(false)
+  const [hand, setHand] = useState(false) // Space held: the cursor says the board will pan
 
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
       const t = e.target as HTMLElement
-      if (e.code === 'Space' && !t.closest('input, textarea, [contenteditable=true]'))
+      if (e.code === 'Space' && !t.closest('input, textarea, [contenteditable=true]')) {
         space.current = true
+        setHand(true)
+      }
     }
     const up = (e: KeyboardEvent): void => {
-      if (e.code === 'Space') space.current = false
+      if (e.code === 'Space') {
+        space.current = false
+        setHand(false)
+      }
     }
     addEventListener('keydown', down)
     addEventListener('keyup', up)
@@ -59,12 +70,34 @@ export function Canvas({
     }
   }, [])
 
+  useEffect(() => {
+    if (!content) return
+    const key = (e: KeyboardEvent): void => {
+      if (typing(e)) return
+      const zoom = (f: number): void =>
+        void fly(zoomAt(live.current, f, viewport.w / 2, viewport.h / 2), 200)
+      const code = e.code
+      if (code === 'Equal' || code === 'NumpadAdd') zoom(2)
+      else if (code === 'Minus' || code === 'NumpadSubtract') zoom(1 / 2)
+      else if (code === 'Digit0' && (e.ctrlKey || e.metaKey || e.shiftKey)) zoom(1 / live.current.z)
+      else if (code === 'Digit1' && e.shiftKey) void fly(fitBelow(content().all, MAX_ZOOM), 200)
+      else if (code === 'Digit2' && e.shiftKey) {
+        const r = content().selected
+        if (r) void fly(fitBelow(r, MAX_ZOOM), 200)
+      } else return
+      e.preventDefault()
+    }
+    addEventListener('keydown', key)
+    return () => removeEventListener('keydown', key)
+  }, [content, fly, viewport])
+
   // wheel is attached natively: React's listener is passive, so it can't stop the page zooming
   useEffect(() => {
     const el = ref.current
     if (!el) return
     const wheel = (e: WheelEvent): void => {
-      // over something that can still scroll that way, the wheel scrolls it; otherwise it zooms
+      // over something that can still scroll that way, the wheel scrolls it; otherwise it moves
+      // the board
       if (!e.ctrlKey && scrollable) {
         for (let n = e.target as HTMLElement | null; n && n !== el; n = n.parentElement) {
           if (!n.matches(scrollable)) continue
@@ -75,9 +108,7 @@ export function Canvas({
       }
       e.preventDefault()
       const box = el.getBoundingClientRect()
-      // pinch and ctrl+wheel send small deltas; a mouse wheel sends ~100 a notch
-      const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))
-      set(zoomAt(live.current, factor, e.clientX - box.left, e.clientY - box.top))
+      set(wheelCamera(live.current, e, e.clientX - box.left, e.clientY - box.top))
     }
     el.addEventListener('wheel', wheel, { passive: false })
     return () => el.removeEventListener('wheel', wheel)
@@ -114,13 +145,14 @@ export function Canvas({
     <div
       ref={ref}
       onPointerDown={pointerDown}
+      onMouseDown={(e) => e.button === 1 && e.preventDefault()} // no autoscroll on middle click
       onDoubleClick={(e) => e.target === e.currentTarget && onBackground?.(e)}
       onContextMenu={(e) => {
         if (e.target !== e.currentTarget && !(e.target as HTMLElement).dataset.board) return
         e.preventDefault()
         onContextMenu?.(e)
       }}
-      className={`bg-dots relative h-full w-full touch-none overflow-hidden select-none ${panning ? 'cursor-grabbing' : ''} ${className}`}
+      className={`bg-dots relative h-full w-full touch-none overflow-hidden select-none ${panning ? 'cursor-grabbing' : hand ? 'cursor-grab' : ''} ${className}`}
       style={{
         backgroundSize: `${s}px ${s}px`,
         backgroundPosition: `${-camera.x * camera.z}px ${-camera.y * camera.z}px`

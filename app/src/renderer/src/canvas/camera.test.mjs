@@ -1,6 +1,26 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { clampZoom, ease, fit, lerpCamera, snap, toWorld, zoomAt } from './camera.ts'
+import { clampZoom, ease, fit, lerpCamera, snap, toWorld, wheelCamera, zoomAt } from './camera.ts'
+
+const wheel = (deltaX, deltaY, keys = {}) => ({
+  deltaX,
+  deltaY,
+  ctrlKey: false,
+  metaKey: false,
+  shiftKey: false,
+  ...keys
+})
+
+test('wheelCamera pans on scroll, sideways with shift, and zooms with ctrl', () => {
+  const c = { x: 0, y: 0, z: 2 }
+  assert.deepEqual(wheelCamera(c, wheel(0, 100), 0, 0), { x: 0, y: 50, z: 2 })
+  assert.deepEqual(wheelCamera(c, wheel(0, 100, { shiftKey: true }), 0, 0), { x: 50, y: 0, z: 2 })
+  const zoomed = wheelCamera(c, wheel(0, -100, { ctrlKey: true }), 300, 200)
+  assert.ok(zoomed.z > c.z && zoomed.z < c.z * 1.5, 'one notch is a gentle step')
+  const before = toWorld(c, 300, 200)
+  const after = toWorld(zoomed, 300, 200)
+  assert.ok(Math.abs(before.x - after.x) < 1e-6 && Math.abs(before.y - after.y) < 1e-6)
+})
 
 test('fit centres a rect and picks the smaller axis', () => {
   const c = fit({ x: 100, y: 100, w: 400, h: 200 }, 800, 800)

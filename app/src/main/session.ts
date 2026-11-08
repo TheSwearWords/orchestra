@@ -24,11 +24,16 @@ export interface ToolUse {
   input: Record<string, unknown>
 }
 
+/** Claude's plan limits, per window (five_hour, seven_day): 0–1 used, reset in epoch seconds. */
+export type Usage = Record<string, { utilization: number; resetsAt: number }>
+
 export interface SessionHandlers {
   /** The reply so far in the current turn, while it streams. */
   onLive?: (text: string) => void
   /** One finished assistant message: its text and the tools it called. */
   onAssistant?: (text: string, tools: ToolUse[]) => void
+  /** Claude reported where the plan's limits stand. */
+  onUsage?: (usage: Usage) => void
   /** A turn finished: everything it said, and whether Claude reported an error. */
   onTurnEnd: (text: string, isError: boolean) => void
   /** The process ended. `expected` when the app ended it (stop, quit, hand-over). */
@@ -124,6 +129,9 @@ export class ClaudeSession {
             .filter((c) => c.type === 'tool_use')
             .map((c) => ({ name: c.name ?? '', input: c.input ?? {} }))
           on.onAssistant?.(text, tools)
+        } else if (ev.type === 'rate_limit_event') {
+          const usage = ev.rate_limit_info?.unifiedWindows
+          if (usage) on.onUsage?.(usage)
         } else if (ev.type === 'result') {
           const text = live() || (typeof ev.result === 'string' ? ev.result.trim() : '')
           done = []
@@ -181,6 +189,7 @@ interface StreamLine {
       cache_creation_input_tokens?: number
     }
   }
+  rate_limit_info?: { unifiedWindows?: Usage }
   result?: unknown
   is_error?: boolean
 }

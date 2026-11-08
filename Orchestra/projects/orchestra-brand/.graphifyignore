@@ -1,0 +1,4 @@
+.orchestra/
+graphify-out/
+boards/
+*.json.bak

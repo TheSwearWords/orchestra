@@ -161,6 +161,17 @@ body {
   }
 }
 
+/* the Orchestrator's working label: three squares lighting in turn */
+@keyframes working {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  33% {
+    opacity: 1;
+  }
+}
+
 @keyframes stagger-fade {
   from {
     opacity: 0;

@@ -5,6 +5,7 @@ import type { AgentState, ChatEvent, ChatMessage, LogEntry } from '../main/condu
 import type { EditKey, Instrument, Library, Musician, Role } from '../main/library'
 import type { ProviderStatus } from '../main/providers'
 import type { Setup } from '../main/setup'
+import type { Usage } from '../main/session'
 import type { Output } from '../main/outputs'
 import type { Proposal } from '../main/proposals'
 import type { Ask } from '../main/asks'
@@ -15,6 +16,7 @@ export type {
   EditKey,
   ProviderStatus,
   Setup,
+  Usage,
   ChatEvent,
   ChatMessage,
   Instrument,

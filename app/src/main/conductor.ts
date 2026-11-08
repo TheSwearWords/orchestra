@@ -13,7 +13,7 @@ import {
   type MusicianDraft,
   type Proposal
 } from './proposals.ts'
-import { ClaudeSession, type ToolUse } from './session.ts'
+import { ClaudeSession, type ToolUse, type Usage } from './session.ts'
 
 // Create's agents. A project has several chats: "general" for the whole project and one per
 // chosen deliverable. Each chat has its Orchestrator, the only agent the user talks to. The
@@ -53,6 +53,7 @@ type EventBody =
   | { kind: 'agents' } // a Musician or Instrument changed status
   | { kind: 'asks' } // a window the Orchestrator opened changed
   | { kind: 'error'; text: string }
+  | { kind: 'usage'; usage: Usage } // the account's plan limits, from any agent's session
 export type ChatEvent = { project: string; chat: string } & EventBody
 
 export const GENERAL = 'general'
@@ -300,6 +301,7 @@ export class Conductor implements Hub {
         onLive: (text) => {
           if (!o.handingOver) emit({ kind: 'live', text })
         },
+        onUsage: (usage) => emit({ kind: 'usage', usage }),
         onAssistant: (text, tools) => {
           if (o.handingOver) return
           void this.logActions(project, chat, 'orchestrator', text, tools)
@@ -695,6 +697,7 @@ export class Conductor implements Hub {
         disallowedTools: NOT_ALLOWED
       },
       {
+        onUsage: (usage) => this.opts.emit({ project, chat: a.chat, kind: 'usage', usage }),
         onAssistant: (text, tools) => void this.logActions(project, a.chat, key, text, tools),
         onTurnEnd: (text, isError) => void this.agentTurnEnd(project, key, a, text, isError),
         onExit: ({ expected, stderr, spawnError }) => {

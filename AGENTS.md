@@ -116,6 +116,7 @@ Every agent is its own `claude` process with its own saved session id, so it res
 - An agent's key is `<musician>` or `<musician>--<instrument>`.
 - All agents get `Read, Glob, Grep, WebFetch, WebSearch`, and file edits inside the project through `acceptEdits`. `Task`, `Agent` and `Bash` are disallowed.
 - Limits live in `conductor.ts`: 4 agents working at once per project, 40 messages between agents per project per hour.
+- A deliverable's prerequisites gate it: until their files exist (`missingFoundations`), `brief_musician` needs `foundation` set to the next one, and the Musician can run only those. Create shows the same check as tags on the wire.
 - At 140,000 context tokens the Orchestrator writes a handoff note to `notes/`, and the next message starts a fresh session that reads it.
 - `open_window` kept its name from an earlier design. It now puts a choice in the Action box.
 
@@ -308,7 +309,7 @@ The full reference is `ideation/brand-spec.md`, and the layouts are in `ideation
 - **The user talks only to the Orchestrator.** Deliverable windows have no text input and are wired to the Orchestrator's window. Choices go in the Action box.
 - **Waiting items** get an orange mark on their window and appear in Needs you. Orange means this and nothing else.
 - **Wires curve** and go bold on hover.
-- **A window shows what it is.** Give a card a `kind` (`canvas/kinds.tsx`). Agents are blue with round marks, files are paper with a page mark, finished work is ink, decisions have a diamond.
+- **A window shows what it is.** Give a card a `kind` (`canvas/kinds.tsx`). Agents share one blue header with a rank tab on the left, files are paper with a page mark, finished work is ink, decisions have a diamond.
 - **Labels explain themselves.** Use plain words with a one-line description. No in-joke names.
 - **Hover never moves layout.** Add `serif-on` to labels, and `serifHold.ts` holds their width.
 - **Selected, hovered or current** means Bodoni Moda italic 800, through `serif-on` or the `type-current-*` utilities.

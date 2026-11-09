@@ -7,8 +7,7 @@ export const V_GAP = 144
 export interface TreeNode {
   id: string
   parent?: string // the window it's wired to; none makes it a root
-  // beside its parent instead of under it; or 'band', in a row of its own between it and its children
-  side?: 'left' | 'right' | 'band'
+  side?: 'left' | 'right' // beside its parent instead of under it
   x: number // where a root goes; ignored for the rest
   y: number
   w: number
@@ -21,10 +20,7 @@ export function treeLayout(nodes: TreeNode[]): Record<string, { x: number; y: nu
   const known = new Set(nodes.map((n) => n.id))
   const hasParent = (n: TreeNode): boolean => !!n.parent && known.has(n.parent)
   const kids = (id: string): TreeNode[] => nodes.filter((n) => n.parent === id && !n.side)
-  const sides = (id: string): TreeNode[] =>
-    nodes.filter((n) => n.parent === id && n.side && n.side !== 'band')
-  const bands = (id: string): TreeNode[] =>
-    nodes.filter((n) => n.parent === id && n.side === 'band')
+  const sides = (id: string): TreeNode[] => nodes.filter((n) => n.parent === id && n.side)
   const span = (n: TreeNode): number => {
     const row = kids(n.id)
     const total = row.reduce((sum, k) => sum + span(k), 0) + H_GAP * Math.max(0, row.length - 1)
@@ -52,16 +48,7 @@ export function treeLayout(nodes: TreeNode[]): Record<string, { x: number; y: nu
       if (s.side === 'left') left = at
       else right = at + s.w
     }
-    let nextY = y + tallest[depth] + V_GAP
-    const band = bands(n.id)
-    if (band.length) {
-      let at = x + n.w / 2 - (band.reduce((sum, b) => sum + b.w, 0) + H_GAP * (band.length - 1)) / 2
-      for (const b of band) {
-        out[b.id] = { x: snap(at), y: snap(nextY) }
-        at += b.w + H_GAP
-      }
-      nextY += Math.max(...band.map((b) => b.h)) + V_GAP
-    }
+    const nextY = y + tallest[depth] + V_GAP
     const row = kids(n.id)
     if (!row.length) return
     const width = row.reduce((sum, k) => sum + span(k), 0) + H_GAP * (row.length - 1)

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm } from 'fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { Conductor, parseAgent, readChat } from './conductor.ts'
@@ -103,6 +103,29 @@ test('roles, and who each agent may start', async () => {
       instrument: 'copywriter'
     })
   } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a deliverable waits for its prerequisites', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'orchestra-agents-'))
+  lib.instruments[0].output = 'prereqs/brief.md'
+  try {
+    await mkdir(join(dir, 'prereqs'), { recursive: true })
+    const c = conductor(dir)
+    await assert.rejects(c.briefMusician('p', 'general', 'website', 'Build it'), /can't start yet/)
+    await assert.rejects(
+      c.briefMusician('p', 'general', 'website', 'Build it', 'copywriter'),
+      /foundation "brief"/
+    )
+    await assert.rejects(
+      c.runInstrument('p', 'general', 'website', 'copywriter', 'x'),
+      /Make the prerequisites/
+    )
+    await writeFile(join(dir, 'prereqs', 'brief.md'), '# Brief')
+    assert.deepEqual(await c.missingFoundations('p', 'website'), [])
+  } finally {
+    delete lib.instruments[0].output
     await rm(dir, { recursive: true, force: true })
   }
 })

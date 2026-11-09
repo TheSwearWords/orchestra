@@ -32,10 +32,12 @@ export interface CardSpec {
   onClose?: () => void // a window opened on the board, rather than one of its sections
   link?: string // another card's id: a wire runs between them (a window and its Orchestrator)
   // placed with what it's linked to until you move it: under it, or beside it (see tree.ts)
-  auto?: true | 'left' | 'right' | 'band'
-  also?: string[] // more windows a wire runs to, for something several things depend on
+  auto?: true | 'left' | 'right'
   port?: number // instead of link: a wire to the dock's left edge, this far down the window
   solid?: boolean // its wire is solid: what it joins is connected
+  pin?: boolean // anchored: always exactly at x and y, wherever it was once dragged to
+  bottom?: number // anchored: stays at x, its bottom edge here however tall it grows
+  gate?: React.ReactNode // sits on its wire, just outside its group: what has to be ready first
   needsYou?: boolean // waiting on the user: an orange tab on its top edge
   working?: boolean // an agent is working on it: a waveform over the frame
   kind?: CardKind // what this window is: its look and its tag (kinds.tsx)
@@ -76,6 +78,8 @@ interface Props {
   onPick?: (from: string, to: string) => void
   locked?: React.ReactNode // the board is shown greyed out and can't be used; this says why
   anchored?: React.ReactNode // held in place over the board, like the New card
+  worldGroup?: { name: string; rect: Rect } // a frame and tag around what's under the cards
+  worldWire?: { x: number; y: number; to: string } // a wire from the stage to a window
   // named groups of windows: a blue frame around them, moved and renamed by its label
   frames?: {
     id: string
@@ -86,6 +90,9 @@ interface Props {
     onMenu?: () => void
   }[]
   hidden?: string[] // windows not drawn, though they keep their place in the layout
+  // new windows to put somewhere: at this board point, or the middle of the view
+  spawn?: { at?: { x: number; y: number }; windows: { id: string; dx: number; dy: number }[] }
+  onSpawned?: () => void
 }
 
 export function Board({
@@ -110,7 +117,11 @@ export function Board({
   locked,
   frames,
   anchored,
-  hidden = []
+  worldGroup,
+  worldWire,
+  hidden = [],
+  spawn,
+  onSpawned
 }: Props): React.JSX.Element {
   const [layout, setLayout] = useState<BoardLayout | null>(null)
   const [tidying, setTidying] = useState(false)
@@ -137,8 +148,19 @@ export function Board({
         h: tall({ ...c, collapsed: layout?.[c.id]?.collapsed })
       }))
   )
-  const wanted = cards.map((c) => ({ ...c, ...tree[c.id], ...layout?.[c.id], h: 0 }))
-  const order = [...wanted].sort((a, b) => Number(!layout?.[a.id]) - Number(!layout?.[b.id]))
+  const wanted = cards.map((c) => ({
+    ...c,
+    ...tree[c.id],
+    ...layout?.[c.id],
+    ...(c.pin ? { x: c.x, y: c.y } : {}),
+    ...(c.bottom === undefined
+      ? {}
+      : { x: c.x, y: c.bottom - tall({ ...c, collapsed: layout?.[c.id]?.collapsed }) }),
+    h: 0
+  }))
+  const order = [...wanted].sort(
+    (a, b) => Number(!layout?.[a.id] && !a.pin) - Number(!layout?.[b.id] && !b.pin)
+  )
   const settled = settle(
     order.map((c) => ({ ...c, h: tall(c) })),
     obstacles
@@ -172,9 +194,13 @@ export function Board({
         ...obstacles.map((rect) => ({ ids: [], rect, fixed: true }))
       ])
     : {}
-  const placed = fitted.map((c) =>
-    shifts[c.id] ? { ...c, x: c.x + shifts[c.id].dx, y: c.y + shifts[c.id].dy } : c
-  )
+  // settling snaps to the grid, so an anchored card is put back exactly
+  const placed = fitted.map((c) => {
+    const home = cards.find((s) => s.id === c.id)!
+    if (home.bottom !== undefined) return { ...c, x: home.x, y: home.bottom - c.h }
+    if (home.pin) return { ...c, x: home.x, y: home.y }
+    return shifts[c.id] ? { ...c, x: c.x + shifts[c.id].dx, y: c.y + shifts[c.id].dy } : c
+  })
   const rectOf = (c: (typeof placed)[number]): Rect => ({ x: c.x, y: c.y, w: c.w, h: c.h })
   const rects: Rect[] = [...placed.map(rectOf), ...(worldRect ? [worldRect] : [])]
   const bounds = (): Rect => {
@@ -212,6 +238,23 @@ export function Board({
     setPorts((old) => (JSON.stringify(old) === JSON.stringify(found) ? old : found))
   })
 
+  // new windows land where they were asked for, as soon as they exist
+  useEffect(() => {
+    if (!spawn || !layout) return
+    const made = spawn.windows.map((w) => ({ ...w, c: placed.find((p) => p.id === w.id) }))
+    if (made.some((m) => !m.c)) return
+    const { x, y, z } = cam.camera
+    const origin = spawn.at ?? {
+      x: x + (cam.viewport.w / 2 - 240) / z,
+      y: y + (cam.viewport.h / 2 - 200) / z
+    }
+    const next = { ...layout }
+    for (const m of made)
+      next[m.id] = { x: snap(origin.x + m.dx), y: snap(origin.y + m.dy), w: m.c!.w }
+    save(next)
+    onSpawned?.()
+  })
+
   // the wire being pulled out of a data-out handle, ending at the pointer in board px
   const [pick, setPick] = useState<{ from: string; x: number; y: number } | null>(null)
   const latest = useRef({ onPick, camera: cam.camera })
@@ -230,16 +273,34 @@ export function Board({
       root.setPointerCapture(e.pointerId)
       const from = handle.dataset.out!
       let over: HTMLElement | null = null
+      // the nearest socket within reach: the wire jumps to it, so you needn't land exactly
+      const REACH = 96
+      const socketNear = (cx: number, cy: number): HTMLElement | null => {
+        let best: HTMLElement | null = null
+        let dist = REACH
+        root.querySelectorAll<HTMLElement>('[data-in]').forEach((el) => {
+          const r = el.getBoundingClientRect()
+          const d = Math.hypot(
+            Math.max(r.left - cx, 0, cx - r.right),
+            Math.max(r.top - cy, 0, cy - r.bottom)
+          )
+          if (d < dist) {
+            dist = d
+            best = el
+          }
+        })
+        return best
+      }
       const move = (m: PointerEvent): void => {
         const box = root.getBoundingClientRect()
         const { x, y, z } = latest.current.camera
+        const el = socketNear(m.clientX, m.clientY)
+        const r = el?.getBoundingClientRect()
         setPick({
           from,
-          x: x + (m.clientX - box.left) / z,
-          y: y + (m.clientY - box.top) / z
+          x: x + ((r ? r.left : m.clientX) - box.left) / z,
+          y: y + ((r ? r.top + r.height / 2 : m.clientY) - box.top) / z
         })
-        const el =
-          document.elementFromPoint(m.clientX, m.clientY)?.closest<HTMLElement>('[data-in]') ?? null
         if (el === over) return
         over?.classList.remove('pick-over')
         el?.classList.add('pick-over')
@@ -251,10 +312,7 @@ export function Board({
         root.removeEventListener('pointercancel', up)
         setPick(null)
         over?.classList.remove('pick-over')
-        // where the pointer let go, which the last move may not have reached
-        const end = document
-          .elementFromPoint(u.clientX, u.clientY)
-          ?.closest<HTMLElement>('[data-in]')
+        const end = socketNear(u.clientX, u.clientY)
         if (end && u.type === 'pointerup') latest.current.onPick?.(from, end.dataset.in!)
       }
       root.addEventListener('pointermove', move)
@@ -484,6 +542,19 @@ export function Board({
         inert={!!locked}
         className={locked ? 'pointer-events-none opacity-40 grayscale' : 'contents'}
       >
+        {worldGroup && (
+          <div
+            className="pointer-events-none absolute border border-brand/40 bg-brand/5"
+            style={{
+              left: worldGroup.rect.x,
+              top: worldGroup.rect.y,
+              width: worldGroup.rect.w,
+              height: worldGroup.rect.h
+            }}
+          >
+            <GroupLabel name={worldGroup.name} z={cam.camera.z} />
+          </div>
+        )}
         {world}
         {layout && (
           <svg
@@ -500,6 +571,15 @@ export function Board({
                 solid
               />
             )}
+            {worldWire &&
+              (() => {
+                const to = placed.find((p) => p.id === worldWire.to)
+                return (
+                  to && (
+                    <Wire x1={worldWire.x} y1={worldWire.y} x2={to.x + to.w / 2} y2={to.y} solid />
+                  )
+                )
+              })()}
             {wires?.flatMap((w) => {
               const a = ports[w.from]
               const b = ports[w.to]
@@ -532,23 +612,9 @@ export function Board({
                   />
                 ]
               }
-              if (hidden.includes(c.id)) return []
-              const extra = (c.also ?? [])
-                .map((id) => placed.find((p) => p.id === id))
-                .filter((p): p is (typeof placed)[number] => !!p && !hidden.includes(p.id))
-                .map((p) => (
-                  <Wire
-                    key={`${c.id}>${p.id}`}
-                    x1={c.x + c.w / 2}
-                    y1={c.y + c.h}
-                    x2={p.x + p.w / 2}
-                    y2={p.y}
-                  />
-                ))
               const to = c.link && placed.find((p) => p.id === c.link)
-              if (!to || hidden.includes(to.id)) return extra
+              if (!to || hidden.includes(c.id) || hidden.includes(to.id)) return []
               return [
-                ...extra,
                 <Wire
                   key={c.id}
                   x1={c.x + c.w / 2}
@@ -562,6 +628,27 @@ export function Board({
             })}
           </svg>
         )}
+        {layout &&
+          placed.map((c) => {
+            if (!c.gate || hidden.includes(c.id)) return null
+            const r = moved(c)
+            const mid = r.x + r.w / 2
+            const from = placed.find((p) => p.id === c.link)
+            const clear = r.y - 28 - Math.max(12, 36 / cam.camera.z)
+            // never up into the window it's wired from
+            const under = from && mid + 160 > from.x && mid - 160 < from.x + from.w
+            return (
+              <div
+                key={c.id}
+                data-gate={c.id}
+                className="absolute -translate-x-1/2 -translate-y-full"
+                // clear of the group's frame and its label, which keeps its size on screen
+                style={{ left: mid, top: under ? Math.max(clear, from.y + from.h + 72) : clear }}
+              >
+                {c.gate}
+              </div>
+            )
+          })}
         {layout &&
           frames?.map((f) => {
             const inside = placed
@@ -713,7 +800,10 @@ export function Card({
   useEffect(() => {
     const el = box.current
     if (!el || !onHeight) return
-    const ro = new ResizeObserver(() => onHeight(Math.ceil(el.offsetHeight / 24) * 24))
+    const ro = new ResizeObserver(() => {
+      const grid = card.bottom === undefined ? 24 : 1 // an anchored edge has to land exactly
+      onHeight(Math.ceil(el.offsetHeight / grid) * grid)
+    })
     ro.observe(el)
     return () => ro.disconnect()
   }, [onHeight])
@@ -762,6 +852,15 @@ export function Card({
       }}
     >
       {card.working && <Waveform w={w} />}
+      {card.kind && look?.rank && (
+        <span
+          aria-hidden
+          className="absolute top-0 right-full flex w-7 items-center justify-center bg-brand text-on-brand"
+          style={{ height: HEADER }}
+        >
+          <KindMark kind={card.kind} />
+        </span>
+      )}
       <header
         // on the header, not the title: dragging captures the pointer here, so clicks land here
         onDoubleClick={(e) => {
@@ -793,7 +892,7 @@ export function Card({
         <span aria-hidden className="font-mono text-[11px] tracking-[-0.2em] opacity-50">
           ⋮⋮
         </span>
-        {card.kind && <KindMark kind={card.kind} />}
+        {card.kind && !look?.rank && <KindMark kind={card.kind} />}
         {renaming ? (
           <Rename
             value={card.title}

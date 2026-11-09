@@ -589,10 +589,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('agents:set', async (_, role: Role, id: string, key: string, value: unknown) => {
     const file = agentFile(ORCHESTRA_HOME, role, id)
     const md = await readFile(file, 'utf8')
-    if (key === 'instruments') {
+    if (['instruments', 'prerequisites', 'tools'].includes(key)) {
       if (!Array.isArray(value) || !value.every((v) => /^[\w-]+$/.test(String(v))))
-        throw new Error('Not a list of Instrument ids.')
-      return writeFile(file, setField(md, 'instruments', value.map(String)))
+        throw new Error('Not a list of ids.')
+      return writeFile(file, setField(md, key, value.map(String)))
     }
     if (!['name', 'description', 'runsOn'].includes(key)) throw new Error(`Can't set ${key}.`)
     await writeFile(file, editAgent(md, role, key as EditKey, String(value)))

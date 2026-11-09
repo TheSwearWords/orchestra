@@ -126,8 +126,7 @@ const api = {
     id: string,
     name: string,
     groups: { id: string; label: string }[] = []
-  ): Promise<string | null> =>
-    ipcRenderer.invoke('projects:menu', id, name, groups),
+  ): Promise<string | null> => ipcRenderer.invoke('projects:menu', id, name, groups),
   setCover: (id: string, cover: Cover): Promise<Cover> =>
     ipcRenderer.invoke('projects:setCover', id, cover),
   pickCover: (id: string): Promise<string | null> => ipcRenderer.invoke('projects:pickCover', id),
@@ -172,7 +171,8 @@ const api = {
     ipcRenderer.invoke('research:openFile', project, file),
   interpret: (project: string, box: string): Promise<string> =>
     ipcRenderer.invoke('research:interpret', project, box),
-  addBox: (project: string): Promise<{ id: string }[]> => ipcRenderer.invoke('research:addBox', project),
+  addBox: (project: string): Promise<{ id: string }[]> =>
+    ipcRenderer.invoke('research:addBox', project),
   renameBox: (project: string, id: string, name: string): Promise<void> =>
     ipcRenderer.invoke('research:renameBox', project, id, name),
   removeBox: (project: string, id: string): Promise<void> =>
@@ -245,6 +245,11 @@ const api = {
   // a blank Instrument in a Musician's crew; returns its id
   newInstrument: (musician: string): Promise<string> =>
     ipcRenderer.invoke('agents:newInstrument', musician),
+  setAgentList: (
+    musician: string,
+    key: 'prerequisites' | 'tools',
+    value: string[]
+  ): Promise<void> => ipcRenderer.invoke('agents:set', 'musician', musician, key, value),
   setCrew: (musician: string, instruments: string[]): Promise<void> =>
     ipcRenderer.invoke('agents:set', 'musician', musician, 'instruments', instruments),
   listOutputs: (project: string): Promise<Output[]> =>

@@ -2,6 +2,10 @@ import type { Instrument, Musician } from './library'
 
 // No Node imports: the renderer uses this too, to show the build order live.
 
+/** The files an Instrument's output line names. */
+export const outputPaths = (output: string): string[] =>
+  output.match(/\b(?:prereqs|exports)\/[\w./-]*/g)?.map((p) => p.replace(/[.,]$/, '')) ?? []
+
 /** The foundation Instruments the chosen deliverables need, each once, needs before dependents. */
 export function foundationOrder(
   musicians: Musician[],

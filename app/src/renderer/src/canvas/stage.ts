@@ -1,19 +1,22 @@
-// Pure layout for the Create stage. Top to bottom: the Prerequisites circle ringed by every
-// foundation, one row of deliverable seats (grouped by category), the Deliverables circle
-// where you confirm, and once confirmed, each chosen deliverable's window in a row below it.
+// Pure layout for the Create stage. Left to right: the deliverables in columns of five, the
+// prerequisites in a column, and the button to lock them in; once locked in, the windows open below.
 // No DOM, so it is tested in node.
 
-export const SEAT = { w: 208, h: 208 }
+import { outputPaths } from '../../../main/plan.ts'
+
+export { outputPaths }
+export const SEAT = { w: 208, h: 248 }
 const SEAT_GAP = 32
-export const PREREQS = { x: 0, y: -660, r: 110, ring: 290 }
-export const PODIUM = { x: 0, y: 470, r: 150 } // the Deliverables circle
+const PER_COLUMN = 5
+export const LANE = 160 // room for the wires between the columns
+export const PREREQ = { w: 220, h: 44, gap: 16, x: SEAT.w / 2 + LANE + 110 }
+export const LOCK_R = 120
 export const WINDOW_W = 520
 export const ORCH_W = 640
 export const ORCH_CAP = Math.round((ORCH_W * 3240) / 1920)
 // a markdown file's window stops at twice that, and scrolls
 export const DOC_BODY = ORCH_CAP * 2 - 44
 const WINDOW_GAP = 48
-export const WINDOWS_Y = PODIUM.y + PODIUM.r + 120
 
 // Categories in the order a project usually needs them; unknown ones follow alphabetically.
 const CATEGORY_ORDER = ['Brand', 'Web', 'Product', 'Motion', '3D', 'Code']
@@ -23,23 +26,63 @@ const rank = (c: string): number => {
 }
 
 export interface Seated {
-  id: string // a Musician id, or "add" for the dashed Add seat
+  id: string // a Musician id
   x: number // seat centre
   y: number
 }
 
-/** Every seat in one row, centred, category by category, then the Add seat. */
-export function seatRow(musicians: { id: string; category: string; name: string }[]): Seated[] {
+/** Seats in columns of five, category by category; each new column goes on the left. */
+export function seatColumns(musicians: { id: string; category: string; name: string }[]): Seated[] {
   const ordered = [...musicians].sort(
     (a, b) =>
       rank(a.category) - rank(b.category) ||
       a.category.localeCompare(b.category) ||
       a.name.localeCompare(b.name)
   )
-  const ids = [...ordered.map((m) => m.id), 'add']
-  const step = SEAT.w + SEAT_GAP
-  const start = -((ids.length - 1) * step) / 2
-  return ids.map((id, i) => ({ id, x: start + i * step, y: 0 }))
+  return ordered.map((m, i) => ({
+    id: m.id,
+    x: -Math.floor(i / PER_COLUMN) * (SEAT.w + SEAT_GAP),
+    y: (i % PER_COLUMN) * (SEAT.h + SEAT_GAP)
+  }))
+}
+
+/** The prerequisites in a column, centred on `middle`; each point the middle of one. */
+export function prereqSpots(n: number, middle: number): { x: number; y: number }[] {
+  const step = PREREQ.h + PREREQ.gap
+  return Array.from({ length: n }, (_, i) => ({
+    x: PREREQ.x,
+    y: middle + (i - (n - 1) / 2) * step
+  }))
+}
+
+// A deliverable's connections, from its `tools` list. figma-read and figma-write are one connection.
+const NOT_MCP = ['files', 'shell']
+const pair = (t: string): string => t.replace(/-(read|write)$/, '')
+export const mcpsOf = (tools: string[]): string[] => [
+  ...new Set(tools.filter((t) => !NOT_MCP.includes(t)).map(pair))
+]
+/** Its tools list with these connections instead of the ones it had. */
+export const toolsFor = (mcps: string[], tools: string[]): string[] => [
+  ...tools.filter((t) => NOT_MCP.includes(t)),
+  ...mcps.flatMap((m) => (m === 'figma' ? ['figma-read', 'figma-write'] : [m]))
+]
+const NAMES: Record<string, string> = { elevenlabs: 'ElevenLabs' }
+export const mcpLabel = (id: string): string =>
+  NAMES[id] ??
+  id
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+
+export type McpState = 'connected' | 'auth' | 'failed' | 'missing'
+// names as `claude mcp list` shows them, where they differ from ours
+const LISTED: Record<string, string> = { 'google-drive': 'google drive' }
+const LOCAL = ['blender'] // being added is enough: it can't answer unless the app is open
+export function mcpState(id: string, listed: Record<string, string>): McpState {
+  const s = listed[LISTED[id] ?? id]
+  if (!s) return 'missing'
+  if (LOCAL.includes(id) || s === 'connected') return 'connected'
+  return s === 'auth' ? 'auth' : 'failed'
 }
 
 /** Points evenly round a ring, starting at the top. */
@@ -57,8 +100,6 @@ export function windowX(i: number, n: number): number {
 }
 
 /** The project paths an Instrument's `output` names (prereqs/… or exports/), if any. */
-export const outputPaths = (output: string): string[] =>
-  output.match(/\b(?:prereqs|exports)\/[\w./-]*/g)?.map((p) => p.replace(/[.,]$/, '')) ?? []
 
 /** The files a deliverable made: those under the paths its Instruments and foundations name.
  * shortcut: files are matched by path, so two deliverables sharing exports/ both list them;

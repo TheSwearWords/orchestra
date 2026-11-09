@@ -14,13 +14,14 @@ export function GroupLabel({
   name: string
   z: number
   onRename?: (to: string) => void // leave it out for a name that can't change
-  onDrag: (dx: number, dy: number) => void
-  onDrop: (dx: number, dy: number) => void
+  // leave these out for a group that stays where it is
+  onDrag?: (dx: number, dy: number) => void
+  onDrop?: (dx: number, dy: number) => void
   onMenu?: () => void // right-click
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   function down(e: React.PointerEvent): void {
-    if (e.button !== 0) return
+    if (e.button !== 0 || !onDrag) return
     e.stopPropagation()
     const el = e.currentTarget as HTMLElement
     el.setPointerCapture(e.pointerId)
@@ -28,12 +29,12 @@ export function GroupLabel({
     let moved = false
     const move = (m: PointerEvent): void => {
       moved = true
-      onDrag((m.clientX - sx) / z, (m.clientY - sy) / z)
+      onDrag?.((m.clientX - sx) / z, (m.clientY - sy) / z)
     }
     const up = (u: PointerEvent): void => {
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', up)
-      if (moved) onDrop((u.clientX - sx) / z, (u.clientY - sy) / z)
+      if (moved) onDrop?.((u.clientX - sx) / z, (u.clientY - sy) / z)
     }
     el.addEventListener('pointermove', move)
     el.addEventListener('pointerup', up)
@@ -65,7 +66,7 @@ export function GroupLabel({
           title={
             onRename ? 'Drag to move the group. Double-click to rename.' : 'Drag to move the group.'
           }
-          className="block cursor-grab bg-brand px-2 py-0.5 type-label-s whitespace-nowrap text-on-brand active:cursor-grabbing"
+          className={`block bg-brand px-2 py-0.5 type-label-s whitespace-nowrap text-on-brand ${onDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
         >
           {name}
         </span>

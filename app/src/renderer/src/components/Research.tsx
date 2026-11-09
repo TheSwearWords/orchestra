@@ -44,7 +44,10 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
   const [data, setData] = useState<ResearchState | null>(null)
   const [error, setError] = useState('')
   const [interpreting, setInterpreting] = useState<string | null>(null) // the box at work
-  const [focus, setFocus] = useState<string>()
+  const [spawn, setSpawn] = useState<{
+    at?: { x: number; y: number }
+    windows: { id: string; dx: number; dy: number }[]
+  }>()
   // pictures of any sites that don't have one yet; a slow job, so it happens in the background
   const missing = data?.sites.filter((s) => !s.shot).length ?? 0
   useEffect(() => {
@@ -88,27 +91,42 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
   const nameOf = (g: Group): string => g ?? defaultName
   const kindsOf = (g: Group): Kind[] => (g && data.groups.kinds[g]) || FULL
   const windowId = (g: Group, k: Kind): string => `w-${g ?? ''}-${k}`
-  /** A new full group, or with `kind` a single window; the board flies to it. */
-  const create = (name: string, kind?: Kind): void =>
+  type At = { x: number; y: number } | undefined
+  /** A new full group, or with `kind` a single window, where you right-clicked. */
+  const create = (name: string, at: At, kind?: Kind): void =>
     void run(async () => {
       const made = await window.api.addGroup(project, name, kind ? [kind] : undefined)
-      setFocus(windowId(made.others[made.others.length - 1], kind ?? 'links'))
+      const g = made.others[made.others.length - 1]
+      setSpawn({
+        at,
+        windows: (kind ? [kind] : FULL).map((k) => ({
+          id: windowId(g, k),
+          dx: kind ? 0 : SLOT[k].x,
+          dy: 0
+        }))
+      })
     })
-  const newGroup = (): void => create('New research group')
-  const newBox = (): void =>
+  const newBox = (at: At): void =>
     void run(async () => {
       const boxes = await window.api.addBox(project)
-      setFocus(`interpret-${boxes[boxes.length - 1].id}`)
+      const id = boxes[boxes.length - 1].id
+      setSpawn({
+        at,
+        windows: [
+          { id: `interpret-${id}`, dx: 0, dy: 0 },
+          { id: `direction-${id}`, dx: 624, dy: 0 }
+        ]
+      })
     })
-  const addItems: MenuItem[] = [
-    { label: 'New research group', run: newGroup },
+  const addItems = (at?: At): MenuItem[] => [
+    { label: 'New research group', run: () => create('New research group', at) },
     { label: '', separator: true },
     ...KIND_LIST.map((k) => ({
       label: `New ${LABEL[k].toLowerCase()} window`,
-      run: () => create(LABEL[k], k)
+      run: () => create(LABEL[k], at, k)
     })),
     { label: '', separator: true },
-    { label: 'New Interpret box', run: newBox }
+    { label: 'New Interpret box', run: () => newBox(at) }
   ]
   /** A text window's button: its words, through an Interpret box of their own. */
   const interpretText = async (group: string, text: string): Promise<void> => {
@@ -166,8 +184,8 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
           window.api.connectBox(project, to.replace(/^box-/, ''), from.replace(/^group-/, ''), true)
         )
       }
-      focus={focus}
-      onFocused={() => setFocus(undefined)}
+      spawn={spawn}
+      onSpawned={() => setSpawn(undefined)}
       frames={groups
         .filter((g) => kindsOf(g).length > 1)
         .map((g) => ({
@@ -190,12 +208,12 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
                     }
                   ])
         }))}
-      addMenu={() => addItems}
+      addMenu={(at) => addItems(at)}
       anchored={
         <NewCard
           title="New asset"
           hint="A group, a window or an Interpret box."
-          onClick={() => void popMenu(addItems)}
+          onClick={() => void popMenu(addItems())}
         />
       }
       top={

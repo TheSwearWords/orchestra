@@ -3,7 +3,7 @@ import { join } from 'path'
 import { answerAsk, openAsk, readAsks, type Ask, type OptionInput } from './asks.ts'
 import type { Instrument, Musician } from './library.ts'
 import { startOrchestraMcp, type Hub, type OrchestraMcp, type Role } from './orchestra-mcp.ts'
-import { foundationOrder } from './plan.ts'
+import { foundationOrder, outputPaths } from './plan.ts'
 import { runnableOrThrow } from './providers.ts'
 import {
   draftProblems,
@@ -402,11 +402,33 @@ export class Conductor implements Hub {
     return lib.instruments.filter((i) => ids.has(i.id)).map((i) => ({ id: i.id, name: i.name }))
   }
 
+  /** The prerequisites a deliverable is still waiting on, in build order. One whose output
+   * names no file can't be checked, so it doesn't hold anything up. */
+  async missingFoundations(project: string, musician: string): Promise<Instrument[]> {
+    const lib = await this.opts.library()
+    const dir = this.opts.projectDir(project)
+    const missing: Instrument[] = []
+    for (const f of foundationOrder(lib.musicians, lib.instruments, [musician])) {
+      const paths = outputPaths(f.output ?? '')
+      const made = await Promise.all(
+        paths.map((p) =>
+          stat(join(dir, p)).then(
+            () => true,
+            () => false
+          )
+        )
+      )
+      if (paths.length && !made.some(Boolean)) missing.push(f)
+    }
+    return missing
+  }
+
   async briefMusician(
     project: string,
     chat: string,
     musician: string,
-    brief: string
+    brief: string,
+    foundation?: string
   ): Promise<string> {
     const allowed = await this.choices(project, 'orchestrator')
     const m = allowed.find((x) => x.id === musician)
@@ -414,13 +436,19 @@ export class Conductor implements Hub {
       throw new Error(
         `${musician} isn't one of this project's chosen deliverables. You can brief: ${allowed.map((x) => x.id).join(', ') || 'none yet'}. To add one, suggest it to the user.`
       )
+    // its prerequisites have to exist first; making those is the one thing it can be briefed on
+    const missing = await this.missingFoundations(project, musician)
+    if (missing.length && foundation !== missing[0].id)
+      throw new Error(
+        `The ${m.name} Musician can't start yet. Still to make: ${missing.map((f) => f.name).join(', ')}. Brief it with foundation "${missing[0].id}" to make the next one.`
+      )
     await this.log(project, chat, 'orchestrator', 'message', `→ ${m.name}: ${oneLine(brief)}`)
     await this.deliver(
       project,
       chat,
       musician,
       'musician',
-      `[Brief from the Orchestrator]\n${brief}`
+      `[Brief from the Orchestrator]\n${missing.length ? `Make the ${missing[0].name} prerequisite and nothing else yet.\n` : ''}${brief}`
     )
     return `Briefed the ${m.name} Musician. It reports back to you when it has news; that arrives as a message here.`
   }
@@ -434,6 +462,11 @@ export class Conductor implements Hub {
   ): Promise<string> {
     const allowed = await this.choices(project, musician)
     const i = allowed.find((x) => x.id === instrument)
+    const waiting = i ? await this.missingFoundations(project, musician) : []
+    if (waiting.length && !waiting.some((f) => f.id === instrument))
+      throw new Error(
+        `Make the prerequisites before ${i!.name}. Still to make: ${waiting.map((f) => f.name).join(', ')}.`
+      )
     if (!i)
       throw new Error(
         `${instrument} isn't one of your Instruments. You can run: ${allowed.map((x) => x.id).join(', ')}.`

@@ -1,5 +1,5 @@
-// What a window is, readable at a glance and from far away. Agents are blue with round marks,
-// getting quieter down the chain of command. Files are paper with a page mark. Finished work is
+// What a window is, readable at a glance and from far away. Agents share one blue header, with a
+// tab on the left showing their rank. Files are paper with a page mark. Finished work is
 // ink. Decisions wait in a heavy ink frame with a diamond. Each also says its kind in words.
 import { Icon } from '../components/Icon'
 
@@ -13,25 +13,16 @@ export type CardKind =
   | 'reference'
   | 'process'
 
+// every agent looks the same; the tab on the left says which rank it is
+const AGENT = { frame: 'border border-brand bg-card', header: 'bg-brand text-on-brand', rank: true }
+
 export const KIND: Record<
   CardKind,
-  { tag: string; frame?: string; header?: string; title?: string }
+  { tag: string; frame?: string; header?: string; title?: string; rank?: boolean }
 > = {
-  orchestrator: {
-    tag: 'Orchestrator',
-    frame: 'border-2 border-brand bg-card',
-    header: 'bg-brand text-on-brand'
-  },
-  musician: {
-    tag: 'Musician',
-    frame: 'border-2 border-brand/50 bg-card',
-    header: 'border-b border-brand/30 bg-brand/15 text-link'
-  },
-  instrument: {
-    tag: 'Instrument',
-    frame: 'border border-brand/40 bg-card',
-    header: 'border-b border-hair text-link'
-  },
+  orchestrator: { tag: 'Orchestrator', ...AGENT },
+  musician: { tag: 'Musician', ...AGENT },
+  instrument: { tag: 'Instrument', ...AGENT },
   file: {
     tag: 'Markdown',
     frame: 'border border-inverse/40 bg-card',
@@ -54,14 +45,38 @@ export const KIND: Record<
 
 /** The shape beside a window's title: round for agents, the rest each their own. */
 export function KindMark({ kind }: { kind: CardKind }): React.JSX.Element {
-  const ring = 'shrink-0 rounded-full border-current'
   switch (kind) {
     case 'orchestrator':
       return <Icon name="logo-mark" size={16} />
     case 'musician':
-      return <span aria-hidden className={`${ring} size-3.5 border-[3px]`} />
+      return (
+        <svg
+          aria-hidden
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          className="shrink-0"
+        >
+          <circle cx="5.2" cy="10.8" r="3.4" />
+          <circle cx="8" cy="8" r="2.3" />
+          <path d="M8.4 7.6l5-5 .9.9-5 5z" />
+        </svg>
+      )
     case 'instrument':
-      return <span aria-hidden className={`${ring} size-2.5 border-[1.5px]`} />
+      return (
+        <svg
+          aria-hidden
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          className="shrink-0"
+        >
+          <circle cx="5" cy="12.2" r="2.3" />
+          <path d="M6.3 2.5h1.4v9.7H6.3zM7.7 2.5h5.3v2.6H7.7z" />
+        </svg>
+      )
     case 'file':
       return (
         <svg aria-hidden width="12" height="14" viewBox="0 0 12 14" className="shrink-0">

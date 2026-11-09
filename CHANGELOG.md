@@ -6,6 +6,12 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 
 ### Added
 
+- Create stage: deliverables in columns of five, prerequisites in a column feeding Lock in, research anchored beside it, the Orchestrator straight below, all in a "Select your deliverables" group.
+- Lock in only ever adds: locked-in deliverables stay, and new ones arrive with "Add N".
+- Prerequisite tags on the wire into each deliverable turn green as their files appear; the Orchestrator can only brief that deliverable on the next missing prerequisite until they are all green.
+- Every agent shares one header, with a rank tab on the left. Double-click a prerequisite to open its markdown.
+- Right-click a deliverable to edit it, including its connections; deliverable cards flag a missing connection.
+- New windows open at the cursor, and a pulled wire snaps to the nearest socket.
 - Onboarding rework: welcome modal, floating Open the studio panel, real connection steps for providers, MCP tools, GitHub and Graphify, a workspace folder picker, and dashed-to-solid wires you can drag.
 - Research groups as blue frames of windows, single windows, text windows, and more than one Interpret box, wired by dragging from a group's dot.
 - The reference library shows a picture of each site, adds new sites from links, and filters by tag.

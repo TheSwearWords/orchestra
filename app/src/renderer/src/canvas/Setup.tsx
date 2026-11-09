@@ -69,7 +69,7 @@ const choice = (on: boolean): string =>
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 
 /** One instruction: what to do, the command if there is one, and the way to do it from here. */
-function StepRow({
+export function StepRow({
   n,
   step,
   after

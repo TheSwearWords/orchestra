@@ -22,7 +22,13 @@ export interface Hub {
   roleOf(project: string, agent: string): Promise<Role | null>
   /** Ids the caller may brief or run, for the tool's description and checks. */
   choices(project: string, agent: string): Promise<{ id: string; name: string }[]>
-  briefMusician(project: string, chat: string, musician: string, brief: string): Promise<string>
+  briefMusician(
+    project: string,
+    chat: string,
+    musician: string,
+    brief: string,
+    foundation?: string
+  ): Promise<string>
   runInstrument(
     project: string,
     chat: string,
@@ -93,9 +99,17 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
       'brief_musician',
       {
         description: `Start the Musician for one of this project's chosen deliverables, or send more to one already working. Brief it like a person: the goal, the files to read, constraints, the output and where it goes, and what "done" means. It reports back to you. Musicians you can brief: ${list}.`,
-        inputSchema: { musician: z.string(), brief: z.string() }
+        inputSchema: {
+          musician: z.string(),
+          brief: z.string(),
+          foundation: z
+            .string()
+            .optional()
+            .describe('While its prerequisites are missing: the id of the next one to make')
+        }
       },
-      ({ musician, brief }) => run(() => hub.briefMusician(project, chat, musician, brief))
+      ({ musician, brief, foundation }) =>
+        run(() => hub.briefMusician(project, chat, musician, brief, foundation))
     )
     mcp.registerTool(
       'propose_musician',

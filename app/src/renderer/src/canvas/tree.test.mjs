@@ -64,16 +64,3 @@ test('side windows sit beside their parent and count toward its row height', () 
   assert.deepEqual(at.l, { x: -H_GAP - 240, y: 0 })
   assert.equal(at.kid.y, 960 + V_GAP)
 })
-
-test('a band sits in its own row between a parent and its children', () => {
-  const at = treeLayout([
-    node('root', undefined, 240, 240),
-    node('p1', 'root', 240, 480, { side: 'band' }),
-    node('p2', 'root', 240, 240, { side: 'band' }),
-    node('kid', 'root')
-  ])
-  assert.equal(at.p1.y, 240 + V_GAP)
-  assert.equal(at.p2.y, at.p1.y)
-  assert.equal(at.kid.y, at.p1.y + 480 + V_GAP)
-  assert.equal(at.p2.x - at.p1.x, 240 + H_GAP)
-})

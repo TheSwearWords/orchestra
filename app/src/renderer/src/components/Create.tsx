@@ -9,7 +9,8 @@ import type {
   Ask,
   Output,
   Proposal,
-  Previews
+  Previews,
+  MachineCheck
 } from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
 import { NewCard } from '../canvas/Chrome'
@@ -27,25 +28,29 @@ import {
 } from '../canvas/shared'
 import { AgentFile } from './Agents'
 import {
-  PODIUM,
-  PREREQS,
+  LANE,
+  LOCK_R,
+  PREREQ,
+  prereqSpots,
   SEAT,
   ORCH_CAP,
   ORCH_W,
-  WINDOWS_Y,
   WINDOW_W,
   filesFor,
   outputPaths,
-  ring,
-  seatRow,
+  mcpLabel,
+  mcpState,
+  mcpsOf,
+  seatColumns,
   windowX
 } from '../canvas/stage'
 import { splitDecision, type Decision } from '../decide'
 import { splitSuggestion } from '../suggest'
 import { splitGoTo, type Place } from '../goto'
 import { Icon } from './Icon'
-import { ConfirmModal } from './ConfirmModal'
+import { DeliverableEditor } from './DeliverableEditor'
 import { DocWindow } from './DocWindow'
+import { PrereqTags } from './PrereqTags'
 import { Layers, type Layer } from './Layers'
 import { PROVIDERS, provider } from '../../../main/providers'
 import { OptionPreview } from './OptionPreview'
@@ -85,10 +90,34 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const [dropped, setDropped] = useState<Record<string, { x: number; y: number }>>({})
   // shortcut: confirmed is per viewer (localStorage); move it into deliverables.md if it
   // should follow the project to other machines
-  const [confirmed, setConfirmed] = useState(() => remembered(`confirmed:${project}`).length > 0)
+  const [lockedRaw, setLockedRaw] = useState(() => remembered(`confirmed:${project}`))
   // a card to bring into view: one just opened, or one the Needs you list points at
   const [focus, setFocus] = useState<string | undefined>(() => takeFocus(project))
-  const [dropping, setDropping] = useState<string | null>(null) // awaiting "Are you sure?"
+  const [editing, setEditing] = useState<string | null>(null) // the deliverable being edited
+  const [openDocs, setOpenDocs] = useState<string[]>([]) // prerequisites open as windows
+  const [spawn, setSpawn] = useState<{ windows: { id: string; dx: number; dy: number }[] }>()
+  const openDoc = useRef<(id: string) => void>(() => {})
+  useEffect(() => {
+    // double-clicking a prerequisite inside a deliverable's window
+    const open = (e: Event): void => openDoc.current((e as CustomEvent<string>).detail)
+    addEventListener('orchestra:open-doc', open)
+    return () => removeEventListener('orchestra:open-doc', open)
+  }, [])
+  const [machine, setMachine] = useState<MachineCheck | null>(null) // what's really connected
+  const lastCheck = useRef(0)
+  function recheck(force = true): void {
+    if (!force && Date.now() - lastCheck.current < 60_000) return
+    lastCheck.current = Date.now()
+    void window.api.checkSetup().then(setMachine, () => {})
+  }
+  useEffect(() => {
+    if (frame.preview) return
+    recheck()
+    const look = (): void => recheck(false)
+    addEventListener('focus', look)
+    return () => removeEventListener('focus', look)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, per screen
+  }, [frame.preview])
   const [hiddenLayers, setHiddenLayers] = useState(() => remembered(`hidden:${project}`))
   function hideLayers(ids: string[]): void {
     setHiddenLayers(ids)
@@ -139,18 +168,23 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
 
   if (!plan) return <div className="bg-dots h-full" />
 
-  function confirm(on: boolean): void {
-    setConfirmed(on)
-    remember(`confirmed:${project}`, on ? ['1'] : [])
-    if (!on) return
+  /** Locks in what's on and not yet locked. It only ever adds: nothing locked in comes back out. */
+  function lockIn(): void {
+    const fresh = plan!.selected.filter((id) => !lockedIn.includes(id))
+    if (!fresh.length) return
+    const next = [...lockedIn, ...fresh]
+    setLockedRaw(next)
+    remember(`confirmed:${project}`, next)
     setFocus('orchestrator')
     // the Orchestrator takes it from here: it asks which deliverable to start with
-    const names = plan!.selected.map((id) => musician(id)?.name ?? id).join(', ')
+    const names = fresh.map((id) => musician(id)?.name ?? id).join(', ')
     void window.api
       .sendChat(
         project,
         GENERAL,
-        `I have confirmed my deliverables: ${names}. Walk me through making them.`
+        confirmed
+          ? `I have added to my deliverables: ${names}. Walk me through these too.`
+          : `I have confirmed my deliverables: ${names}. Walk me through making them.`
       )
       .catch((e) => setError(reason(e)))
   }
@@ -159,34 +193,36 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     try {
       const saved = await window.api.saveDeliverables(project, ids)
       setPlan({ ...plan!, selected: saved })
-      if (!saved.length) confirm(false) // nothing left to have confirmed
     } catch (e) {
       setError(reason(e))
     }
   }
+  /** Once it's locked in, or work has started on it, a deliverable stays on. */
+  const startedOn = (id: string): boolean =>
+    lockedIn.includes(id) ||
+    !!chats.find((x) => x.id === id)?.count ||
+    Object.keys(agents).some((k) => k === id || k.startsWith(`${id}--`))
   async function seatMenu(id: string): Promise<void> {
     const chosen = plan!.selected.includes(id)
+    const locked = startedOn(id)
     const c = await window.api.menu([
-      { id: 'toggle', label: chosen ? 'Take off the stage' : 'Choose' },
-      ...(chosen && confirmed ? [{ id: 'instrument', label: 'Add an Instrument' }] : [])
+      {
+        id: 'toggle',
+        label: locked ? 'Locked in' : chosen ? 'Turn off' : 'Turn on',
+        enabled: !locked
+      },
+      { id: 'edit', label: 'Edit deliverable…' },
+      ...(lockedIn.includes(id) ? [{ id: 'instrument', label: 'Add an Instrument' }] : [])
     ])
     if (c === 'instrument') return void addInstrument(id)
-    if (c !== 'toggle') return
-    if (!chosen) return void choose([...plan!.selected, id])
-    deactivate(id)
+    if (c === 'edit') return setEditing(id)
+    if (c === 'toggle') seat(id)
   }
-  /** Takes a deliverable off the stage, asking first if any work has started on it. */
-  function deactivate(id: string): void {
-    const started =
-      !!chats.find((x) => x.id === id)?.count ||
-      Object.keys(agents).some((k) => k === id || k.startsWith(`${id}--`))
-    if (started) setDropping(id)
-    else void choose(plan!.selected.filter((s) => s !== id))
-  }
-  /** A seat click turns the deliverable on or off. */
+  /** A seat click turns the deliverable on or off, until work on it has started. */
   function seat(id: string): void {
-    if (plan!.selected.includes(id)) deactivate(id)
-    else void choose([...plan!.selected, id])
+    if (startedOn(id)) return
+    const on = plan!.selected.includes(id)
+    void choose(on ? plan!.selected.filter((s) => s !== id) : [...plan!.selected, id])
   }
 
   const instCard = (m: string, i: string): string => `inst--${m}--${i}`
@@ -221,18 +257,45 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     setFocus(`file-${ref.role}-${ref.id}`)
   }
 
-  const seats = seatRow(plan.musicians)
+  const seats = seatColumns(plan.musicians)
   const at = new Map(seats.map((s) => [s.id, s]))
   const musician = (id: string): Musician | undefined => plan.musicians.find((m) => m.id === id)
   const chosen = plan.selected.filter((id) => at.has(id))
+  // ['1'] is how projects locked in before this was per-deliverable were remembered
+  const lockedIn = lockedRaw.includes('1') ? plan.selected : lockedRaw
+  const confirmed = lockedIn.length > 0
+  const spawned = chosen.filter((id) => lockedIn.includes(id))
+  const waitingToLock = chosen.filter((id) => !lockedIn.includes(id))
   const foundations = plan.instruments.filter((i) =>
     plan.musicians.some((m) => m.prerequisites.includes(i.id))
   )
   const lit = new Set(foundationOrder(plan.musicians, plan.instruments, chosen).map((i) => i.id))
-  const spots = ring(foundations.length, PREREQS.x, PREREQS.y, PREREQS.ring)
+  const lockY = Math.max(...seats.map((s) => s.y)) / 2 // the middle of the columns
+  const spots = prereqSpots(foundations.length, lockY)
+  const lockX = PREREQ.x + PREREQ.w / 2 + LANE + LOCK_R
+  // the group around all of it, and the windows start clear of it
+  const stageLeft = Math.min(...seats.map((s) => s.x)) - SEAT.w / 2 - 56
+  const stageTop =
+    Math.min(-SEAT.h / 2, lockY - LOCK_R, ...spots.map((s) => s.y - PREREQ.h / 2)) - 56
+  const stageBottom =
+    Math.max(lockY * 2 + SEAT.h / 2, lockY + LOCK_R, ...spots.map((s) => s.y + PREREQ.h / 2)) + 56
+  const stageGroup = {
+    x: stageLeft,
+    y: stageTop,
+    w: lockX + LOCK_R + 56 - stageLeft,
+    h: stageBottom - stageTop
+  }
+  const windowsY = stageGroup.y + stageGroup.h + 160
   const spot = new Map(foundations.map((f, i) => [f.id, spots[i]]))
-  const exists = (output: string): boolean =>
-    outputPaths(output).some((p) => outputs.some((o) => o.path === p || o.path.startsWith(p)))
+  // one that names no file can't be checked, so it never holds anything up (same in the conductor)
+  const exists = (output: string): boolean => {
+    const paths = outputPaths(output)
+    return (
+      !paths.length || paths.some((p) => outputs.some((o) => o.path === p || o.path.startsWith(p)))
+    )
+  }
+  const needs = (id: string): ReturnType<typeof foundationOrder> =>
+    foundationOrder(plan.musicians, plan.instruments, [id])
   const making = (id: string): boolean =>
     Object.entries(agents).some(([k, a]) => k.endsWith(`--${id}`) && a.status === 'working')
 
@@ -265,10 +328,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const newItems: MenuItem[] = [
     { label: 'New deliverable', run: ask('I need a new deliverable: ') },
     { label: 'New prerequisite', run: ask('I need a new prerequisite: ') },
-    ...(confirmed && chosen.length
+    ...(confirmed && spawned.length
       ? [
           { label: '', separator: true },
-          ...chosen.map((d) => ({
+          ...spawned.map((d) => ({
             label: `New Instrument for ${musician(d)!.name}`,
             run: () => void addInstrument(d)
           }))
@@ -283,8 +346,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       name: 'Research',
       path: 'research.md',
       busy: false,
-      link: 'orchestrator',
-      users: [] as string[]
+      link: 'orchestrator'
     },
     ...outputs
       .filter((o) => /^research\/.*\.md$/.test(o.path))
@@ -293,14 +355,12 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         name: `Research · ${o.path.slice(9, -3)}`,
         path: o.path,
         busy: false,
-        link: 'orchestrator',
-        users: [] as string[]
+        link: 'orchestrator'
       })),
     ...foundations
       .filter((f) => lit.has(f.id) || exists(f.output))
       .flatMap((f) => {
         const path = outputPaths(f.output).find((p) => p.endsWith('.md'))
-        const users = chosen.filter((d) => musician(d)?.prerequisites.includes(f.id))
         return path
           ? [
               {
@@ -308,8 +368,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
                 name: f.name,
                 path,
                 busy: making(f.id),
-                link: 'orchestrator',
-                users
+                link: 'orchestrator'
               }
             ]
           : []
@@ -318,42 +377,70 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     .map((d) => ({ ...d, stamp: outputs.find((o) => o.path === d.path)?.modified }))
     .filter((d) => d.stamp || d.busy)
 
-  // every chosen seat wires down to the circle and up to each foundation it needs
-  const wires = chosen.flatMap((id) => {
-    const s = at.get(id)!
-    const down = {
-      key: `${id}-down`,
-      x1: s.x,
-      y1: s.y + SEAT.h / 2,
-      x2: PODIUM.x,
-      y2: PODIUM.y - PODIUM.r,
-      on: true
+  /** A prerequisite's file: a window here if it's markdown, otherwise its own app. */
+  function openPrereq(id: string): void {
+    const doc = docs.find((d) => d.id === id)
+    if (doc) {
+      if (openDocs.includes(id)) return setFocus(`doc-${id}`)
+      setOpenDocs((o) => [...o, id])
+      return setSpawn({ windows: [{ id: `doc-${id}`, dx: 0, dy: 0 }] })
     }
-    const up = musician(id)!
-      .prerequisites.filter((f) => spot.has(f))
-      .map((f) => ({
-        key: `${id}-${f}`,
-        x1: s.x,
-        y1: s.y - SEAT.h / 2,
-        x2: spot.get(f)!.x,
-        y2: spot.get(f)!.y,
-        on: !hover || hover === f
-      }))
-    return [down, ...up]
-  })
-
-  const extent = {
-    x: seats[0].x - SEAT.w,
-    y: PREREQS.y - PREREQS.ring - 80,
-    w: -seats[0].x * 2 + SEAT.w * 2,
-    h: PODIUM.y + PODIUM.r - (PREREQS.y - PREREQS.ring) + 160
+    const f = foundations.find((x) => x.id === id)
+    const file = f && outputs.find((o) => outputPaths(f.output).includes(o.path))
+    if (file) void window.api.openOutput(project, file.path).catch(() => {})
   }
-  // what the windows must keep clear of
-  const obstacles = [
-    { x: seats[0].x - SEAT.w / 2, y: -SEAT.h / 2, w: -seats[0].x * 2 + SEAT.w, h: SEAT.h },
-    { x: PODIUM.x - PODIUM.r, y: PODIUM.y - PODIUM.r, w: PODIUM.r * 2, h: PODIUM.r * 2 }
+  openDoc.current = openPrereq
+
+  // every chosen seat wires across to each foundation it needs, and those on to Lock in
+  const wires = [
+    ...chosen.flatMap((id) => {
+      const s = at.get(id)!
+      return musician(id)!
+        .prerequisites.filter((f) => spot.has(f))
+        .map((f) => ({
+          key: `${id}-${f}`,
+          x1: s.x + SEAT.w / 2,
+          y1: s.y,
+          x2: spot.get(f)!.x - PREREQ.w / 2,
+          y2: spot.get(f)!.y,
+          on: !hover || hover === f
+        }))
+    }),
+    ...foundations
+      .filter((f) => lit.has(f.id))
+      .map((f) => ({
+        key: `${f.id}-lock`,
+        x1: spot.get(f.id)!.x + PREREQ.w / 2,
+        y1: spot.get(f.id)!.y,
+        x2: lockX - LOCK_R,
+        y2: lockY,
+        on: !hover || hover === f.id
+      }))
   ]
+
+  const extent = stageGroup
+  // what the windows must keep clear of
+  const obstacles = [stageGroup]
   const ready = chosen.length > 0
+  /** What a deliverable's connections look like right now, for its seat. */
+  const connection = (m: Musician): { text: string; bad: boolean } => {
+    const needs = mcpsOf(m.tools)
+    if (!needs.length) return { text: 'No connection needed', bad: false }
+    if (!machine) return { text: needs.map(mcpLabel).join(', '), bad: false }
+    const problem = needs.find((id) => mcpState(id, machine.mcp) !== 'connected')
+    if (!problem) return { text: `${needs.map(mcpLabel).join(', ')} connected`, bad: false }
+    const state = mcpState(problem, machine.mcp)
+    return {
+      text:
+        mcpLabel(problem) +
+        (state === 'auth'
+          ? ': sign in again'
+          : state === 'failed'
+            ? ': not working'
+            : ': not connected'),
+      bad: true
+    }
+  }
 
   const world = (
     <>
@@ -367,92 +454,64 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         ))}
       </svg>
 
-      {/* the Prerequisites circle, ringed by every foundation; lit when a chosen seat needs it */}
-      <div
-        className="absolute flex flex-col items-center justify-center rounded-full border border-card-line bg-card text-center shadow-card"
-        style={{
-          left: PREREQS.x - PREREQS.r,
-          top: PREREQS.y - PREREQS.r,
-          width: PREREQS.r * 2,
-          height: PREREQS.r * 2
-        }}
+      {/* the prerequisites, lit when a chosen deliverable needs one */}
+      <p
+        className="absolute text-center type-caption text-dim"
+        style={{ left: PREREQ.x - 180, width: 360, top: spots[0]?.y - PREREQ.h / 2 - 28 }}
       >
-        <span className="type-label-serif-l text-link">Prerequisites</span>
-        <span className="mt-1 px-4 type-caption text-dim">
-          {lit.size ? `${lit.size} of ${foundations.length} needed` : 'Built once, shared'}
-        </span>
-      </div>
+        Prerequisites ·{' '}
+        {lit.size ? `${lit.size} of ${foundations.length} needed` : 'built once, shared'}
+        {' · double-click to open'}
+      </p>
       {foundations.map((f, i) => {
         const on = lit.has(f.id)
         const state = !on ? '' : exists(f.output) ? 'Ready' : making(f.id) ? 'Making' : 'To make'
         return (
           <button
             key={f.id}
-            onClick={() => {
-              // to its file: the window on this board if it's markdown, else the file itself
-              if (docs.some((d) => d.id === f.id)) return setFocus(`doc-${f.id}`)
-              const file = outputs.find((o) => outputPaths(f.output).includes(o.path))
-              if (file) void window.api.openOutput(project, file.path).catch(() => {})
-            }}
+            onDoubleClick={() => openPrereq(f.id)}
             onPointerEnter={() => on && setHover(f.id)}
             onPointerLeave={() => setHover(null)}
             title={`${f.job}\n→ ${f.output}`}
-            className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full px-3 py-1.5 type-label-s whitespace-nowrap transition-colors duration-200 ${
+            className={`absolute flex items-center justify-between gap-2 px-3 type-label-s whitespace-nowrap transition-colors duration-200 ${
               !on
                 ? 'border border-dashed border-wire/40 bg-card text-placeholder'
                 : state === 'Ready'
                   ? 'bg-success-subtle text-success-fg'
                   : 'border border-brand bg-card text-link shadow-float'
             }`}
-            style={{ left: spots[i].x, top: spots[i].y }}
+            style={{
+              left: spots[i].x - PREREQ.w / 2,
+              top: spots[i].y - PREREQ.h / 2,
+              width: PREREQ.w,
+              height: PREREQ.h
+            }}
           >
-            {f.name}
+            <span className="truncate">{f.name}</span>
             {on && <span className="type-caption normal-case">{state}</span>}
           </button>
         )
       })}
 
       {seats.map((s) => {
-        const style = {
-          left: s.x - SEAT.w / 2,
-          top: s.y - SEAT.h / 2,
-          width: SEAT.w,
-          height: SEAT.h
-        }
-        if (s.id === 'add')
-          return (
-            <button
-              key="add"
-              onClick={() =>
-                document
-                  .querySelector<HTMLInputElement>('input[aria-label^="Message the Orchestrator"]')
-                  ?.focus()
-              }
-              title="Ask the Orchestrator for a deliverable the library doesn't have"
-              className="absolute flex flex-col items-center justify-center gap-1 border border-dashed border-wire bg-card/70 px-4 text-center text-link"
-              style={style}
-            >
-              <span className="font-mono text-xl text-link/40">+</span>
-              <span className="serif-on type-heading-m">Add a seat</span>
-              <span className="type-caption text-dim">Ask the Orchestrator for one</span>
-            </button>
-          )
         const m = musician(s.id)!
         const on = chosen.includes(m.id)
         const c = chats.find((x) => x.id === m.id)
+        const locked = startedOn(m.id)
+        const link = connection(m)
         // an approval waiting in its chat
         const needsYou = Object.values(proposals).some(
           (p) => p.chat === m.id && p.status === 'pending'
         )
         const status = !on
-          ? 'Choose'
-          : !confirmed
-            ? 'Chosen'
+          ? 'Off'
+          : !lockedIn.includes(m.id)
+            ? 'On'
             : needsYou
               ? 'Needs you'
               : c?.busy
                 ? 'Playing'
-                : c?.count
+                : locked
                   ? 'Started'
                   : 'Not started'
         return (
@@ -466,18 +525,21 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             }}
             aria-pressed={on}
             title={
-              on
-                ? confirmed
-                  ? `Show ${m.name}`
-                  : `Unchoose ${m.name}`
-                : `Choose ${m.name}: ${m.deliverable}`
+              locked
+                ? `${m.name} is locked on: work has started. Right-click to edit it.`
+                : `${on ? 'Turn off' : 'Turn on'} ${m.name}: ${m.deliverable}`
             }
             className={`absolute flex flex-col items-center px-4 pt-5 pb-4 text-center transition-[background-color,color] duration-200 ease-(--ease) ${
               on
                 ? 'bg-poster-dots shadow-card'
                 : 'border border-card-line bg-card text-link shadow-card hover:bg-selected'
-            }`}
-            style={style}
+            } ${locked ? 'cursor-default outline-[3px] outline-offset-4 outline-brand' : ''}`}
+            style={{
+              left: s.x - SEAT.w / 2,
+              top: s.y - SEAT.h / 2,
+              width: SEAT.w,
+              height: SEAT.h
+            }}
           >
             {needsYou && confirmed && (
               <span className="absolute -top-3 right-4 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
@@ -501,50 +563,63 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               {status}
             </span>
             <span
-              className={`mt-2 line-clamp-2 type-caption ${on ? 'text-poster-dim' : 'text-dim'}`}
+              className={`mt-auto w-full truncate px-1 py-0.5 type-caption ${
+                link.bad ? 'bg-signal-subtle text-signal-fg' : on ? 'text-poster-dim' : 'text-dim'
+              }`}
+              title={link.text}
             >
-              {on && confirmed && c?.last ? c.last.text.replace(/\s+/g, ' ') : m.deliverable}
+              {link.text}
             </span>
           </button>
         )
       })}
 
-      {/* the Deliverables circle: the prompt, then Confirm once something is chosen */}
+      {/* lock in: opens the windows for what's on */}
       <button
-        onClick={() => ready && confirm(!confirmed)}
-        disabled={!ready}
+        onClick={lockIn}
+        disabled={waitingToLock.length === 0}
         title={
           !ready
-            ? 'Choose the deliverables this project needs'
-            : confirmed
-              ? 'Change what is chosen'
-              : 'Confirm these deliverables'
+            ? 'Turn on the deliverables this project needs'
+            : waitingToLock.length
+              ? 'Lock in the deliverables that are on'
+              : 'Turn on another deliverable to add it'
         }
         className={`group absolute flex flex-col items-center justify-center gap-1 rounded-full px-6 text-center shadow-card transition-colors duration-200 ease-(--ease) ${
-          ready ? 'bg-poster-dots hover:bg-inverse' : 'border border-card-line bg-card text-link'
+          ready
+            ? `bg-poster-dots ${waitingToLock.length ? 'hover:bg-inverse' : ''}`
+            : 'border border-card-line bg-card text-link'
         }`}
         style={{
-          left: PODIUM.x - PODIUM.r,
-          top: PODIUM.y - PODIUM.r,
-          width: PODIUM.r * 2,
-          height: PODIUM.r * 2
+          left: lockX - LOCK_R,
+          top: lockY - LOCK_R,
+          width: LOCK_R * 2,
+          height: LOCK_R * 2
         }}
       >
-        <span className="type-heading-m">Deliverables</span>
-        {/* at rest: what to do; on hover, the action */}
-        <span
-          className={`type-label-s ${ready ? 'text-poster-dim group-hover:hidden' : 'text-dim'}`}
-        >
-          {!ready
-            ? 'Select your deliverables'
-            : `${chosen.length} chosen${confirmed ? ' · confirmed' : ''}`}
+        <span className="type-heading-m">
+          {waitingToLock.length
+            ? confirmed
+              ? `Add ${waitingToLock.length}`
+              : 'Lock in'
+            : confirmed
+              ? 'Locked in'
+              : 'Lock in'}
         </span>
-        {ready && (
-          <span className="hidden type-label-serif-l group-hover:block">
-            {confirmed ? 'Change selection' : 'Confirm'}
-          </span>
-        )}
+        <span className={`type-label-s ${ready ? 'text-poster-dim' : 'text-dim'}`}>
+          {!ready ? 'Turn on your deliverables' : `${chosen.length} on`}
+        </span>
       </button>
+      {editing && musician(editing) && (
+        <DeliverableEditor
+          musician={musician(editing)!}
+          foundations={foundations}
+          machine={machine}
+          onRecheck={() => recheck()}
+          onClose={() => setEditing(null)}
+          onSaved={() => setEditing(null)}
+        />
+      )}
     </>
   )
 
@@ -576,21 +651,22 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const waiting = approvals.length + (question ? 1 : 0) + (suggested.length ? 1 : 0)
   /** Whose group a question sits in: the deliverable it's about, or the one that needs it. */
   const askOwner = (about?: string): string | undefined =>
-    about && chosen.includes(about)
+    about && spawned.includes(about)
       ? about
-      : chosen.find((d) => about && musician(d)?.prerequisites.includes(about))
-  const cards: CardSpec[] = !confirmed
+      : spawned.find((d) => about && musician(d)?.prerequisites.includes(about))
+  const work: CardSpec[] = !confirmed
     ? []
     : [
         {
           id: 'orchestrator',
           kind: 'orchestrator' as const,
           auto: true,
+          pin: true, // straight below Lock in
           title: 'Orchestrator',
           count: chats.find((c) => c.id === GENERAL)?.busy ? 'thinking' : undefined,
           working: !!chats.find((c) => c.id === GENERAL)?.busy,
-          x: -ORCH_W / 2,
-          y: WINDOWS_Y,
+          x: lockX - ORCH_W / 2,
+          y: windowsY,
           w: ORCH_W,
           tone: 'paper' as const,
           height: ORCH_CAP - 44, // under its 44px header
@@ -619,7 +695,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             auto: owner ? true : 'right',
             title: a.title,
             x: ORCH_W / 2 + 48,
-            y: WINDOWS_Y,
+            y: windowsY,
             w: ASK_W,
             link: owner ? `chat-${owner}` : 'orchestrator',
             needsYou: true,
@@ -633,7 +709,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           title: 'Action',
           count: waiting ? `${waiting} waiting` : undefined,
           x: ORCH_W / 2 + 48,
-          y: WINDOWS_Y,
+          y: windowsY,
           w: ASK_W,
           link: 'orchestrator',
           needsYou: waiting > 0,
@@ -690,17 +766,24 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             </p>
           )
         },
-        ...chosen.map((id, i) => ({
+        ...spawned.map((id, i) => ({
           id: `chat-${id}`,
           kind: 'musician' as const,
           auto: true as const,
           title: musician(id)!.name,
           count: chats.find((c) => c.id === id)?.busy ? 'playing' : undefined,
           working: !!chats.find((c) => c.id === id)?.busy || agents[id]?.status === 'working',
-          x: windowX(i, chosen.length),
-          y: WINDOWS_Y + 960,
+          x: windowX(i, spawned.length),
+          y: windowsY + 960,
           w: WINDOW_W,
           link: 'orchestrator',
+          solid: needs(id).every((f) => exists(f.output)),
+          gate: needs(id).length > 0 && (
+            <PrereqTags
+              items={needs(id).map((f) => ({ id: f.id, name: f.name, ready: exists(f.output) }))}
+              onOpen={openPrereq}
+            />
+          ),
           needsYou: pending(id),
           menu: [
             { label: 'Add an Instrument', run: () => void addInstrument(id) },
@@ -713,7 +796,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           body: <ChatPanel project={project} chat={id} plan={plan} view="work" />
         })),
         // each deliverable's crew, one window per Instrument, under it and wired to it
-        ...chosen.flatMap((id, i) => {
+        ...spawned.flatMap((id, i) => {
           const m = musician(id)!
           return m.instruments.map((iid, j): CardSpec => {
             const inst = plan.instruments.find((x) => x.id === iid)
@@ -729,8 +812,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               count: state ? STATUS[state.status].label : undefined,
               working: state?.status === 'working',
               ...(dropped[card] ?? {
-                x: windowX(i, chosen.length) + (j % 2) * (INST_W + 24),
-                y: WINDOWS_Y + 1800 + Math.floor(j / 2) * 300
+                x: windowX(i, spawned.length) + (j % 2) * (INST_W + 24),
+                y: windowsY + 1800 + Math.floor(j / 2) * 300
               }),
               w: INST_W,
               link: `chat-${id}`,
@@ -751,23 +834,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             }
           })
         }),
-        ...docs.map((d, i): CardSpec => ({
-          id: `doc-${d.id}`,
-          kind: 'file',
-          auto: d.id.startsWith('research') ? 'left' : 'band',
-          also: d.users.map((u) => `chat-${u}`),
-          title: d.name,
-          count: d.path,
-          x: windowX(i % 4, 4),
-          y: WINDOWS_Y + 3200 + Math.floor(i / 4) * 900,
-          w: 560,
-          tone: 'paper',
-          link: d.link,
-          working: d.busy,
-          body: <DocWindow project={project} path={d.path} stamp={d.stamp} />
-        })),
         // a place for the finished work, there from the start
-        ...chosen
+        ...spawned
           .filter((id) => !previews[id]?.length)
           .map((id): CardSpec => ({
             id: `preview-${id}-empty`,
@@ -775,7 +843,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             auto: true,
             title: 'Preview',
             x: 0,
-            y: WINDOWS_Y + 2400,
+            y: windowsY + 2400,
             w: 360,
             link: `chat-${id}`,
             body: (
@@ -785,14 +853,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             )
           })),
         // finished work, under the deliverable it belongs to
-        ...chosen.flatMap((id) =>
+        ...spawned.flatMap((id) =>
           (previews[id] ?? []).map((p): CardSpec => ({
             id: `preview-${id}-${p.label}`,
             kind: 'deliverable',
             auto: true,
             title: p.label,
             x: 0,
-            y: WINDOWS_Y + 2400,
+            y: windowsY + 2400,
             w: 360,
             link: `chat-${id}`,
             body: <PreviewWindow project={project} deliverable={id} preview={p} />
@@ -805,7 +873,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           auto: 'right',
           title: `${[...plan.instruments, ...plan.musicians].find((x) => x.id === ref.id)?.name ?? ref.name} · file`,
           x: 0,
-          y: WINDOWS_Y + 2600,
+          y: windowsY + 2600,
           w: 640,
           link: from,
           onClose: () => setFiles((f) => f.filter((x) => x.ref.id !== ref.id)),
@@ -813,26 +881,44 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         }))
       ]
 
+  // the research sits to the right of the stage, there from the start
+  const research = docs.filter((d) => d.id.startsWith('research'))
+  const researchCards = research.map((d, i): CardSpec => ({
+    id: `doc-${d.id}`,
+    kind: 'file',
+    title: d.name,
+    count: d.path,
+    x: stageGroup.x + stageGroup.w + 112 + i * 672,
+    y: stageGroup.y,
+    pin: true,
+    bottom: stageBottom,
+    w: 600,
+    body: <DocWindow project={project} path={d.path} stamp={d.stamp} />
+  }))
+  const openedDocs = docs
+    .filter((d) => openDocs.includes(d.id) && !d.id.startsWith('research'))
+    .map((d): CardSpec => ({
+      id: `doc-${d.id}`,
+      kind: 'file',
+      title: d.name,
+      count: d.path,
+      x: stageGroup.x,
+      y: windowsY,
+      w: 600,
+      working: d.busy,
+      onClose: () => setOpenDocs((o) => o.filter((x) => x !== d.id)),
+      body: <DocWindow project={project} path={d.path} stamp={d.stamp} />
+    }))
+  const cards = [...researchCards, ...openedDocs, ...work]
   const byId = new Map(cards.map((c) => [c.id, c]))
   const ownerOf = (id: string): string | undefined => {
     for (let c = byId.get(id); c; c = c.link ? byId.get(c.link) : undefined)
       if (c.id.startsWith('chat-')) return c.id.slice(5)
     return undefined
   }
-  const shared = cards.filter((c) => c.auto === 'band')
-  const prereqLayer: Layer[] = shared.length
-    ? [
-        {
-          id: 'prereqs',
-          name: 'Prerequisites',
-          members: shared.map((c) => ({ id: c.id, title: c.title, kind: c.kind }))
-        }
-      ]
-    : []
   const layers: Layer[] = confirmed
     ? [
-        ...prereqLayer,
-        ...chosen.map((id) => ({
+        ...spawned.map((id) => ({
           id,
           name: musician(id)!.name,
           members: cards
@@ -850,24 +936,12 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       crumbs={frame.crumbs}
       pages={frame.pages}
       preview={frame.preview}
-      world={
-        <>
-          {world}
-          {dropping && (
-            <ConfirmModal
-              title={`Deactivate ${plan.musicians.find((m) => m.id === dropping)?.name ?? dropping}?`}
-              body="Work has already started on it. Its chat and files stay in the project."
-              confirm="Deactivate"
-              onCancel={() => setDropping(null)}
-              onConfirm={() => {
-                void choose(plan.selected.filter((s) => s !== dropping))
-                setDropping(null)
-              }}
-            />
-          )}
-        </>
-      }
+      world={world}
       worldRect={extent}
+      worldGroup={{ name: 'Select your deliverables', rect: stageGroup }}
+      worldWire={confirmed ? { x: lockX, y: lockY + LOCK_R, to: 'orchestrator' } : undefined}
+      spawn={spawn}
+      onSpawned={() => setSpawn(undefined)}
       obstacles={obstacles}
       focus={focus}
       onFocused={() => setFocus(undefined)}
@@ -907,10 +981,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         )
       }
       addMenu={(at, sel): MenuItem[] => {
-        if (!confirmed) return [{ label: 'Confirm your deliverables to add Instruments' }]
+        if (!confirmed) return [{ label: 'Lock in your deliverables to add Instruments' }]
         // a deliverable's window, or one of its Instruments, selected: the menu is about it
         const id = /^chat-(.+)$/.exec(sel ?? '')?.[1] ?? /^inst--(.+?)--/.exec(sel ?? '')?.[1]
-        const m = id && chosen.includes(id) ? musician(id) : undefined
+        const m = id && spawned.includes(id) ? musician(id) : undefined
         if (m)
           return [
             { label: `New Instrument for ${m.name}`, run: () => void addInstrument(m.id, at) },
@@ -919,7 +993,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               run: () => openFile({ role: 'musician', id: m.id, name: m.name }, `chat-${m.id}`)
             }
           ]
-        return chosen.map((d) => ({
+        return spawned.map((d) => ({
           label: `New Instrument for ${musician(d)!.name}`,
           run: () => void addInstrument(d, at)
         }))
@@ -2035,7 +2109,13 @@ function Score({
               </p>
               <ul className="ml-3 flex flex-col">
                 {foundations.map((f) => (
-                  <li key={f.id} className={branch}>
+                  <li
+                    key={f.id}
+                    className={branch}
+                    onDoubleClick={() =>
+                      dispatchEvent(new CustomEvent('orchestra:open-doc', { detail: f.id }))
+                    }
+                  >
                     <WorkNode
                       name={workName(f.output, f.name)}
                       ready={ready(f.output)}

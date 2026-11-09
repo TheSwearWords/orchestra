@@ -9,18 +9,32 @@ export type Tag = 'inspiration' | 'asset'
 
 export interface Reference {
   id: string // note file name without .md
-  kind: 'link' | 'file'
+  kind: 'link' | 'file' | 'text' // text: words the user wrote, kept as the note
   source: string // the URL, or the file name inside references/files/
   note: string
   tag: Tag
   added: string // ISO date
   size?: number // bytes, files only
+  group?: string // the group it's filed under; none means the project's default group
 }
+
+/** How the references are organised (references/groups.json). Every project has one default
+ * group, called "<project> research" until it's renamed. */
+export interface Groups {
+  default: string | null
+  others: string[]
+  kinds: Record<string, Kind[]> // a window of its own has one kind; a full group isn't listed
+}
+
+export const KINDS = ['links', 'inspiration', 'assets', 'text'] as const
+export type Kind = (typeof KINDS)[number]
 
 export interface Site {
   name: string
   url: string
   about?: string // what the site is for, in a line; names alone don't say
+  tags?: string[] // what kind of library it is
+  shot?: boolean // has a picture of its landing page, worked out on load and never saved
 }
 
 // The seven sources from the project notes; users add their own on top (sites.json).
@@ -62,6 +76,16 @@ export const DEFAULT_SITES: Site[] = [
   }
 ]
 
+const DEFAULT_TAGS: Record<string, string[]> = {
+  'Are.na': ['Moodboards'],
+  Visuelle: ['Graphic design', 'Typography'],
+  'Design Reviewed': ['Graphic design', 'Print'],
+  CARI: ['Aesthetics', 'Images'],
+  'Public Work': ['Images'],
+  Artvee: ['Art', 'Images'],
+  Rawpixel: ['Images', 'Stock']
+}
+
 export const FILE_TYPES = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'pdf']
 const MAX_FILE_BYTES = 25 * 1024 * 1024
 const ID = /^[a-z0-9][a-z0-9-]*$/
@@ -93,7 +117,8 @@ const oneLine = (s: string): string => s.replace(/\s*\r?\n\s*/g, ' ').trim()
 
 export function referenceMarkdown(r: Omit<Reference, 'id'>): string {
   const size = r.size === undefined ? '' : `size: ${r.size}\n`
-  return `---\nkind: ${r.kind}\nsource: ${oneLine(r.source)}\ntag: ${r.tag}\nadded: ${r.added}\n${size}---\n\n${r.note.trim()}\n`
+  const group = r.group ? `group: ${oneLine(r.group)}\n` : ''
+  return `---\nkind: ${r.kind}\nsource: ${oneLine(r.source)}\ntag: ${r.tag}\nadded: ${r.added}\n${size}${group}---\n\n${r.note.trim()}\n`
 }
 
 export function parseReference(id: string, md: string): Reference | null {
@@ -104,7 +129,7 @@ export function parseReference(id: string, md: string): Reference | null {
     const kv = /^(\w+):\s*(.*)$/.exec(line)
     if (kv) f[kv[1]] = kv[2].trim()
   }
-  if ((f.kind !== 'link' && f.kind !== 'file') || !f.source) return null
+  if ((f.kind !== 'link' && f.kind !== 'file' && f.kind !== 'text') || !f.source) return null
   return {
     id,
     kind: f.kind,
@@ -112,7 +137,8 @@ export function parseReference(id: string, md: string): Reference | null {
     note: m[2].trim(),
     tag: f.tag === 'asset' ? 'asset' : 'inspiration',
     added: f.added ?? '',
-    ...(f.size ? { size: Number(f.size) } : {})
+    ...(f.size ? { size: Number(f.size) } : {}),
+    ...(f.group ? { group: f.group } : {})
   }
 }
 
@@ -196,11 +222,125 @@ async function readRef(project: string, id: string): Promise<Reference> {
 export async function updateReference(
   project: string,
   id: string,
-  change: { note?: string; tag?: Tag }
+  change: { note?: string; tag?: Tag; group?: string | null }
 ): Promise<Reference> {
-  const ref = { ...(await readRef(project, id)), ...change }
+  const { group, ...rest } = change
+  const ref: Reference = { ...(await readRef(project, id)), ...rest }
+  if (group === null) delete ref.group
+  else if (group !== undefined) {
+    if (!(await readGroups(project)).others.includes(group)) throw new Error('Unknown group.')
+    ref.group = group
+  }
   await writeFile(join(refsDir(project), `${id}.md`), referenceMarkdown(ref))
   return { ...ref, note: ref.note.trim() }
+}
+
+/** What the user typed into a text window: one note per window; empty removes it. */
+export async function saveText(project: string, group: unknown, raw: unknown): Promise<void> {
+  const g = await readGroups(project)
+  if (typeof group !== 'string' || !g.kinds[group]?.includes('text'))
+    throw new Error('Unknown text window.')
+  const text = typeof raw === 'string' ? raw.trim().slice(0, 20_000) : ''
+  const old = (await listReferences(project)).find((r) => r.kind === 'text' && r.group === group)
+  if (!text) {
+    if (old) await rm(join(refsDir(project), `${old.id}.md`))
+    return
+  }
+  const dir = refsDir(project)
+  await mkdir(dir, { recursive: true })
+  const id = old?.id ?? (await uniqueName(dir, slugify(`note-${group}`), '.md'))
+  await writeFile(
+    join(dir, `${id}.md`),
+    referenceMarkdown({
+      kind: 'text',
+      source: 'text',
+      note: text,
+      tag: 'inspiration',
+      added: old?.added ?? new Date().toISOString(),
+      group
+    })
+  )
+}
+
+const groupsFile = (project: string): string => join(refsDir(project), 'groups.json')
+
+export async function readGroups(project: string): Promise<Groups> {
+  const g = await readFile(groupsFile(project), 'utf8')
+    .then((t) => JSON.parse(t) as Partial<Groups>)
+    .catch(() => ({}) as Partial<Groups>)
+  return {
+    default: typeof g.default === 'string' ? g.default : null,
+    others: Array.isArray(g.others) ? g.others.filter((n) => typeof n === 'string') : [],
+    kinds: g.kinds && typeof g.kinds === 'object' ? g.kinds : {}
+  }
+}
+
+async function saveGroups(project: string, g: Groups): Promise<Groups> {
+  await mkdir(refsDir(project), { recursive: true })
+  await writeFile(groupsFile(project), JSON.stringify(g, null, 2))
+  return g
+}
+
+function groupName(raw: unknown): string {
+  const name = typeof raw === 'string' ? oneLine(raw).slice(0, 60) : ''
+  if (!name) throw new Error('Give the group a name.')
+  return name
+}
+
+/** Adds a group, numbering the name if it's already used. */
+export async function addGroup(project: string, raw: unknown, kinds?: unknown): Promise<Groups> {
+  const g = await readGroups(project)
+  const base = groupName(raw)
+  let name = base
+  for (let n = 2; g.others.includes(name) || g.default === name; n++) name = `${base} ${n}`
+  const only = Array.isArray(kinds) ? kinds.filter((k) => KINDS.includes(k)) : []
+  return saveGroups(project, {
+    ...g,
+    others: [...g.others, name],
+    kinds: only.length ? { ...g.kinds, [name]: only } : g.kinds
+  })
+}
+
+/** Renames a group (null is the default one) and refiles what's in it under the new name. */
+export async function renameGroup(project: string, from: unknown, raw: unknown): Promise<Groups> {
+  const g = await readGroups(project)
+  const name = groupName(raw)
+  if (from === null) return saveGroups(project, { ...g, default: name })
+  if (from === name) return g
+  if (typeof from !== 'string' || !g.others.includes(from)) throw new Error('Unknown group.')
+  if (g.others.includes(name) || g.default === name)
+    throw new Error('There is already a group with that name.')
+  for (const r of await listReferences(project))
+    if (r.group === from) {
+      const { id, ...rest } = r
+      await writeFile(
+        join(refsDir(project), `${id}.md`),
+        referenceMarkdown({ ...rest, group: name })
+      )
+    }
+  const { [from]: kept, ...kinds } = g.kinds
+  return saveGroups(project, {
+    ...g,
+    others: g.others.map((n) => (n === from ? name : n)),
+    kinds: kept ? { ...kinds, [name]: kept } : kinds
+  })
+}
+
+/** Deletes a group; its references go back to the default group. */
+export async function removeGroup(project: string, name: unknown): Promise<Groups> {
+  const g = await readGroups(project)
+  if (typeof name !== 'string' || !g.others.includes(name)) throw new Error('Unknown group.')
+  for (const r of await listReferences(project))
+    if (r.group === name) {
+      if (r.kind === 'text') {
+        await rm(join(refsDir(project), `${r.id}.md`))
+        continue
+      }
+      const { id, group: _gone, ...rest } = r
+      await writeFile(join(refsDir(project), `${id}.md`), referenceMarkdown(rest))
+    }
+  const { [name]: _kinds, ...kinds } = g.kinds
+  return saveGroups(project, { ...g, others: g.others.filter((n) => n !== name), kinds })
 }
 
 export async function removeReference(project: string, id: string): Promise<void> {
@@ -219,14 +359,37 @@ export async function listSites(home: string): Promise<Site[]> {
   const own = await readFile(join(home, 'sites.json'), 'utf8')
     .then((t) => JSON.parse(t) as Site[])
     .catch(() => [] as Site[])
-  return [...DEFAULT_SITES, ...own]
+  return [...DEFAULT_SITES.map((s) => ({ ...s, tags: DEFAULT_TAGS[s.name] })), ...own]
+}
+
+export const siteHost = (url: string): string => new URL(url).hostname.replace(/^www\./, '')
+
+/** Puts a link's website in the reference library, unless it's already there. */
+export async function ensureSite(home: string, url: string): Promise<void> {
+  const host = siteHost(url)
+  if ((await listSites(home)).some((s) => siteHost(s.url) === host)) return
+  const name = host.split('.')[0]
+  await addSite(home, {
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    url: new URL(url).origin,
+    about: 'Added from a reference link.'
+  })
 }
 
 export async function addSite(home: string, input: Site): Promise<Site[]> {
   const name = oneLine(input.name)
   if (!name) throw new Error('Give the site a name.')
   const about = oneLine(input.about ?? '').slice(0, 160)
-  const site = { name, url: normalizeUrl(input.url), ...(about ? { about } : {}) }
+  const tags = (Array.isArray(input.tags) ? input.tags : [])
+    .map((t) => oneLine(String(t)).slice(0, 24))
+    .filter(Boolean)
+    .slice(0, 5)
+  const site = {
+    name,
+    url: normalizeUrl(input.url),
+    ...(about ? { about } : {}),
+    ...(tags.length ? { tags } : {})
+  }
   const own = (await listSites(home)).slice(DEFAULT_SITES.length)
   await mkdir(home, { recursive: true })
   await writeFile(join(home, 'sites.json'), JSON.stringify([...own, site], null, 2))

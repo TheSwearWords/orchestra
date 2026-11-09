@@ -1,9 +1,10 @@
-// The Knowledge graph window on the Studio desk: Graphify's graph of your work, for people.
-// Not the whole tangle: what keeps coming up, its clusters, and one thing at a time to trace,
-// with what links to it around it. Every project together, or one.
-import { useEffect, useState } from 'react'
+// The Knowledge graph window on the Studio board: Graphify's graph of your work, for people.
+// Compact it's the turning 3D graph. Expanded, the graph stands beside what keeps coming up, its
+// clusters, and one thing at a time to trace. Every project together, or one.
+import { useEffect, useMemo, useState } from 'react'
 import type { Project } from '../../../preload'
 import { Icon } from '../components/Icon'
+import { Graph3D } from './Graph3D'
 import { label, neighbourhood, search, summarize, type Graph } from './graphview'
 import { ring } from './stage'
 import { Wire } from './Wire'
@@ -12,34 +13,80 @@ type Status = 'none' | 'building' | 'ready'
 const VIEW = { w: 656, h: 440, r: 168 }
 const short = (s: string, n = 24): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-export function Knowledge({ projects }: { projects: Project[] }): React.JSX.Element {
+export function Knowledge({
+  projects,
+  hovered,
+  expanded,
+  onExpand
+}: {
+  projects: Project[]
+  hovered: string | null // the book the pointer is on: its part of the graph lights up
+  expanded: boolean
+  onExpand: (on: boolean) => void
+}): React.JSX.Element {
   const [scope, setScope] = useState<string | null>(null) // null: every project
-  const [graph, setGraph] = useState<Graph | null | undefined>(undefined) // undefined: loading
+  const [parts, setParts] = useState<{ id: string; graph: Graph }[] | undefined>(undefined)
   const [status, setStatus] = useState<Record<string, Status>>({})
+  const [built, setBuilt] = useState<Record<string, number | null>>({})
   const [center, setCenter] = useState<string | null>(null)
   const [q, setQ] = useState('')
 
   useEffect(() => {
     let live = true
     const load = (): void => {
-      void window.api.loadGraph(scope).then(
-        (g) => live && setGraph((g as Graph | null) ?? null),
-        () => live && setGraph(null)
-      )
+      void Promise.all(
+        projects.map(async (p) => ({
+          id: p.id,
+          graph: (await window.api.loadGraph(p.id).catch(() => null)) as Graph | null
+        }))
+      ).then((all) => {
+        if (live) setParts(all.filter((x): x is { id: string; graph: Graph } => !!x.graph))
+      })
       void Promise.all(
         projects.map(async (p) => [p.id, await window.api.graphStatus(p.id)] as const)
       ).then((all) => live && setStatus(Object.fromEntries(all)))
+      void Promise.all(
+        projects.map(async (p) => [p.id, await window.api.graphBuiltAt(p.id)] as const)
+      ).then((all) => live && setBuilt(Object.fromEntries(all)))
     }
     load()
-    // builds run in the background; look again now and then while the window is open
+    // builds run in the background; look again now and then
     const t = setInterval(load, 20_000)
     return () => {
       live = false
       clearInterval(t)
     }
-  }, [scope, projects])
+  }, [projects])
+
+  // a new object only when the graphs changed, because laying one out is the slow part
+  const key = JSON.stringify(parts?.map((p) => [p.id, p.graph.nodes.length, p.graph.links.length]))
+  const graph = useMemo((): Graph | null | undefined => {
+    if (!parts) return undefined
+    if (scope) return parts.find((p) => p.id === scope)?.graph ?? null
+    // each node's id starts with its project, so hovering a book can pick out its part
+    return {
+      nodes: parts.flatMap((p) =>
+        p.graph.nodes.map((n) => ({
+          ...n,
+          id: `${p.id}/${n.id}`,
+          cluster: `${p.id}:${n.community}`
+        }))
+      ),
+      links: parts.flatMap((p) =>
+        p.graph.links.map((l) => ({
+          ...l,
+          source: `${p.id}/${l.source}`,
+          target: `${p.id}/${l.target}`
+        }))
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key stands for parts
+  }, [key, scope])
 
   const building = Object.values(status).some((s) => s === 'building')
+  const lastBuilt = scope
+    ? built[scope]
+    : Math.max(0, ...Object.values(built).map((t) => t ?? 0)) || null
   const chip = (on: boolean): string =>
     `flex items-center gap-1.5 border px-2.5 py-1 type-label-s ${on ? 'border-brand bg-brand text-on-brand' : 'border-card-line text-link hover:bg-selected'}`
   const dot = (s: Status | undefined): string =>
@@ -59,6 +106,17 @@ export function Knowledge({ projects }: { projects: Project[] }): React.JSX.Elem
           </button>
         ))}
         <span className="flex-1" />
+        {lastBuilt && (
+          <span className="type-caption text-dim">
+            Last built{' '}
+            {new Date(lastBuilt).toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit'
+            })}
+          </span>
+        )}
         <button
           onClick={() => {
             void window.api.buildGraph(scope)
@@ -94,6 +152,9 @@ export function Knowledge({ projects }: { projects: Project[] }): React.JSX.Elem
           onCenter={setCenter}
           q={q}
           onQ={setQ}
+          expanded={expanded}
+          onExpand={onExpand}
+          highlight={!scope && hovered ? `${hovered}/` : undefined}
         />
       )}
     </div>
@@ -105,13 +166,19 @@ function Body({
   center,
   onCenter,
   q,
-  onQ
+  onQ,
+  expanded,
+  onExpand,
+  highlight
 }: {
   graph: Graph
   center: string | null
   onCenter: (id: string) => void
   q: string
   onQ: (q: string) => void
+  expanded: boolean
+  onExpand: (on: boolean) => void
+  highlight?: string
 }): React.JSX.Element {
   const { hubs, clusters } = summarize(graph, 10)
   const focus = center && graph.nodes.some((n) => n.id === center) ? center : hubs[0]?.id
@@ -120,7 +187,7 @@ function Body({
   const spots = ring(hood?.around.length ?? 0, VIEW.w / 2, VIEW.h / 2, VIEW.r)
   const biggest = clusters[0]?.size ?? 1
 
-  return (
+  const details = (
     <>
       <section className="border-b border-hair px-5 py-4">
         <p className="type-caption text-dim">
@@ -267,5 +334,33 @@ function Body({
         )}
       </section>
     </>
+  )
+  const space = <Graph3D graph={graph} focus={focus} onPick={onCenter} highlight={highlight} />
+  const toggle =
+    'serif-on h-9 border border-chip-line bg-card px-3 type-label-s text-link hover:bg-selected'
+  if (!expanded)
+    return (
+      <>
+        <div className="relative" style={{ aspectRatio: '656 / 440' }}>
+          {space}
+        </div>
+        <div className="flex justify-end border-t border-hair px-3 py-2">
+          <button onClick={() => onExpand(true)} className={toggle}>
+            Expand →
+          </button>
+        </div>
+      </>
+    )
+  // the graph is as tall as everything beside it
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_656px]">
+      <div className="relative border-r border-hair">
+        {space}
+        <button onClick={() => onExpand(false)} className={`${toggle} absolute bottom-3 left-3`}>
+          ← Show less
+        </button>
+      </div>
+      <div className="min-w-0">{details}</div>
+    </div>
   )
 }

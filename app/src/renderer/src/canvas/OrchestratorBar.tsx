@@ -1,5 +1,5 @@
 // The Orchestrator bar (brand spec §5.2, canvas spec §0.4): anchored to the window, bottom
-// centre on every screen, spanning the room between the bottom-left corner and the viewfinder.
+// centre on every screen, the same width whether it is open or not.
 // Who it talks to follows where you are: in the Studio, the Orchestrator above every project;
 // inside a book, that project's. Clicking the field opens it up: the conversation grows out of
 // the bar, your conversations line the left of the window, and the agents (their status, and
@@ -39,9 +39,6 @@ const MODES = [
   }
 ] as const
 
-// room the bar leaves for the bottom-left corner (pages, the Studio title) and the viewfinder
-export const BAR_LEFT = 300
-export const BAR_RIGHT = 240
 const BAR_H = 58
 const METER_H = 24 // the usage meter under the field
 const STACK = BAR_H + METER_H
@@ -50,16 +47,23 @@ const METERS = [
   ['five_hour', '5-hour'],
   ['seven_day', 'Weekly']
 ] as const
-const SIDE_W = 288 // the conversations and agents panels beside the open bar
+const SIDE_W = 288 // the agents panel beside the open bar
+// a centred window with room around it, like Spotlight on a laptop
+const OPEN_W = 'clamp(560px, 56vw, 1000px)'
+const OPEN_INSET = `calc((100% - ${OPEN_W}) / 2)`
+const LIST_W = 240 // the conversations inside it
+const ROOM_FOR_LIST = '(min-width: 1360px)' // narrower than this, the list hides behind a menu
 
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 const newThread = (): string => `t-${Date.now().toString(36)}`
 const THINKING = { text: 'Thinking' }
 
 // the last reading, so the meter isn't empty until the next reply
-function savedUsage(): Usage | null {
+type Reading = { at: number; windows: Usage }
+function savedUsage(): Reading | null {
   try {
-    return JSON.parse(localStorage.getItem('usage') ?? 'null')
+    const r = JSON.parse(localStorage.getItem('usage-reading') ?? 'null') as Reading | null
+    return r?.windows ? r : null
   } catch {
     return null
   }
@@ -82,10 +86,41 @@ export function OrchestratorBar({
   const [open, setOpen] = useState(false)
   const [picking, setPicking] = useState(false) // the mode menu
   const [agents, setAgents] = useState(false) // the Agents pop-out
+  const [wide, setWide] = useState(() => matchMedia(ROOM_FOR_LIST).matches)
+  const [listOpen, setListOpen] = useState(false) // the conversations, when they're behind the menu
+  useEffect(() => {
+    const room = matchMedia(ROOM_FOR_LIST)
+    const change = (): void => setWide(room.matches)
+    room.addEventListener('change', change)
+    return () => room.removeEventListener('change', change)
+  }, [])
   const [hi, setHi] = useState(0) // the highlighted slash command
   const [busy, setBusy] = useState(false)
   const [step, setStep] = useState<{ agent?: string; text: string }>(THINKING)
-  const [usage, setUsage] = useState(savedUsage)
+  const [reading, setReading] = useState(savedUsage)
+  const usage = reading?.windows
+  // keeps the newest reading, from an agent here or from Claude Code's status line
+  const take = useRef((r: Reading): void => {
+    setReading((old) => {
+      if (old && old.at >= r.at) return old
+      try {
+        localStorage.setItem('usage-reading', JSON.stringify(r))
+      } catch {
+        // only the reading after a restart is lost
+      }
+      return r
+    })
+  })
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const poll = (): void => {
+      void window.api.readUsage().then((r) => r && take.current(r))
+      tick((n) => n + 1) // a window that has reset drops to 0% without a new reading
+    }
+    poll()
+    const timer = setInterval(poll, 30_000)
+    return () => clearInterval(timer)
+  }, [])
   const [error, setError] = useState('')
   const [plan, setPlan] = useState<CreateState | undefined>(undefined)
   const [threads, setThreads] = useState<Thread[]>([])
@@ -118,15 +153,7 @@ export function OrchestratorBar({
         () => {}
       )
     const off = window.api.onChatEvent((e) => {
-      if (e.kind === 'usage') {
-        setUsage(e.usage)
-        try {
-          localStorage.setItem('usage', JSON.stringify(e.usage))
-        } catch {
-          // only the reading after a restart is lost
-        }
-        return
-      }
+      if (e.kind === 'usage') return take.current({ at: Date.now(), windows: e.usage })
       if (e.project !== to.project) return
       if (e.chat === chat && e.kind === 'busy') {
         setBusy(e.busy)
@@ -146,10 +173,33 @@ export function OrchestratorBar({
     }
   }, [to.project, chat])
 
+  // something on the board starts a message for you to finish
+  useEffect(() => {
+    const start = (e: Event): void => {
+      setText((e as CustomEvent<string>).detail)
+      input.current?.focus()
+    }
+    addEventListener('orchestra:ask', start)
+    return () => removeEventListener('orchestra:ask', start)
+  }, [])
+
   // "/" jumps to the bar; Esc closes it before the board hears; a click anywhere else puts it
   // away (the panels count as part of it)
   useEffect(() => {
     const keys = (e: KeyboardEvent): void => {
+      // shortcut: fixed to ctrl+space; move it to Settings when hotkeys can be changed
+      if (e.code === 'Space' && e.ctrlKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (open) {
+          setOpen(false)
+          input.current?.blur()
+        } else {
+          input.current?.focus()
+          setOpen(true)
+        }
+        return
+      }
       if (e.key === '/' && !typing(e)) {
         e.preventDefault()
         input.current?.focus()
@@ -221,8 +271,6 @@ export function OrchestratorBar({
   const mode = MODES[0]
   const current = threads.find((t) => t.id === chat)
   const side = `fixed z-30 flex flex-col border border-chip-line bg-card animate-[rise-in_240ms_var(--ease)_both]`
-  // the Conversations panel stands on the bottom edge, its top level with the opened chat's
-  const sideBox = { bottom: 14, height: `calc(${CHAT_H} + ${STACK}px)` }
   const stepBy =
     step.agent &&
     [...(plan?.musicians ?? []), ...(plan?.instruments ?? [])].find(
@@ -254,47 +302,6 @@ export function OrchestratorBar({
     <div ref={here}>
       {open && (
         <>
-          {/* your conversations with the Orchestrator */}
-          <aside
-            aria-label="Conversations"
-            className={side}
-            style={{ ...sideBox, left: 14, width: SIDE_W }}
-          >
-            <header className="flex h-11 shrink-0 items-center justify-between border-b border-hair px-4 text-link">
-              <span className="type-label-serif-l">Conversations</span>
-              <button
-                onClick={() => pick(newThread())}
-                title="Start a new conversation"
-                className="flex h-7 items-center gap-1 border border-chip-line px-2 type-label-s hover:bg-selected"
-              >
-                <Icon name="add-line" size={12} />
-                New
-              </button>
-            </header>
-            <ul className="min-h-0 flex-1 overflow-y-auto p-1.5">
-              {(current
-                ? threads
-                : [
-                    { id: chat, title: 'New conversation', count: 0, updated: '', busy: false },
-                    ...threads
-                  ]
-              ).map((t) => (
-                <li key={t.id}>
-                  <button
-                    onClick={() => pick(t.id)}
-                    aria-current={t.id === chat ? 'true' : undefined}
-                    className={`flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left ${t.id === chat ? 'bg-selected' : 'hover:bg-selected'}`}
-                  >
-                    <span className="line-clamp-2 type-body-s text-link">{t.title}</span>
-                    <span className="type-caption text-dim">
-                      {t.busy ? 'Working…' : t.count ? `${t.count} messages` : 'Not started'}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </aside>
-
           {/* the agents, popped out on request: how they stand, and what the Orchestrator says */}
           {agents && (
             <aside
@@ -333,15 +340,8 @@ export function OrchestratorBar({
         </>
       )}
 
-      {/* open, the bar sits between the two panels; closed, between the corners */}
-      <div
-        className="absolute bottom-3.5 z-30"
-        style={
-          open
-            ? { left: SIDE_W + 26, right: agents ? SIDE_W + 26 : BAR_RIGHT }
-            : { left: BAR_LEFT, right: BAR_RIGHT }
-        }
-      >
+      {/* the same width open or closed */}
+      <div className="absolute bottom-3.5 z-30" style={{ left: OPEN_INSET, right: OPEN_INSET }}>
         {open && (
           // the bar, opened up: same frame, no shadow of its own
           <section
@@ -350,6 +350,17 @@ export function OrchestratorBar({
             style={{ bottom: STACK, height: CHAT_H }}
           >
             <header className="flex h-11 shrink-0 items-center gap-3 border-b border-hair px-4 text-link">
+              {!wide && (
+                <button
+                  onClick={() => setListOpen(!listOpen)}
+                  aria-expanded={listOpen}
+                  aria-label="Conversations"
+                  title="Conversations"
+                  className="flex size-7 items-center justify-center font-mono text-[16px] hover:bg-selected"
+                >
+                  ≡
+                </button>
+              )}
               <span className="type-label-serif-l">{current?.title ?? 'New conversation'}</span>
               <span className="type-label-mono text-dim">{to.label}</span>
               <span className="flex-1" />
@@ -370,22 +381,81 @@ export function OrchestratorBar({
                 ✕
               </button>
             </header>
-            <div className="mx-auto flex min-h-0 w-full max-w-[880px] flex-1 flex-col">
-              <ChatPanel
-                key={`${to.project}/${chat}`}
-                project={to.project}
-                chat={chat}
-                plan={plan}
-                composer={false}
-                view="conversation"
-                projects={projects}
-                onGo={(p) => {
-                  setOpen(false)
-                  onGo(p)
-                }}
-              />
+            <div className="relative flex min-h-0 flex-1">
+              {(wide || listOpen) && (
+                <aside
+                  aria-label="Conversations"
+                  className={`flex shrink-0 flex-col border-r border-hair bg-card ${
+                    wide ? '' : 'absolute inset-y-0 left-0 z-10 shadow-lift'
+                  }`}
+                  style={{ width: LIST_W }}
+                >
+                  <div className="flex h-11 shrink-0 items-center justify-between px-3 text-link">
+                    <span className="type-label-s">Conversations</span>
+                    <button
+                      onClick={() => {
+                        pick(newThread())
+                        setListOpen(false)
+                      }}
+                      title="Start a new conversation"
+                      className="flex h-7 items-center gap-1 border border-chip-line px-2 type-label-s hover:bg-selected"
+                    >
+                      <Icon name="add-line" size={12} />
+                      New
+                    </button>
+                  </div>
+                  <ul className="min-h-0 flex-1 overflow-y-auto p-1.5 pt-0">
+                    {(current
+                      ? threads
+                      : [
+                          {
+                            id: chat,
+                            title: 'New conversation',
+                            count: 0,
+                            updated: '',
+                            busy: false
+                          },
+                          ...threads
+                        ]
+                    ).map((t) => (
+                      <li key={t.id}>
+                        <button
+                          onClick={() => {
+                            pick(t.id)
+                            setListOpen(false)
+                          }}
+                          aria-current={t.id === chat ? 'true' : undefined}
+                          className={`flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left ${t.id === chat ? 'bg-selected' : 'hover:bg-selected'}`}
+                        >
+                          <span className="line-clamp-2 type-body-s text-link">{t.title}</span>
+                          <span className="type-caption text-dim">
+                            {t.busy ? 'Working…' : t.count ? `${t.count} messages` : 'Not started'}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </aside>
+              )}
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <div className="mx-auto flex min-h-0 w-full max-w-[880px] flex-1 flex-col px-5">
+                  <ChatPanel
+                    key={`${to.project}/${chat}`}
+                    project={to.project}
+                    chat={chat}
+                    plan={plan}
+                    composer={false}
+                    view="conversation"
+                    projects={projects}
+                    onGo={(p) => {
+                      setOpen(false)
+                      onGo(p)
+                    }}
+                  />
+                </div>
+                {working && <div className="shrink-0">{working}</div>}
+              </div>
             </div>
-            {working && <div className="shrink-0">{working}</div>}
           </section>
         )}
 
@@ -517,17 +587,10 @@ export function OrchestratorBar({
             >
               Stop
             </button>
-          ) : (
-            <kbd className="flex size-6 shrink-0 items-center justify-center border border-chip-line font-mono text-[12px] text-link/70">
-              /
-            </kbd>
-          )}
-          <span className="max-w-52 shrink-0 truncate type-label-mono text-link" title={to.label}>
-            {to.label}
-          </span>
+          ) : null}
         </form>
         <div
-          className="flex items-center gap-5 border border-t-0 border-chip-line bg-chip px-3 type-caption text-link"
+          className="relative flex items-center gap-5 border border-t-0 border-chip-line bg-chip px-3 type-caption text-link"
           style={{ height: METER_H }}
         >
           {usage ? (
@@ -544,7 +607,7 @@ export function OrchestratorBar({
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={pct}
-                  title={`Resets ${when.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`}
+                  title={`Resets ${when.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}. Last read ${new Date(reading!.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`}
                   className="flex min-w-0 flex-1 items-center gap-2"
                 >
                   <span className="shrink-0">{name}</span>

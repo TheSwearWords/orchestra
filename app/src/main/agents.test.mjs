@@ -64,7 +64,8 @@ test('each level gets only its own tools', async () => {
       'ask_graph',
       'propose_instrument',
       'report',
-      'run_instrument'
+      'run_instrument',
+      'set_preview'
     ])
     assert.deepEqual(await toolsFor(c, 'website--copywriter'), [])
     assert.deepEqual(await toolsFor(c, 'not-an-agent'), [])

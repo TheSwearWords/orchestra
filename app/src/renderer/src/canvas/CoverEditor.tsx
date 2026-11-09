@@ -1,9 +1,11 @@
 // C2 · The cover editor: new project (one question at a time) and edit project (every field
 // at once). The cover on the left is the result, updating as you type.
 import { useEffect, useRef, useState } from 'react'
-import type { Project } from '../../../preload'
+import type { Cover, Project } from '../../../preload'
 import { Shell } from './Chrome'
 import { CoverFace } from './Cover'
+import { Ascii } from '../components/Ascii'
+import { ART } from './shared'
 
 type Field = 'name' | 'client' | 'concept'
 const QUESTIONS: { field: Field; ask: string; label: string; optional?: boolean }[] = [
@@ -45,6 +47,26 @@ export function CoverEditor({
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [cover, setCover] = useState<Cover>(project?.cover ?? {})
+  async function changeCover(next: Cover): Promise<void> {
+    if (!project) return
+    setCover(next)
+    try {
+      await window.api.setCover(project.id, next)
+      onSaved()
+    } catch (err) {
+      setError(reason(err))
+    }
+  }
+  async function upload(): Promise<void> {
+    if (!project) return
+    try {
+      const image = await window.api.pickCover(project.id)
+      if (image) await changeCover({ ...cover, image })
+    } catch (err) {
+      setError(reason(err))
+    }
+  }
 
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
@@ -114,7 +136,9 @@ export function CoverEditor({
           className="origin-top-left"
           style={{ width: 300, height: 400, transform: 'scale(1.7)' }}
         >
-          <CoverFace info={{ id: project?.id ?? 'new', name: v.name, client: v.client, no }} />
+          <CoverFace
+            info={{ id: project?.id ?? 'new', name: v.name, client: v.client, no, cover }}
+          />
         </div>
       </div>
 
@@ -144,6 +168,68 @@ export function CoverEditor({
             <p role="status" className="mt-4 h-5 type-caption text-dim">
               {error ? <span className="text-danger-fg">{error}</span> : saved && 'Saved'}
             </p>
+            <div className="mt-6 flex flex-col gap-2">
+              <span className="type-label-s text-dim">Cover colour</span>
+              <div className="flex gap-2">
+                {(
+                  [
+                    [undefined, 'Auto', 'bg-card'],
+                    ['blue', 'Blue', 'bg-brand'],
+                    ['ink', 'Ink', 'bg-terminal'],
+                    ['white', 'White', 'bg-card']
+                  ] as const
+                ).map(([value, name, swatch]) => (
+                  <button
+                    key={name}
+                    aria-pressed={cover.color === value}
+                    onClick={() => void changeCover({ ...cover, color: value })}
+                    title={name}
+                    className={`flex h-9 items-center gap-2 border px-2.5 type-label-s text-link ${
+                      cover.color === value ? 'border-brand bg-selected' : 'border-chip-line'
+                    }`}
+                  >
+                    {value && <span className={`size-4 border border-chip-line ${swatch}`} />}
+                    {name}
+                  </button>
+                ))}
+              </div>
+              <span className="mt-3 type-label-s text-dim">Artwork</span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  aria-pressed={!cover.art && !cover.image}
+                  onClick={() => void changeCover({ color: cover.color })}
+                  className={`flex size-16 items-center justify-center border type-label-s text-link ${
+                    !cover.art && !cover.image ? 'border-brand bg-selected' : 'border-chip-line'
+                  }`}
+                >
+                  Auto
+                </button>
+                {ART.map((a) => (
+                  <button
+                    key={a}
+                    aria-label={a}
+                    title={a}
+                    aria-pressed={cover.art === a && !cover.image}
+                    onClick={() => void changeCover({ color: cover.color, art: a })}
+                    className={`relative size-16 bg-brand text-white ${
+                      cover.art === a && !cover.image
+                        ? 'outline-2 outline-offset-2 outline-brand'
+                        : ''
+                    }`}
+                  >
+                    <Ascii name={a} fit="contain" className="absolute inset-1" />
+                  </button>
+                ))}
+                <button
+                  onClick={() => void upload()}
+                  className={`flex size-16 items-center justify-center border border-dashed text-center type-label-s text-link hover:bg-selected ${
+                    cover.image ? 'border-brand' : 'border-wire'
+                  }`}
+                >
+                  Upload
+                </button>
+              </div>
+            </div>
             <div className="mt-6 flex gap-2.5">
               <button
                 onClick={() => onEnter(project.id)}

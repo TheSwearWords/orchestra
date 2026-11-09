@@ -8,6 +8,10 @@ const SEAT_GAP = 32
 export const PREREQS = { x: 0, y: -660, r: 110, ring: 290 }
 export const PODIUM = { x: 0, y: 470, r: 150 } // the Deliverables circle
 export const WINDOW_W = 520
+export const ORCH_W = 640
+export const ORCH_CAP = Math.round((ORCH_W * 3240) / 1920)
+// a markdown file's window stops at twice that, and scrolls
+export const DOC_BODY = ORCH_CAP * 2 - 44
 const WINDOW_GAP = 48
 export const WINDOWS_Y = PODIUM.y + PODIUM.r + 120
 

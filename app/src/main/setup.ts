@@ -9,7 +9,7 @@ export interface Setup {
   providers: string[] // provider ids wired in
   tools: string[] // apps the user designs in
   workspace: string // the folder everything lives in
-  memory: boolean // keep the Obsidian vault as memory
+  memory: boolean // the knowledge graph (Graphify) was connected
   github: boolean
 }
 

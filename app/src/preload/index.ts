@@ -6,17 +6,26 @@ import type { EditKey, Instrument, Library, Musician, Role } from '../main/libra
 import type { ProviderStatus } from '../main/providers'
 import type { Setup } from '../main/setup'
 import type { Usage } from '../main/session'
+import type { MachineCheck } from '../main/onboard'
+import type { InterpretBox } from '../main/interprets'
+import type { Cover } from '../main/covers'
+import type { Preview, Previews } from '../main/previews'
 import type { Output } from '../main/outputs'
 import type { Proposal } from '../main/proposals'
 import type { Ask } from '../main/asks'
-import type { Reference, Site, Tag } from '../main/research'
+import type { Groups, Kind, Reference, Site, Tag } from '../main/research'
 
 export type {
   AgentState,
   EditKey,
   ProviderStatus,
   Setup,
+  Kind,
+  Cover,
+  Preview,
+  Previews,
   Usage,
+  MachineCheck,
   ChatEvent,
   ChatMessage,
   Instrument,
@@ -38,6 +47,7 @@ export type {
 export interface StudioLayout {
   covers: Record<string, [number, number, number]>
   labels: { x: number; y: number; text: string }[]
+  groups?: { name: string; ids: string[] }[] // projects put together on the shelf
 }
 
 /** A board's cards (projects/<id>/boards/<board>.json): place, size, collapsed. */
@@ -69,6 +79,8 @@ export interface ResearchState {
   references: Reference[]
   interpretation: string | null
   sites: Site[]
+  groups: Groups
+  boxes: (InterpretBox & { text: string | null })[]
 }
 
 export interface CreateState {
@@ -112,9 +124,13 @@ const api = {
     ipcRenderer.invoke('projects:rename', id, name),
   projectMenu: (
     id: string,
-    name: string
-  ): Promise<'enter' | 'edit' | 'opened' | 'deleted' | null> =>
-    ipcRenderer.invoke('projects:menu', id, name),
+    name: string,
+    groups: { id: string; label: string }[] = []
+  ): Promise<string | null> =>
+    ipcRenderer.invoke('projects:menu', id, name, groups),
+  setCover: (id: string, cover: Cover): Promise<Cover> =>
+    ipcRenderer.invoke('projects:setCover', id, cover),
+  pickCover: (id: string): Promise<string | null> => ipcRenderer.invoke('projects:pickCover', id),
   loadStudio: (): Promise<StudioLayout> => ipcRenderer.invoke('studio:load'),
   saveStudio: (layout: StudioLayout): Promise<void> => ipcRenderer.invoke('studio:save', layout),
   loadBoard: (project: string, board: string): Promise<BoardLayout> =>
@@ -139,14 +155,31 @@ const api = {
   updateReference: (
     project: string,
     id: string,
-    change: { note?: string; tag?: Tag }
+    change: { note?: string; tag?: Tag; group?: string | null }
   ): Promise<Reference> => ipcRenderer.invoke('research:update', project, id, change),
+  addGroup: (project: string, name: string, kinds?: Kind[]): Promise<Groups> =>
+    ipcRenderer.invoke('research:addGroup', project, name, kinds),
+  saveText: (project: string, group: string, text: string): Promise<void> =>
+    ipcRenderer.invoke('research:saveText', project, group, text),
+  captureSites: (): Promise<boolean> => ipcRenderer.invoke('sites:capture'),
+  renameGroup: (project: string, from: string | null, name: string): Promise<Groups> =>
+    ipcRenderer.invoke('research:renameGroup', project, from, name),
+  removeGroup: (project: string, name: string): Promise<Groups> =>
+    ipcRenderer.invoke('research:removeGroup', project, name),
   removeReference: (project: string, id: string): Promise<void> =>
     ipcRenderer.invoke('research:remove', project, id),
   openReferenceFile: (project: string, file: string): Promise<void> =>
     ipcRenderer.invoke('research:openFile', project, file),
-  interpret: (project: string): Promise<string> =>
-    ipcRenderer.invoke('research:interpret', project),
+  interpret: (project: string, box: string): Promise<string> =>
+    ipcRenderer.invoke('research:interpret', project, box),
+  addBox: (project: string): Promise<{ id: string }[]> => ipcRenderer.invoke('research:addBox', project),
+  renameBox: (project: string, id: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('research:renameBox', project, id, name),
+  removeBox: (project: string, id: string): Promise<void> =>
+    ipcRenderer.invoke('research:removeBox', project, id),
+  connectBox: (project: string, id: string, group: string, on: boolean): Promise<void> =>
+    ipcRenderer.invoke('research:connectBox', project, id, group, on),
+  readUsage: (): Promise<{ at: number; windows: Usage } | null> => ipcRenderer.invoke('usage:read'),
   addSite: (site: Site): Promise<Site[]> => ipcRenderer.invoke('sites:add', site),
 
   loadCreate: (project: string): Promise<CreateState> => ipcRenderer.invoke('create:load', project),
@@ -158,6 +191,8 @@ const api = {
     ipcRenderer.invoke('create:save', project, ids),
   listChats: (project: string): Promise<ChatInfo[]> => ipcRenderer.invoke('chats:list', project),
   listThreads: (project: string): Promise<Thread[]> => ipcRenderer.invoke('chats:threads', project),
+  graphBuiltAt: (project: string): Promise<number | null> =>
+    ipcRenderer.invoke('graph:builtAt', project),
   graphStatus: (project: string): Promise<'none' | 'building' | 'ready'> =>
     ipcRenderer.invoke('graph:status', project),
   loadGraph: (project: string | null): Promise<unknown> =>
@@ -196,9 +231,17 @@ const api = {
   editAgent: (role: Role, id: string, key: EditKey, value: string): Promise<void> =>
     ipcRenderer.invoke('agents:set', role, id, key, value),
   providerStatus: (): Promise<ProviderStatus> => ipcRenderer.invoke('providers:status'),
-  loadSetup: (): Promise<{ setup: Setup; home: string; gh: boolean; obsidian: boolean }> =>
-    ipcRenderer.invoke('setup:load'),
-  saveSetup: (s: Setup): Promise<Setup> => ipcRenderer.invoke('setup:save', s),
+  loadSetup: (): Promise<{ setup: Setup; home: string }> => ipcRenderer.invoke('setup:load'),
+  checkSetup: (): Promise<MachineCheck> => ipcRenderer.invoke('setup:check'),
+  runSetupStep: (id: string): Promise<{ ok: boolean; out: string }> =>
+    ipcRenderer.invoke('setup:run', id),
+  openSetupStep: (id: string): Promise<void> => ipcRenderer.invoke('setup:open', id),
+  pickFolder: (current: string): Promise<string | null> =>
+    ipcRenderer.invoke('setup:pickFolder', current),
+  saveKey: (provider: string, key: string): Promise<void> =>
+    ipcRenderer.invoke('setup:saveKey', provider, key),
+  forgetKey: (provider: string): Promise<void> => ipcRenderer.invoke('setup:forgetKey', provider),
+  finishSetup: (s: Setup): Promise<void> => ipcRenderer.invoke('setup:finish', s),
   // a blank Instrument in a Musician's crew; returns its id
   newInstrument: (musician: string): Promise<string> =>
     ipcRenderer.invoke('agents:newInstrument', musician),
@@ -206,6 +249,12 @@ const api = {
     ipcRenderer.invoke('agents:set', 'musician', musician, 'instruments', instruments),
   listOutputs: (project: string): Promise<Output[]> =>
     ipcRenderer.invoke('create:outputs', project),
+  listPreviews: (project: string): Promise<Previews> =>
+    ipcRenderer.invoke('previews:list', project),
+  openPreview: (project: string, deliverable: string, label: string): Promise<void> =>
+    ipcRenderer.invoke('previews:open', project, deliverable, label),
+  readOutput: (project: string, path: string): Promise<string> =>
+    ipcRenderer.invoke('create:readOutput', project, path),
   openOutput: (project: string, path: string): Promise<void> =>
     ipcRenderer.invoke('create:openOutput', project, path)
 }

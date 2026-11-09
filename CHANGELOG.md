@@ -6,6 +6,20 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 
 ### Added
 
+- Onboarding rework: welcome modal, floating Open the studio panel, real connection steps for providers, MCP tools, GitHub and Graphify, a workspace folder picker, and dashed-to-solid wires you can drag.
+- Research groups as blue frames of windows, single windows, text windows, and more than one Interpret box, wired by dragging from a group's dot.
+- The reference library shows a picture of each site, adds new sites from links, and filters by tag.
+- Studio groups for projects, shift-click selection, double-click to enter, and custom book covers with uploads.
+- Drag a box to select windows and move them together.
+- Create: a Layers panel with hide, show and Only; a bounding box per deliverable; a Prerequisites group; markdown files on the board; preview windows that link to the finished work; and a window for each open question.
+- Windows show what they are (Orchestrator, Musician, Instrument, Markdown, Deliverable, Decision).
+- A waveform and Working tag on windows agents are busy in.
+- Knowledge graph on the Studio board: 3D or 2D, named clusters, Freeze, zoom buttons, expand, last-built date, and hovering a book lights up its part.
+- Action box options can show typefaces and pictures.
+- Agents can use Figma when it's connected, and record previews of what they make.
+- Ctrl+Space opens the Orchestrator. The usage meter also counts Claude Code use.
+- A New asset card on Research and Create.
+
 - The Orchestrator bar shows a blue working label with a loading animation and the current step.
 - A usage meter under the bar shows your 5-hour and weekly Claude limits.
 - Full-height buttons on the left and right of the window move between Research, Create and Refine.
@@ -13,6 +27,18 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 - The product site redesign and deployment files are in the repo, under `Site/`.
 
 ### Changed
+
+- The Orchestrator is a centred window the same width open or closed, with conversations inside it.
+- The page indicator sits under the header, with small page icons. The breadcrumb has node connectors.
+- Windows open beside what they connect to, with more room, and bounding boxes never overlap.
+- Needs You is per project, with orange tags on the Studio's books.
+- Create stays greyed out until a project has research.
+- Clicking a deliverable turns it on or off, and asks first if work has started.
+
+### Fixed
+
+- Typing an answer in the Action box now closes the question, and older questions no longer show empty boxes.
+- The mouse wheel scrolls inside windows that scroll.
 
 - The artboard now follows Figma's controls: the wheel pans, Shift+wheel pans sideways, Ctrl+wheel or a pinch zooms, and the middle button or Space+drag pans.
 - The Conversations panel lines up with the top of the open chat.

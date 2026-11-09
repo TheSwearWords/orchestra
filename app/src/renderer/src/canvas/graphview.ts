@@ -6,6 +6,7 @@ export interface GNode {
   label?: string
   community?: number
   community_name?: string
+  cluster?: string // keeps clusters apart when several projects' graphs are shown together
   source_file?: string
   file_type?: string
 }
@@ -45,13 +46,19 @@ export function summarize(
     .map((n) => ({ id: n.id, label: label(n), degree: d.get(n.id) ?? 0 }))
     .sort((a, b) => b.degree - a.degree || a.label.localeCompare(b.label))
     .slice(0, top)
-  const sizes = new Map<string, number>()
+  // Graphify often only numbers its clusters: those take the name of their best connected member
+  const groups = new Map<string, GNode[]>()
   for (const n of g.nodes) {
-    const name = n.community_name || (n.community !== undefined ? `Cluster ${n.community}` : '')
-    if (name) sizes.set(name, (sizes.get(name) ?? 0) + 1)
+    const key = n.community_name || (n.community !== undefined ? `Cluster ${n.community}` : '')
+    if (key) groups.set(key, [...(groups.get(key) ?? []), n])
   }
-  const clusters = [...sizes]
-    .map(([name, size]) => ({ name, size }))
+  const clusters = [...groups]
+    .map(([key, members]) => ({
+      name: /^(cluster|community) \d+$/i.test(key)
+        ? label([...members].sort((a, b) => (d.get(b.id) ?? 0) - (d.get(a.id) ?? 0))[0])
+        : key,
+      size: members.length
+    }))
     .sort((a, b) => b.size - a.size || a.name.localeCompare(b.name))
   return { hubs, clusters }
 }

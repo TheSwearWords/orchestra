@@ -1,6 +1,6 @@
 // A project's cover, generated from its name, client and art, like a concert programme
 // (brand spec §5.4 Book/Cover, canvas spec §2.3).
-import { Ascii } from '../components/Ascii'
+import { Ascii, type AsciiName } from '../components/Ascii'
 import { AREAS, coverArt, coverColor, type Area, type CoverColor, type CoverInfo } from './shared'
 
 const LOOK: Record<CoverColor, { face: string; spine: string; plate: string; dim: string }> = {
@@ -36,7 +36,7 @@ export function CoverFace({
   playing?: boolean
   className?: string
 }): React.JSX.Element {
-  const color = coverColor(info.id)
+  const color = info.cover?.color ?? coverColor(info.id)
   const look = LOOK[color]
   const m = AREAS.find((a) => a.id === movement)
   return (
@@ -49,7 +49,19 @@ export function CoverFace({
         <span>No. {String(info.no).padStart(2, '0')}</span>
       </div>
       <div className={`absolute top-[64px] right-6 size-[150px] text-white ${look.plate}`}>
-        <Ascii name={coverArt(info.id)} fit="contain" className="absolute inset-2" />
+        {info.cover?.image ? (
+          <img
+            alt=""
+            src={`orchestra://file/${info.id}/${encodeURIComponent(info.cover.image)}`}
+            className="size-full object-cover"
+          />
+        ) : (
+          <Ascii
+            name={(info.cover?.art as AsciiName) ?? coverArt(info.id)}
+            fit="contain"
+            className="absolute inset-2"
+          />
+        )}
       </div>
       <div className="mt-auto">
         <h3 className="type-heading-l [overflow-wrap:anywhere]">{info.name || 'Untitled'}</h3>

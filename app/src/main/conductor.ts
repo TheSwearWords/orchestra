@@ -14,6 +14,7 @@ import {
   type Proposal
 } from './proposals.ts'
 import { ClaudeSession, type ToolUse, type Usage } from './session.ts'
+import { savePreview, type PreviewInput } from './previews.ts'
 
 // Create's agents. A project has several chats: "general" for the whole project and one per
 // chosen deliverable. Each chat has its Orchestrator, the only agent the user talks to. The
@@ -63,6 +64,7 @@ const ID = /^[a-z0-9][a-z0-9-]*$/
 const READ_TOOLS = ['Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch']
 // agents lead through Orchestra's own hierarchy, never Claude subagents, and have no shell yet
 const NOT_ALLOWED = ['Task', 'Agent', 'Bash']
+const FIGMA = 'mcp__figma' // Musicians and Instruments build in the project's Figma file
 const MAX_WORKING = 4 // Musicians and Instruments working at once, per project
 const MESSAGES_PER_HOUR = 40 // briefs and reports between agents, per project
 
@@ -480,6 +482,18 @@ export class Conductor implements Hub {
 
   /** The Orchestrator proposes a Musician for a deliverable the library doesn't cover. */
   /** The Orchestrator opens (or updates) a window on the Create board to ask the user. */
+  /** A Musician says where finished work lives, so its window on the board can show it. */
+  async setPreview(
+    project: string,
+    chat: string,
+    musician: string,
+    input: PreviewInput
+  ): Promise<string> {
+    const p = await savePreview(this.opts.projectDir(project), musician, input)
+    this.opts.emit({ project, chat, kind: 'agents' })
+    return `Recorded "${p.label}". It now shows on the board.`
+  }
+
   async openWindow(
     project: string,
     chat: string,
@@ -499,7 +513,7 @@ export class Conductor implements Hub {
     const a = (await readAsks(this.opts.projectDir(project)))[id]
     if (!a) throw new Error('That window is gone.')
     if (this.isBusy(project, a.chat)) throw new Error('The Orchestrator is still answering.')
-    await answerAsk(this.opts.projectDir(project), id, clean, final)
+    await answerAsk(this.opts.projectDir(project), id, clean)
     this.opts.emit({ project, chat: a.chat, kind: 'asks' })
     await this.send(project, a.chat, `[${a.title}] ${final ? `Chose: ${clean}` : clean}`)
   }
@@ -693,7 +707,8 @@ export class Conductor implements Hub {
         addDirs: this.opts.extraDirs(project),
         // Instruments get no Orchestra tools: their closing message is their report
         mcpConfig: role === 'musician' ? this.mcp.configFor(project, chat, key) : undefined,
-        allowedTools: role === 'musician' ? [...READ_TOOLS, 'mcp__orchestra'] : READ_TOOLS,
+        allowedTools:
+          role === 'musician' ? [...READ_TOOLS, 'mcp__orchestra', FIGMA] : [...READ_TOOLS, FIGMA],
         disallowedTools: NOT_ALLOWED
       },
       {

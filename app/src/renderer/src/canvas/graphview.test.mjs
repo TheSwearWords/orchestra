@@ -29,7 +29,8 @@ test('what keeps coming up: the best connected, and clusters by size', () => {
     ]
   )
   assert.deepEqual(s.clusters[0], { name: 'Projects', size: 2 })
-  assert.ok(s.clusters.some((c) => c.name === 'Cluster 2'))
+  // Graphify only numbered this one, so it takes its best connected member's name
+  assert.ok(s.clusters.some((c) => c.name === 'Warm palette'))
 })
 
 test('search matches every word, best connected first', () => {

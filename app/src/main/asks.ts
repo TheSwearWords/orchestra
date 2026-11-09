@@ -23,12 +23,17 @@ export interface Ask {
 export interface Option {
   label: string
   colors?: string[] // hex swatches, for palettes
+  font?: string // a typeface to show the option set in
+  sample?: string // the words to set it in; the label if none
+  image?: string // a picture: an https address, or a file in the project
   detail?: string
 }
 export type OptionInput = string | Option
 
 const ID = /^[a-z0-9][a-z0-9-]{0,47}$/
 const HEX = /^#[0-9a-f]{3,8}$/i
+const FONT = /^[a-z0-9][a-z0-9 -]{0,59}$/i
+const IMAGE = /^(https:\/\/\S+|(?!.*\.\.)[\w./-]+\.(png|jpe?g|gif|webp|svg))$/i
 
 /** Options as given (words, or objects), tidied: blanks dropped, swatches only valid hex. */
 export const tidyOptions = (options: OptionInput[]): Option[] =>
@@ -37,15 +42,21 @@ export const tidyOptions = (options: OptionInput[]): Option[] =>
     .map((o) => ({
       label: String(o.label ?? '').trim(),
       ...(o.colors?.length ? { colors: o.colors.filter((c) => HEX.test(c)).slice(0, 8) } : {}),
+      ...(o.font && FONT.test(o.font) ? { font: o.font } : {}),
+      ...(o.sample?.trim() ? { sample: o.sample.trim().slice(0, 80) } : {}),
+      ...(o.image && IMAGE.test(o.image) ? { image: o.image } : {}),
       ...(o.detail?.trim() ? { detail: o.detail.trim() } : {})
     }))
     .filter((o) => o.label)
 const file = (dir: string): string => join(dir, '.orchestra', 'asks.json')
 
 export async function readAsks(dir: string): Promise<Record<string, Ask>> {
-  return readFile(file(dir), 'utf8')
+  const all = await readFile(file(dir), 'utf8')
     .then((t) => JSON.parse(t) as Record<string, Ask>)
-    .catch(() => ({}))
+    .catch(() => ({}) as Record<string, Ask>)
+  // older windows were saved with their options as plain words
+  for (const a of Object.values(all)) a.options = tidyOptions(a.options as OptionInput[])
+  return all
 }
 
 async function save(dir: string, all: Record<string, Ask>): Promise<void> {
@@ -86,17 +97,13 @@ export async function openAsk(
   return ask
 }
 
-/** Records the user's pick. A refinement (free text) leaves the window open. */
-export async function answerAsk(
-  dir: string,
-  id: string,
-  text: string,
-  final: boolean
-): Promise<Ask> {
+/** Records the user's answer and closes the window. If they typed something that calls for new
+ * options, the Orchestrator opens it again under the same id. */
+export async function answerAsk(dir: string, id: string, text: string): Promise<Ask> {
   const all = await readAsks(dir)
   const a = all[id]
   if (!a) throw new Error('That window is gone.')
-  all[id] = final ? { ...a, status: 'answered', answer: text } : a
+  all[id] = { ...a, status: 'answered', answer: text }
   await save(dir, all)
   return all[id]
 }

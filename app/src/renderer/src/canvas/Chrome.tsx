@@ -6,18 +6,20 @@ import { clampZoom, type Camera, type Rect } from './camera'
 export type Step = { label: string; onClick?: () => void }
 
 /** Every screen's frame: the breadcrumb across the top (with the screen's own controls on its
- * right), the pages bottom left and the minimap bottom right. The Orchestrator bar and the
+ * right), the pages centred under it and the minimap bottom right. The Orchestrator bar and the
  * back button belong to the whole window, so App draws them. */
 export function Shell({
   crumbs,
   right,
   pages,
+  corner,
   minimap,
   children
 }: {
   crumbs: Step[]
   right?: React.ReactNode
   pages?: React.ReactNode
+  corner?: React.ReactNode // bottom left: the Studio's title
   minimap?: React.ReactNode
   children?: React.ReactNode
 }): React.JSX.Element {
@@ -31,10 +33,11 @@ export function Shell({
         <div className="flex items-center gap-2">{right}</div>
       </header>
       {pages && (
-        <div className="absolute bottom-3.5 z-20" style={{ left: 'calc(14px + var(--side, 0px))' }}>
+        <div className="absolute left-1/2 z-20 -translate-x-1/2" style={{ top: TOP_BAR + 10 }}>
           {pages}
         </div>
       )}
+      {corner && <div className="absolute bottom-3.5 left-3.5 z-20">{corner}</div>}
       {minimap && (
         <div
           className="absolute bottom-3.5 z-20"
@@ -52,6 +55,32 @@ export function Shell({
 export const barButton =
   'serif-on flex h-9 items-center border border-chip-line px-3.5 type-label-s text-link hover:bg-selected'
 
+/** The little wire between two breadcrumb steps: a port on each, joined like the board's nodes. */
+function NodeLink(): React.JSX.Element {
+  return (
+    <svg aria-hidden width="28" height="10" viewBox="0 0 28 10" className="shrink-0 text-brand">
+      <line
+        x1="5"
+        y1="5"
+        x2="23"
+        y2="5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeDasharray="3 3"
+      />
+      <circle
+        cx="4"
+        cy="5"
+        r="3"
+        fill="var(--color-chip)"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <circle cx="24" cy="5" r="3" fill="currentColor" />
+    </svg>
+  )
+}
+
 /** Where you are, as a row of equal boxes: the same type in every one, the current step
  * filled blue. Clicking an earlier step goes back out to it. */
 export function Breadcrumb({ steps }: { steps: Step[] }): React.JSX.Element {
@@ -65,7 +94,8 @@ export function Breadcrumb({ steps }: { steps: Step[] }): React.JSX.Element {
         {steps.map((s, i) => {
           const last = i === steps.length - 1
           return (
-            <li key={i} className={i > 0 ? '-ml-px' : ''}>
+            <li key={i} className="flex items-center">
+              {i > 0 && <NodeLink />}
               {last ? (
                 <span
                   aria-current="location"
@@ -89,8 +119,8 @@ export function Breadcrumb({ steps }: { steps: Step[] }): React.JSX.Element {
   )
 }
 
-/** The pages, as in C5's viewfinder: a blue label naming where you are, over three page
- * rectangles, I to III, the current one filled. Click a page to go there. */
+/** The pages, centred under the top bar where you look to see where you are: a blue label
+ * naming the page beside three small page icons, I to III, the current one filled. */
 export function AreaSwitch({
   current,
   onGo
@@ -100,11 +130,11 @@ export function AreaSwitch({
 }): React.JSX.Element {
   const here = AREAS.find((a) => a.id === current)
   return (
-    <div className="flex flex-col border border-chip-line bg-chip shadow-float">
-      <span className="bg-brand px-2.5 py-1 type-label-mono text-on-brand">
+    <div className="flex h-9 items-stretch border border-chip-line bg-chip shadow-float">
+      <span className="flex w-36 items-center justify-center bg-brand px-3 type-label-mono whitespace-nowrap text-on-brand">
         {here ? `${here.numeral} · ${here.name}` : 'The whole book'}
       </span>
-      <div role="tablist" aria-label="Movements" className="flex gap-1.5 p-2">
+      <div role="tablist" aria-label="Movements" className="flex items-center gap-1 px-1.5">
         {AREAS.map((a, i) => {
           const on = a.id === current
           return (
@@ -115,11 +145,11 @@ export function AreaSwitch({
               aria-label={`${a.numeral} ${a.name}`}
               title={`${a.numeral} · ${a.name} (${i + 1})`}
               onClick={() => onGo(a.id)}
-              className={`relative h-14 w-11 border transition-colors duration-200 ease-(--ease) ${
+              className={`relative h-7 w-[22px] border transition-colors duration-200 ease-(--ease) ${
                 on ? 'border-brand bg-brand/30' : 'border-brand/25 bg-brand/8 hover:bg-brand/18'
               }`}
             >
-              <span className="absolute top-1 left-1.5 font-mono text-[10px] leading-none text-link">
+              <span className="absolute top-0.5 left-[3px] font-mono text-[8px] leading-none text-link">
                 {a.numeral}
               </span>
             </button>
@@ -127,6 +157,29 @@ export function AreaSwitch({
         })}
       </div>
     </div>
+  )
+}
+
+/** The dashed card for making something new, pinned bottom right above the minimap. */
+export function NewCard({
+  title,
+  hint,
+  onClick
+}: {
+  title: string
+  hint: string
+  onClick: () => void
+}): React.JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className="group absolute bottom-[176px] z-10 flex h-[220px] w-[168px] flex-col items-center justify-center gap-2 border border-dashed border-wire bg-card px-3 text-center text-link shadow-book transition-transform duration-200 ease-(--ease) hover:-translate-y-1 [border-dasharray:6]"
+      style={{ right: 'calc(14px + var(--side, 0px))' }}
+    >
+      <span className="font-mono text-2xl text-link/40">+</span>
+      <span className="serif-on type-heading-m">{title}</span>
+      <span className="type-caption text-dim">{hint}</span>
+    </button>
   )
 }
 

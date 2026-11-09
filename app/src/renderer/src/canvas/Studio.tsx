@@ -15,10 +15,14 @@ import {
   type Area,
   type CoverInfo
 } from './shared'
-import { Minimap, Shell, ZoomChip, barButton } from './Chrome'
+import { Minimap, NewCard, Shell, ZoomChip, barButton } from './Chrome'
+import { popMenu } from './shared'
 import { CoverFace } from './Cover'
+import { BookStatus } from './BookStatus'
+import { useNeeds } from './NeedsYou'
 import { Card, type CardSpec } from './Board'
-import { settle } from './place'
+import { freeSpot, separate, settle, touches } from './place'
+import { GroupLabel } from './GroupLabel'
 import { AgentFile, Agents } from '../components/Agents'
 import { Knowledge } from './Knowledge'
 import { Icon } from '../components/Icon'
@@ -47,17 +51,84 @@ export function Studio({
   onChanged,
   hidden
 }: Props): React.JSX.Element {
-  const ids = projects.map((p) => p.id)
+  // grouped projects first, so the default row keeps each group's covers side by side
+  const groups = (layout.groups ?? []).map((g) => ({
+    ...g,
+    ids: g.ids.filter((id) => projects.some((p) => p.id === id))
+  }))
+  const grouped = groups.flatMap((g) => g.ids)
+  const ids = [...grouped, ...projects.map((p) => p.id).filter((id) => !grouped.includes(id))]
+  const needs = useNeeds(projects)
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null)
   const [tidying, setTidying] = useState(false)
   const place = studioPlace(layout, ids)
-  const at = (id: string): [number, number, number] =>
-    drag?.id === id ? [drag.x, drag.y, place[id][2]] : place[id]
+  const [hovered, setHovered] = useState<string | null>(null) // the book the pointer is on
+  const [selected, setSelected] = useState<string[]>([])
+  const [opened, setOpened] = useState<string | null>(null) // the one cover swung open
+  const [moving, setMoving] = useState<{ name: string; dx: number; dy: number } | null>(null)
+  const with_ = (id: string): boolean => selected.length > 1 && selected.includes(id)
+  // one group's frame never lands on another's, or on a cover that isn't in it
+  const inGroup = new Set(groups.flatMap((g) => g.ids))
+  const shifts = separate([
+    ...groups
+      .filter((g) => g.ids.length > 0)
+      .map((g) => {
+        const xs = g.ids.map((id) => place[id][0])
+        const ys = g.ids.map((id) => place[id][1])
+        const x = Math.min(...xs) - 28
+        const y = Math.min(...ys) - 28
+        return {
+          ids: g.ids,
+          rect: {
+            x,
+            y,
+            w: Math.max(...xs) + COVER.w + 28 - x,
+            h: Math.max(...ys) + COVER.h + 28 - y
+          }
+        }
+      }),
+    ...ids
+      .filter((id) => !inGroup.has(id))
+      .map((id) => ({
+        ids: [id],
+        rect: { x: place[id][0], y: place[id][1], ...COVER },
+        fixed: true
+      }))
+  ])
+  const at = (id: string): [number, number, number] => {
+    if (drag?.id === id) return [drag.x, drag.y, place[id][2]]
+    if (shifts[id] && !moving)
+      return [place[id][0] + shifts[id].dx, place[id][1] + shifts[id].dy, place[id][2]]
+    if (moving && groups.find((g) => g.name === moving.name)?.ids.includes(id))
+      return [place[id][0] + moving.dx, place[id][1] + moving.dy, place[id][2]]
+    if (drag && with_(id) && with_(drag.id))
+      return [
+        place[id][0] + drag.x - place[drag.id][0],
+        place[id][1] + drag.y - place[drag.id][1],
+        place[id][2]
+      ]
+    return place[id]
+  }
 
   const rects: Rect[] = ids.map((id) => ({ x: at(id)[0], y: at(id)[1], w: COVER.w, h: COVER.h }))
   // the desk, under the shelf: what every project shares
   const deskY = ROW_Y + COVER.h + 120
   const desk = DESK.map((d, i) => ({ ...d, x: 96 + i * (DESK_W + 24), y: deskY }))
+  // the knowledge graph, always open, beside the desk
+  const [graphWindow, setGraphWindow] = useState({
+    x: snap(96 + DESK.length * (DESK_W + 24) + 72),
+    y: snap(deskY - 24),
+    w: 656,
+    collapsed: false
+  })
+  const [graphExpanded, setGraphExpanded] = useState(false)
+  const [graphH, setGraphH] = useState(528)
+  const graphRect = {
+    x: graphWindow.x,
+    y: graphWindow.y,
+    w: graphExpanded ? GRAPH_WIDE : graphWindow.w,
+    h: graphWindow.collapsed ? 44 : graphH
+  }
   // the desk's windows, and agent files opened from the Agents window (id "file-<role>-<id>")
   const [windows, setWindows] = useState<
     { id: string; x: number; y: number; w?: number; file?: AgentFileRef }[]
@@ -80,7 +151,8 @@ export function Studio({
   const everything: Rect[] = [
     ...rects,
     ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H })),
-    ...windows.map((w) => ({ x: w.x, y: w.y, w: w.w ?? look(w).w, h: look(w).guess }))
+    ...windows.map((w) => ({ x: w.x, y: w.y, w: w.w ?? look(w).w, h: look(w).guess })),
+    graphRect
   ]
   const bounds = (): Rect => {
     const x = Math.min(...everything.map((r) => r.x))
@@ -94,7 +166,14 @@ export function Studio({
   }
   const cam = useCamera(fit(bounds(), innerWidth, innerHeight, 120, 1))
 
+  function expandGraph(on: boolean): void {
+    setGraphExpanded(on)
+    setGraphWindow((g) => ({ ...g, collapsed: false }))
+    if (on) void cam.fly(fitBelow({ ...graphRect, w: GRAPH_WIDE, h: 1100 }, 1), 450)
+  }
   function openWindow(id: Desk): void {
+    // the graph already has its window on the board: this opens it up
+    if (id === 'graph') return expandGraph(true)
     const d = desk.find((x) => x.id === id)!
     const spot = windows.find((w) => w.id === id) ?? { id, x: d.x, y: d.y + DESK_H + 48 }
     if (!windows.some((w) => w.id === id)) setWindows([...windows, spot])
@@ -117,8 +196,53 @@ export function Studio({
     setTimeout(() => setTidying(false), 460)
   }
 
+  /** Files projects under a group (none takes them out), covers moved in beside the others. */
+  function fileUnder(moving: string[], name: string | null, made: boolean): void {
+    const rest = groups.map((g) => ({ ...g, ids: g.ids.filter((x) => !moving.includes(x)) }))
+    const next = made ? [...rest, { name: name!, ids: [] as string[] }] : rest
+    const into = next.find((g) => g.name === name)
+    const covers = { ...place, ...layout.covers }
+    for (const id of moving) {
+      const peers = into?.ids ?? []
+      if (peers.length) {
+        const last = Math.max(...peers.map((x) => covers[x][0]))
+        const y = covers[peers[0]][1]
+        const taken = ids
+          .filter((x) => x !== id)
+          .map((x) => ({ x: covers[x][0], y: covers[x][1], ...COVER }))
+        const spot = freeSpot({ x: last + COVER.w + 72, y, ...COVER }, taken)
+        covers[id] = [snap(spot.x), snap(spot.y), covers[id][2]]
+      }
+      into?.ids.push(id)
+    }
+    setSelected([])
+    onLayout({ ...layout, covers, groups: next.filter((g) => g.ids.length > 0) })
+  }
+  function renameGroup(from: string, to: string): void {
+    if (groups.some((g) => g.name === to)) return
+    onLayout({ ...layout, groups: groups.map((g) => (g.name === from ? { ...g, name: to } : g)) })
+  }
+
   async function menu(p: Project, el: HTMLElement): Promise<void> {
-    const choice = await window.api.projectMenu(p.id, p.name)
+    const moving = with_(p.id) ? selected : [p.id]
+    const mine = groups.find((g) => g.ids.includes(p.id))
+    const choice = await window.api.projectMenu(p.id, p.name, [
+      {
+        id: 'new',
+        label: moving.length > 1 ? `New group with ${moving.length} projects` : 'New group'
+      },
+      ...groups
+        .filter((g) => g !== mine)
+        .map((g) => ({ id: `to:${g.name}`, label: `Add to ${g.name}` })),
+      ...(mine ? [{ id: 'out', label: `Remove from ${mine.name}` }] : [])
+    ])
+    if (choice === 'group:new') {
+      let name = 'New group'
+      for (let n = 2; groups.some((g) => g.name === name); n++) name = `New group ${n}`
+      fileUnder(moving, name, true)
+    }
+    if (choice === 'group:out') fileUnder(moving, null, false)
+    if (choice?.startsWith('group:to:')) fileUnder(moving, choice.slice(9), false)
     if (choice === 'enter') onEnter(p.id, el.getBoundingClientRect())
     if (choice === 'edit') onEdit(p.id)
     if (choice === 'deleted') onChanged()
@@ -128,6 +252,13 @@ export function Studio({
     <Canvas
       cam={cam}
       content={() => ({ all: bounds() })}
+      onPress={() => {
+        setSelected([])
+        setOpened(null)
+      }}
+      onMarquee={(r) =>
+        setSelected(ids.filter((id) => touches({ x: place[id][0], y: place[id][1], ...COVER }, r)))
+      }
       onContextMenu={async () => {
         const c = await window.api.menu([
           { id: 'new', label: 'New project' },
@@ -153,8 +284,8 @@ export function Studio({
               />
             </>
           }
-          pages={
-            <div className="pointer-events-none text-link">
+          corner={
+            <div className="pointer-events-none text-link max-[1200px]:hidden">
               <p className="type-label-s">
                 {projects.length} {projects.length === 1 ? 'project' : 'projects'} · drag to arrange
               </p>
@@ -172,17 +303,45 @@ export function Studio({
           }
         >
           {/* the blank cover, pinned bottom right, standing a clear gap above the minimap */}
-          <button
-            onClick={onNew}
-            className="group absolute right-3.5 bottom-[176px] z-10 flex h-[220px] w-[168px] flex-col items-center justify-center gap-2 border border-dashed border-wire bg-card px-3 text-center text-link shadow-book transition-transform duration-200 ease-(--ease) hover:-translate-y-1 [border-dasharray:6]"
-          >
-            <span className="font-mono text-2xl text-link/40">+</span>
-            <span className="serif-on type-heading-m">New project</span>
-            <span className="type-caption text-dim">A blank cover. Fill it in.</span>
-          </button>
+          <NewCard title="New project" hint="A blank cover. Fill it in." onClick={onNew} />
         </Shell>
       }
     >
+      {groups
+        .filter((g) => g.ids.length > 0)
+        .map((g) => {
+          const xs = g.ids.map((id) => at(id)[0])
+          const ys = g.ids.map((id) => at(id)[1])
+          const pad = 28
+          const x = Math.min(...xs) - pad
+          const y = Math.min(...ys) - pad
+          return (
+            <div
+              key={g.name}
+              className="pointer-events-none absolute border border-brand/40 bg-brand/5"
+              style={{
+                left: x,
+                top: y,
+                width: Math.max(...xs) + COVER.w + pad - x,
+                height: Math.max(...ys) + COVER.h + pad - y
+              }}
+            >
+              <GroupLabel
+                name={g.name}
+                z={cam.camera.z}
+                onRename={(to) => renameGroup(g.name, to)}
+                onDrag={(dx, dy) => setMoving({ name: g.name, dx, dy })}
+                onDrop={(dx, dy) => {
+                  setMoving(null)
+                  const covers = { ...place, ...layout.covers }
+                  for (const id of g.ids)
+                    covers[id] = [snap(place[id][0] + dx), snap(place[id][1] + dy), place[id][2]]
+                  onLayout({ ...layout, covers })
+                }}
+              />
+            </div>
+          )
+        })}
       {projects.map((p) => (
         <ShelfCover
           key={p.id}
@@ -192,13 +351,31 @@ export function Studio({
           tidying={tidying}
           hidden={hidden === p.id}
           movement={movements[p.id]}
+          needs={needs.filter((n) => n.project === p.id).length}
+          open={opened === p.id}
+          onHover={(on) => setHovered(on ? p.id : null)}
+          onClick={() => {
+            setSelected([])
+            setOpened((o) => (o === p.id ? null : p.id))
+          }}
+          onShift={() => {
+            // the open one joins the selection and closes, so what you can see is what's picked
+            setSelected((s) => {
+              const base = opened && !s.includes(opened) ? [...s, opened] : s
+              return base.includes(p.id) ? base.filter((x) => x !== p.id) : [...base, p.id]
+            })
+            setOpened(null)
+          }}
           onDrag={(x, y) => setDrag({ id: p.id, x, y })}
           onDrop={(x, y) => {
             setDrag(null)
-            onLayout({
-              ...layout,
-              covers: { ...place, ...layout.covers, [p.id]: [snap(x), snap(y), place[p.id][2]] }
-            })
+            const moved = with_(p.id) ? selected : [p.id]
+            const dx = x - place[p.id][0]
+            const dy = y - place[p.id][1]
+            const covers = { ...place, ...layout.covers }
+            for (const id of moved)
+              covers[id] = [snap(place[id][0] + dx), snap(place[id][1] + dy), place[id][2]]
+            onLayout({ ...layout, covers })
           }}
           onEnter={(el) => onEnter(p.id, el.getBoundingClientRect())}
           onEdit={() => onEdit(p.id)}
@@ -206,11 +383,56 @@ export function Studio({
         />
       ))}
 
+      {selected.length > 0 &&
+        (() => {
+          const xs = selected.map((id) => at(id)[0])
+          const ys = selected.map((id) => at(id)[1])
+          const pad = 16
+          const x = Math.min(...xs) - pad
+          const y = Math.min(...ys) - pad
+          return (
+            <div
+              className="pointer-events-none absolute z-10 border-2 border-brand"
+              style={{
+                left: x,
+                top: y,
+                width: Math.max(...xs) + COVER.w + pad - x,
+                height: Math.max(...ys) + COVER.h + pad - y
+              }}
+            >
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() =>
+                  void popMenu([
+                    {
+                      label: 'New group',
+                      run: () => {
+                        let name = 'New group'
+                        for (let n = 2; groups.some((g) => g.name === name); n++)
+                          name = `New group ${n}`
+                        fileUnder(selected, name, true)
+                      }
+                    },
+                    ...groups.map((g) => ({
+                      label: `Add to ${g.name}`,
+                      run: () => fileUnder(selected, g.name, false)
+                    }))
+                  ])
+                }
+                className="serif-on pointer-events-auto absolute top-full left-0 mt-2 h-9 origin-top-left bg-brand px-3 type-label-s whitespace-nowrap text-on-brand hover:bg-inverse"
+                style={{ transform: `scale(${1 / cam.camera.z})` }}
+              >
+                Add to group
+              </button>
+            </div>
+          )
+        })()}
+
       {desk.map((d) => (
         <button
           key={d.id}
           onClick={() => openWindow(d.id)}
-          aria-pressed={windows.some((w) => w.id === d.id)}
+          aria-pressed={windows.some((w) => w.id === d.id) || (d.id === 'graph' && graphExpanded)}
           className={`absolute flex flex-col items-start gap-1 border border-card-line bg-card p-4 text-left text-link shadow-card transition-colors duration-200 ease-(--ease) hover:bg-selected ${
             windows.some((w) => w.id === d.id) ? 'outline-2 outline-offset-4 outline-brand' : ''
           }`}
@@ -223,9 +445,31 @@ export function Studio({
           <span className="type-caption text-dim">{d.note}</span>
         </button>
       ))}
+      <Card
+        card={{
+          id: 'live-graph',
+          title: 'Knowledge graph',
+          ...graphWindow,
+          w: graphRect.w,
+          body: (
+            <Knowledge
+              projects={projects}
+              hovered={hovered}
+              expanded={graphExpanded}
+              onExpand={expandGraph}
+            />
+          )
+        }}
+        onHeight={setGraphH}
+        z={cam.camera.z}
+        tidying={tidying}
+        onMove={(x, y) => setGraphWindow((g) => ({ ...g, x, y }))}
+        onResize={(w) => !graphExpanded && setGraphWindow((g) => ({ ...g, w }))}
+        onCollapse={() => setGraphWindow((g) => ({ ...g, collapsed: !g.collapsed }))}
+      />
       {settle(
         windows.map((w) => ({ ...w, w: w.w ?? look(w).w, h: look(w).guess })),
-        [...rects, ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H }))]
+        [...rects, ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H })), graphRect]
       ).map((w) => (
         <Card
           key={w.id}
@@ -244,8 +488,6 @@ export function Studio({
               </AgentFileOpener.Provider>
             ) : w.id === 'mcps' ? (
               <Connections />
-            ) : w.id === 'graph' ? (
-              <Knowledge projects={projects} />
             ) : (
               <Settings />
             )
@@ -271,6 +513,11 @@ function ShelfCover({
   tidying,
   hidden,
   movement,
+  needs,
+  open,
+  onHover,
+  onClick,
+  onShift,
   onDrag,
   onDrop,
   onEnter,
@@ -283,21 +530,25 @@ function ShelfCover({
   tidying: boolean
   hidden: boolean
   movement?: Area
+  needs: number // what is waiting on you in this project: an orange tag on the cover
+  open: boolean
+  onHover: (on: boolean) => void
+  onClick: () => void
+  onShift: () => void
   onDrag: (x: number, y: number) => void
   onDrop: (x: number, y: number) => void
   onEnter: (el: HTMLElement) => void
   onEdit: () => void
   onMenu: (el: HTMLElement) => void
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
-  const timer = useRef(0)
   const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => () => clearTimeout(timer.current), [])
+  const lastClick = useRef(0)
 
   function down(e: React.PointerEvent): void {
     if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return
     e.stopPropagation()
+    if (e.shiftKey) return onShift()
     const start = { sx: e.clientX, sy: e.clientY, x, y }
     let moved = false
     const el = e.currentTarget as HTMLElement
@@ -309,8 +560,6 @@ function ShelfCover({
       if (!moved) {
         moved = true
         setDragging(true)
-        setOpen(false)
-        clearTimeout(timer.current)
       }
       onDrag(start.x + dx, start.y + dy)
     }
@@ -319,7 +568,11 @@ function ShelfCover({
       el.removeEventListener('pointerup', up)
       setDragging(false)
       if (moved) onDrop(start.x + (u.clientX - start.sx) / z, start.y + (u.clientY - start.sy) / z)
-      else if (ref.current) onEnter(ref.current) // a click opens the book
+      else if (performance.now() - lastClick.current < 350 && ref.current) onEnter(ref.current)
+      else {
+        lastClick.current = performance.now()
+        onClick() // a click swings the cover open, onto Enter and Edit; a second goes in
+      }
     }
     el.addEventListener('pointermove', move)
     el.addEventListener('pointerup', up)
@@ -330,21 +583,13 @@ function ShelfCover({
       ref={ref}
       data-cover={info.id}
       onPointerDown={down}
-      onPointerEnter={() => {
-        clearTimeout(timer.current)
-        timer.current = window.setTimeout(() => setOpen(true), 250)
-      }}
-      onPointerLeave={() => {
-        clearTimeout(timer.current)
-        setOpen(false)
-      }}
+      onPointerEnter={() => onHover(true)}
+      onPointerLeave={() => onHover(false)}
       onContextMenu={(e) => {
         e.preventDefault()
         e.stopPropagation()
         onMenu(e.currentTarget)
       }}
-      onFocus={() => setOpen(true)}
-      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setOpen(false)}
       className={`absolute cursor-pointer [perspective:1400px] ${hidden ? 'invisible' : ''} ${dragging ? 'z-10' : ''}`}
       style={{
         width: COVER.w,
@@ -355,6 +600,7 @@ function ShelfCover({
     >
       {/* the first page, under the cover */}
       <div className="absolute inset-0 flex flex-col items-end justify-end gap-2 border border-card-line bg-card p-4 shadow-book">
+        {open && <BookStatus project={info.id} />}
         <button
           tabIndex={open ? 0 : -1}
           onClick={() => ref.current && onEnter(ref.current)}
@@ -376,6 +622,11 @@ function ShelfCover({
         style={{ transform: open ? 'rotateY(-70deg)' : undefined }}
       >
         <CoverFace info={info} movement={movement} />
+        {needs > 0 && (
+          <span className="absolute -top-[22px] right-2 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
+            Needs you · {needs}
+          </span>
+        )}
       </div>
       <button className="sr-only" onClick={() => ref.current && onEnter(ref.current)}>
         Open {info.name}
@@ -386,6 +637,7 @@ function ShelfCover({
 
 type Desk = 'agents' | 'mcps' | 'graph' | 'settings'
 const DESK_W = 216
+const GRAPH_WIDE = 1344 // the Knowledge window, expanded
 const DESK_H = 156
 const DESK: { id: Desk; name: string; note: string; icon: string }[] = [
   { id: 'agents', name: 'Agents', note: 'The Ensemble: who plays what', icon: 'team-line' },

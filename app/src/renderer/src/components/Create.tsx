@@ -8,18 +8,30 @@ import type {
   Musician,
   Ask,
   Output,
-  Proposal
+  Proposal,
+  Previews
 } from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
+import { NewCard } from '../canvas/Chrome'
 import { Board, type CardSpec } from '../canvas/Board'
 import { Wire } from '../canvas/Wire'
 import type { Frame } from '../canvas/Book'
-import { GENERAL, STUDIO, pendingFocus, type AgentFileRef, type MenuItem } from '../canvas/shared'
+import {
+  GENERAL,
+  STUDIO,
+  TOP_BAR,
+  pendingFocus,
+  popMenu,
+  type AgentFileRef,
+  type MenuItem
+} from '../canvas/shared'
 import { AgentFile } from './Agents'
 import {
   PODIUM,
   PREREQS,
   SEAT,
+  ORCH_CAP,
+  ORCH_W,
   WINDOWS_Y,
   WINDOW_W,
   filesFor,
@@ -32,6 +44,12 @@ import { splitDecision, type Decision } from '../decide'
 import { splitSuggestion } from '../suggest'
 import { splitGoTo, type Place } from '../goto'
 import { Icon } from './Icon'
+import { ConfirmModal } from './ConfirmModal'
+import { DocWindow } from './DocWindow'
+import { Layers, type Layer } from './Layers'
+import { PROVIDERS, provider } from '../../../main/providers'
+import { OptionPreview } from './OptionPreview'
+import { PreviewWindow } from './PreviewWindow'
 import { Markdown } from './Research'
 
 // Electron prefixes IPC errors with the channel name; show only the reason
@@ -53,6 +71,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const [plan, setPlan] = useState<CreateState | null>(null)
   const [chats, setChats] = useState<ChatInfo[]>([])
   const [outputs, setOutputs] = useState<Output[]>([])
+  const [outputsRead, setOutputsRead] = useState(false)
+  const [previews, setPreviews] = useState<Previews>({})
   const [agents, setAgents] = useState<Record<string, AgentState>>({})
   const [proposals, setProposals] = useState<Record<string, Proposal>>({})
   const [asks, setAsks] = useState<Record<string, Ask>>({})
@@ -68,6 +88,12 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const [confirmed, setConfirmed] = useState(() => remembered(`confirmed:${project}`).length > 0)
   // a card to bring into view: one just opened, or one the Needs you list points at
   const [focus, setFocus] = useState<string | undefined>(() => takeFocus(project))
+  const [dropping, setDropping] = useState<string | null>(null) // awaiting "Are you sure?"
+  const [hiddenLayers, setHiddenLayers] = useState(() => remembered(`hidden:${project}`))
+  function hideLayers(ids: string[]): void {
+    setHiddenLayers(ids)
+    remember(`hidden:${project}`, ids)
+  }
   useEffect(() => {
     const look = (): void => {
       const card = takeFocus(project)
@@ -87,7 +113,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   useEffect(() => {
     const load = (): void => {
       void window.api.listChats(project).then(setChats, () => {})
-      void window.api.listOutputs(project).then(setOutputs, () => {})
+      void window.api.listOutputs(project).then(
+        (o) => {
+          setOutputs(o)
+          setOutputsRead(true)
+        },
+        () => {}
+      )
+      void window.api.listPreviews(project).then(setPreviews, () => {})
       void window.api.agentStates(project).then(setAgents, () => {})
       void window.api.listProposals(project).then(setProposals, () => {})
       void window.api.listAsks(project).then(setAsks, () => {})
@@ -140,19 +173,20 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     if (c === 'instrument') return void addInstrument(id)
     if (c !== 'toggle') return
     if (!chosen) return void choose([...plan!.selected, id])
-    const started = chats.find((x) => x.id === id)?.count
-    if (
-      started &&
-      !window.confirm('Its chat and files stay in the project. Take it off the stage?')
-    )
-      return
-    void choose(plan!.selected.filter((s) => s !== id))
+    deactivate(id)
   }
-  /** A seat click: before confirming it chooses or unchooses; after, it shows the window. */
+  /** Takes a deliverable off the stage, asking first if any work has started on it. */
+  function deactivate(id: string): void {
+    const started =
+      !!chats.find((x) => x.id === id)?.count ||
+      Object.keys(agents).some((k) => k === id || k.startsWith(`${id}--`))
+    if (started) setDropping(id)
+    else void choose(plan!.selected.filter((s) => s !== id))
+  }
+  /** A seat click turns the deliverable on or off. */
   function seat(id: string): void {
-    const chosen = plan!.selected.includes(id)
-    if (confirmed && chosen) return setFocus(`chat-${id}`)
-    void choose(chosen ? plan!.selected.filter((s) => s !== id) : [...plan!.selected, id])
+    if (plan!.selected.includes(id)) deactivate(id)
+    else void choose([...plan!.selected, id])
   }
 
   const instCard = (m: string, i: string): string => `inst--${m}--${i}`
@@ -201,6 +235,88 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     outputPaths(output).some((p) => outputs.some((o) => o.path === p || o.path.startsWith(p)))
   const making = (id: string): boolean =>
     Object.entries(agents).some(([k, a]) => k.endsWith(`--${id}`) && a.status === 'working')
+
+  const needsResearch =
+    !frame.preview && outputsRead && !outputs.some((o) => /^research(\.md$|\/.*\.md$)/.test(o.path))
+  // new deliverables and prerequisites are agents, so the Orchestrator proposes them for approval
+  const ask = (text: string) => (): void => {
+    dispatchEvent(new CustomEvent('orchestra:ask', { detail: text }))
+  }
+  /** The end of an agent's right-click menu: which model it runs on. */
+  function modelItems(
+    role: 'musician' | 'instrument',
+    a?: { id: string; model: string; provider: string }
+  ): MenuItem[] {
+    if (!a) return []
+    const p = provider(a.provider) ?? PROVIDERS[0]
+    return [
+      { label: '', separator: true },
+      { label: `Model · ${p.name}` },
+      ...p.models.map((m) => ({
+        label: `${m.id === a.model ? '✓ ' : '    '}${m.name}`,
+        run: () =>
+          void window.api.editAgent(role, a.id, 'runsOn', `${p.id}/${m.id}`).then(
+            () => dispatchEvent(new Event('orchestra:agents-changed')),
+            (e) => setError(reason(e))
+          )
+      }))
+    ]
+  }
+  const newItems: MenuItem[] = [
+    { label: 'New deliverable', run: ask('I need a new deliverable: ') },
+    { label: 'New prerequisite', run: ask('I need a new prerequisite: ') },
+    ...(confirmed && chosen.length
+      ? [
+          { label: '', separator: true },
+          ...chosen.map((d) => ({
+            label: `New Instrument for ${musician(d)!.name}`,
+            run: () => void addInstrument(d)
+          }))
+        ]
+      : [])
+  ]
+
+  // the markdown files this project has made or is making, shown on the board to read
+  const docs = [
+    {
+      id: 'research',
+      name: 'Research',
+      path: 'research.md',
+      busy: false,
+      link: 'orchestrator',
+      users: [] as string[]
+    },
+    ...outputs
+      .filter((o) => /^research\/.*\.md$/.test(o.path))
+      .map((o) => ({
+        id: `research-${o.path.slice(9, -3)}`,
+        name: `Research · ${o.path.slice(9, -3)}`,
+        path: o.path,
+        busy: false,
+        link: 'orchestrator',
+        users: [] as string[]
+      })),
+    ...foundations
+      .filter((f) => lit.has(f.id) || exists(f.output))
+      .flatMap((f) => {
+        const path = outputPaths(f.output).find((p) => p.endsWith('.md'))
+        const users = chosen.filter((d) => musician(d)?.prerequisites.includes(f.id))
+        return path
+          ? [
+              {
+                id: f.id,
+                name: f.name,
+                path,
+                busy: making(f.id),
+                link: 'orchestrator',
+                users
+              }
+            ]
+          : []
+      })
+  ]
+    .map((d) => ({ ...d, stamp: outputs.find((o) => o.path === d.path)?.modified }))
+    .filter((d) => d.stamp || d.busy)
 
   // every chosen seat wires down to the circle and up to each foundation it needs
   const wires = chosen.flatMap((id) => {
@@ -270,8 +386,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         const on = lit.has(f.id)
         const state = !on ? '' : exists(f.output) ? 'Ready' : making(f.id) ? 'Making' : 'To make'
         return (
-          <span
+          <button
             key={f.id}
+            onClick={() => {
+              // to its file: the window on this board if it's markdown, else the file itself
+              if (docs.some((d) => d.id === f.id)) return setFocus(`doc-${f.id}`)
+              const file = outputs.find((o) => outputPaths(f.output).includes(o.path))
+              if (file) void window.api.openOutput(project, file.path).catch(() => {})
+            }}
             onPointerEnter={() => on && setHover(f.id)}
             onPointerLeave={() => setHover(null)}
             title={`${f.job}\n→ ${f.output}`}
@@ -286,7 +408,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           >
             {f.name}
             {on && <span className="type-caption normal-case">{state}</span>}
-          </span>
+          </button>
         )
       })}
 
@@ -450,14 +572,23 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const asked = Object.values(asks)
     .filter((a) => a.status === 'open')
     .sort((a, b) => a.t.localeCompare(b.t))
-  const waiting = approvals.length + (question ? 1 : 0) + (suggested.length ? 1 : 0) + asked.length
+  // questions each get a window of their own; this is what's left for the Action box
+  const waiting = approvals.length + (question ? 1 : 0) + (suggested.length ? 1 : 0)
+  /** Whose group a question sits in: the deliverable it's about, or the one that needs it. */
+  const askOwner = (about?: string): string | undefined =>
+    about && chosen.includes(about)
+      ? about
+      : chosen.find((d) => about && musician(d)?.prerequisites.includes(about))
   const cards: CardSpec[] = !confirmed
     ? []
     : [
         {
           id: 'orchestrator',
+          kind: 'orchestrator' as const,
+          auto: true,
           title: 'Orchestrator',
           count: chats.find((c) => c.id === GENERAL)?.busy ? 'thinking' : undefined,
+          working: !!chats.find((c) => c.id === GENERAL)?.busy,
           x: -ORCH_W / 2,
           y: WINDOWS_Y,
           w: ORCH_W,
@@ -480,8 +611,25 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             />
           )
         },
+        ...asked.map((a): CardSpec => {
+          const owner = askOwner(a.about)
+          return {
+            id: `ask-${a.id}`,
+            kind: 'decision',
+            auto: owner ? true : 'right',
+            title: a.title,
+            x: ORCH_W / 2 + 48,
+            y: WINDOWS_Y,
+            w: ASK_W,
+            link: owner ? `chat-${owner}` : 'orchestrator',
+            needsYou: true,
+            body: <AskWindow project={project} ask={a} onError={setError} />
+          }
+        }),
         {
           id: 'actions',
+          kind: 'decision' as const,
+          auto: 'right' as const,
           title: 'Action',
           count: waiting ? `${waiting} waiting` : undefined,
           x: ORCH_W / 2 + 48,
@@ -535,9 +683,6 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
                   />
                 </div>
               )}
-              {asked.map((a) => (
-                <AskWindow key={a.id} project={project} ask={a} onError={setError} />
-              ))}
             </div>
           ) : (
             <p className="p-5 type-body-s text-dim">
@@ -547,8 +692,11 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         },
         ...chosen.map((id, i) => ({
           id: `chat-${id}`,
+          kind: 'musician' as const,
+          auto: true as const,
           title: musician(id)!.name,
           count: chats.find((c) => c.id === id)?.busy ? 'playing' : undefined,
+          working: !!chats.find((c) => c.id === id)?.busy || agents[id]?.status === 'working',
           x: windowX(i, chosen.length),
           y: WINDOWS_Y + 960,
           w: WINDOW_W,
@@ -559,7 +707,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             {
               label: 'Open its file',
               run: () => openFile({ role: 'musician', id, name: musician(id)!.name }, `chat-${id}`)
-            }
+            },
+            ...modelItems('musician', musician(id))
           ],
           body: <ChatPanel project={project} chat={id} plan={plan} view="work" />
         })),
@@ -573,8 +722,12 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             const file: AgentFileRef = { role: 'instrument', id: iid, name: inst?.name ?? iid }
             return {
               id: card,
+              kind: 'instrument' as const,
+              // one you placed with a right-click stays where you put it
+              auto: dropped[card] ? undefined : (true as const),
               title: inst?.name ?? iid,
               count: state ? STATUS[state.status].label : undefined,
+              working: state?.status === 'working',
               ...(dropped[card] ?? {
                 x: windowX(i, chosen.length) + (j % 2) * (INST_W + 24),
                 y: WINDOWS_Y + 1800 + Math.floor(j / 2) * 300
@@ -583,7 +736,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               link: `chat-${id}`,
               menu: [
                 { label: 'Open its file', run: () => openFile(file, card) },
-                { label: `Remove from ${m.name}`, run: () => void removeFromCrew(m, iid) }
+                { label: `Remove from ${m.name}`, run: () => void removeFromCrew(m, iid) },
+                ...modelItems('instrument', inst)
               ],
               body: (
                 <InstrumentCard
@@ -597,9 +751,58 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             }
           })
         }),
+        ...docs.map((d, i): CardSpec => ({
+          id: `doc-${d.id}`,
+          kind: 'file',
+          auto: d.id.startsWith('research') ? 'left' : 'band',
+          also: d.users.map((u) => `chat-${u}`),
+          title: d.name,
+          count: d.path,
+          x: windowX(i % 4, 4),
+          y: WINDOWS_Y + 3200 + Math.floor(i / 4) * 900,
+          w: 560,
+          tone: 'paper',
+          link: d.link,
+          working: d.busy,
+          body: <DocWindow project={project} path={d.path} stamp={d.stamp} />
+        })),
+        // a place for the finished work, there from the start
+        ...chosen
+          .filter((id) => !previews[id]?.length)
+          .map((id): CardSpec => ({
+            id: `preview-${id}-empty`,
+            kind: 'deliverable',
+            auto: true,
+            title: 'Preview',
+            x: 0,
+            y: WINDOWS_Y + 2400,
+            w: 360,
+            link: `chat-${id}`,
+            body: (
+              <p className="flex aspect-[16/10] items-center justify-center p-6 text-center type-body-s text-dim">
+                The finished work shows here. Click it to open the real thing.
+              </p>
+            )
+          })),
+        // finished work, under the deliverable it belongs to
+        ...chosen.flatMap((id) =>
+          (previews[id] ?? []).map((p): CardSpec => ({
+            id: `preview-${id}-${p.label}`,
+            kind: 'deliverable',
+            auto: true,
+            title: p.label,
+            x: 0,
+            y: WINDOWS_Y + 2400,
+            w: 360,
+            link: `chat-${id}`,
+            body: <PreviewWindow project={project} deliverable={id} preview={p} />
+          }))
+        ),
         // agent files opened from a card, beside it
         ...files.map(({ ref, from }): CardSpec => ({
           id: `file-${ref.role}-${ref.id}`,
+          kind: 'file',
+          auto: 'right',
           title: `${[...plan.instruments, ...plan.musicians].find((x) => x.id === ref.id)?.name ?? ref.name} · file`,
           x: 0,
           y: WINDOWS_Y + 2600,
@@ -610,6 +813,35 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         }))
       ]
 
+  const byId = new Map(cards.map((c) => [c.id, c]))
+  const ownerOf = (id: string): string | undefined => {
+    for (let c = byId.get(id); c; c = c.link ? byId.get(c.link) : undefined)
+      if (c.id.startsWith('chat-')) return c.id.slice(5)
+    return undefined
+  }
+  const shared = cards.filter((c) => c.auto === 'band')
+  const prereqLayer: Layer[] = shared.length
+    ? [
+        {
+          id: 'prereqs',
+          name: 'Prerequisites',
+          members: shared.map((c) => ({ id: c.id, title: c.title, kind: c.kind }))
+        }
+      ]
+    : []
+  const layers: Layer[] = confirmed
+    ? [
+        ...prereqLayer,
+        ...chosen.map((id) => ({
+          id,
+          name: musician(id)!.name,
+          members: cards
+            .filter((c) => ownerOf(c.id) === id)
+            .map((c) => ({ id: c.id, title: c.title, kind: c.kind }))
+        }))
+      ]
+    : []
+
   return (
     <Board
       project={project}
@@ -618,10 +850,62 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       crumbs={frame.crumbs}
       pages={frame.pages}
       preview={frame.preview}
-      world={world}
+      world={
+        <>
+          {world}
+          {dropping && (
+            <ConfirmModal
+              title={`Deactivate ${plan.musicians.find((m) => m.id === dropping)?.name ?? dropping}?`}
+              body="Work has already started on it. Its chat and files stay in the project."
+              confirm="Deactivate"
+              onCancel={() => setDropping(null)}
+              onConfirm={() => {
+                void choose(plan.selected.filter((s) => s !== dropping))
+                setDropping(null)
+              }}
+            />
+          )}
+        </>
+      }
       worldRect={extent}
       obstacles={obstacles}
       focus={focus}
+      onFocused={() => setFocus(undefined)}
+      anchored={
+        !needsResearch && (
+          <>
+            <NewCard
+              title="New asset"
+              hint="A deliverable, a prerequisite or an Instrument."
+              onClick={() => void popMenu(newItems)}
+            />
+            {layers.length > 0 && (
+              <Layers
+                layers={layers}
+                hidden={hiddenLayers}
+                top={TOP_BAR + 58}
+                onHidden={hideLayers}
+                onFly={setFocus}
+              />
+            )}
+          </>
+        )
+      }
+      locked={
+        needsResearch && (
+          <div className="flex items-center gap-4 border border-chip-line bg-card py-2 pr-2 pl-4 shadow-float">
+            <p className="type-body-s text-link">
+              Research comes first. Interpret your references, and Create opens up.
+            </p>
+            <button
+              onClick={() => frame.go?.('research')}
+              className="serif-on h-9 shrink-0 bg-brand px-4 type-label-s text-on-brand hover:bg-inverse"
+            >
+              Go to Research
+            </button>
+          </div>
+        )
+      }
       addMenu={(at, sel): MenuItem[] => {
         if (!confirmed) return [{ label: 'Confirm your deliverables to add Instruments' }]
         // a deliverable's window, or one of its Instruments, selected: the menu is about it
@@ -651,6 +935,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         )
       }
       cards={cards}
+      frames={layers.map((l) => ({
+        id: `group:${l.id}`,
+        name: l.name,
+        members: l.members.map((m) => m.id)
+      }))}
+      hidden={layers
+        .filter((l) => hiddenLayers.includes(l.id))
+        .flatMap((l) => l.members.map((m) => m.id))}
     />
   )
 }
@@ -674,11 +966,9 @@ function remember(key: string, value: string[]): void {
 }
 
 const NO_PLAN: CreateState = { musicians: [], instruments: [], selected: [] }
-const ORCH_W = 640
 // the Orchestrator's chat can run forever, so it alone scrolls: capped at 1920×3240's shape
-const ORCH_CAP = Math.round((ORCH_W * 3240) / 1920)
 const ASK_W = 432
-const INST_W = 248 // two Instrument windows sit under each deliverable's
+const INST_W = 288 // two Instrument windows sit under each deliverable's
 
 /** An Instrument's window under its deliverable: its one job, what it writes, its model. */
 function InstrumentCard({
@@ -738,8 +1028,7 @@ function AskWindow({
   }
   return (
     <div className="p-5">
-      <p className="type-label-mono text-link">{ask.title}</p>
-      <p className="mt-1.5 type-body-m text-fg">{ask.question}</p>
+      <p className="type-body-m text-fg">{ask.question}</p>
       <div className="mt-4 flex flex-col gap-2">
         {ask.options.map((o) => (
           <button
@@ -748,13 +1037,7 @@ function AskWindow({
             onClick={() => void answer(o.label, true)}
             className="flex flex-col gap-2 border border-card-line px-3 py-2.5 text-left text-link transition-colors duration-150 hover:border-brand hover:bg-selected"
           >
-            {o.colors && (
-              <span className="flex h-10 w-full">
-                {o.colors.map((c, i) => (
-                  <span key={i} className="flex-1" style={{ background: c }} title={c} />
-                ))}
-              </span>
-            )}
+            <OptionPreview project={project} option={o} />
             <span className="type-label-m">{o.label}</span>
             {o.detail && <span className="type-caption text-dim">{o.detail}</span>}
           </button>
@@ -771,7 +1054,7 @@ function AskWindow({
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={sending}
-          placeholder="Not quite? Say what to change, then Enter"
+          placeholder="Or type your own answer, then Enter"
           aria-label={`Refine ${ask.title}`}
           className="w-full border-0 border-b-2 border-brand bg-transparent py-1.5 type-body-s text-link outline-none placeholder:text-placeholder focus-visible:outline-none"
         />

@@ -21,12 +21,13 @@ interface Props {
   onContextMenu?: (e: React.MouseEvent) => void
   onPress?: () => void // a left press on empty board, e.g. to clear a selection
   content?: () => { all: Rect; selected?: Rect } // gives this board the zoom shortcuts
+  onMarquee?: (r: Rect) => void // dragging empty board draws a selection box instead of panning
   className?: string
 }
 
 /** The artboard, with Figma's controls: the wheel pans (shift for sideways), ctrl+wheel or a
- * pinch zooms at the pointer, the middle button or Space+drag pans. Dragging empty space pans
- * too, because there is no marquee to give it to. Keys: + and - zoom, ctrl or shift+0 is 100%,
+ * pinch zooms at the pointer, the middle button or Space+drag pans. Dragging empty space draws
+ * a selection box on boards that have selection, and pans on those that don't. Keys: + and - zoom, ctrl or shift+0 is 100%,
  * shift+1 fits everything, shift+2 fits the selection. */
 export function Canvas({
   cam,
@@ -37,6 +38,7 @@ export function Canvas({
   onContextMenu,
   onPress,
   content,
+  onMarquee,
   className = ''
 }: Props): React.JSX.Element {
   const { camera, set, fly, viewport, ref } = cam
@@ -47,6 +49,7 @@ export function Canvas({
   const [panning, setPanning] = useState(false)
   const space = useRef(false)
   const [hand, setHand] = useState(false) // Space held: the cursor says the board will pan
+  const [box, setBox] = useState<Rect | null>(null) // the selection box being drawn, on screen
 
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
@@ -117,6 +120,37 @@ export function Canvas({
   function pointerDown(e: React.PointerEvent): void {
     const onBoard = e.target === e.currentTarget || (e.target as HTMLElement).dataset.board
     if (e.button === 0 && onBoard) onPress?.()
+    if (e.button === 0 && onBoard && !space.current && onMarquee) {
+      e.preventDefault()
+      const root = e.currentTarget as HTMLElement
+      root.setPointerCapture(e.pointerId)
+      const at = root.getBoundingClientRect()
+      const sx = e.clientX - at.left
+      const sy = e.clientY - at.top
+      const move = (m: PointerEvent): void => {
+        const mx = m.clientX - at.left
+        const my = m.clientY - at.top
+        const r = {
+          x: Math.min(sx, mx),
+          y: Math.min(sy, my),
+          w: Math.abs(mx - sx),
+          h: Math.abs(my - sy)
+        }
+        setBox(r)
+        const { x, y, z } = live.current
+        onMarquee({ x: x + r.x / z, y: y + r.y / z, w: r.w / z, h: r.h / z })
+      }
+      const up = (): void => {
+        setBox(null)
+        root.removeEventListener('pointermove', move)
+        root.removeEventListener('pointerup', up)
+        root.removeEventListener('pointercancel', up)
+      }
+      root.addEventListener('pointermove', move)
+      root.addEventListener('pointerup', up)
+      root.addEventListener('pointercancel', up)
+      return
+    }
     if (!(e.button === 1 || (e.button === 0 && (onBoard || space.current)))) return
     e.preventDefault()
     const start = { x: e.clientX, y: e.clientY, cam: live.current }
@@ -167,6 +201,13 @@ export function Canvas({
       >
         {children}
       </div>
+      {box && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute z-10 border border-brand bg-brand/10"
+          style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
+        />
+      )}
       {chrome}
     </div>
   )

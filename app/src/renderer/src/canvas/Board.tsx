@@ -4,13 +4,19 @@
 // Tidy puts every card back (brand spec §5.3 Board/Section card, C4–C6).
 // A window on the artboard never scrolls: the board has room, so a card grows to show all of
 // its content, and resizing changes only its width.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import type { BoardLayout } from '../../../preload'
 import { snap, fit, type Rect } from './camera'
 import { Canvas } from './Canvas'
 import { Minimap, Shell, ZoomChip, barButton, type Step } from './Chrome'
-import { TOP_BAR, barInput, fitBelow, popMenu, type MenuItem } from './shared'
-import { freeSpot, settle } from './place'
+import { DOCK_GAP, DOCK_TOP, TOP_BAR, barInput, fitBelow, popMenu, type MenuItem } from './shared'
+import { freeSpot, separate, settle, touches } from './place'
+import { treeLayout } from './tree'
+import { GroupLabel } from './GroupLabel'
+import { Port } from './Port'
+import { Rename } from './Rename'
+import { KIND, KindMark, type CardKind } from './kinds'
+import { Waveform } from './Waveform'
 import { Wire } from './Wire'
 import { useCamera } from './useCamera'
 
@@ -25,11 +31,19 @@ export interface CardSpec {
   body: React.ReactNode
   onClose?: () => void // a window opened on the board, rather than one of its sections
   link?: string // another card's id: a wire runs between them (a window and its Orchestrator)
+  // placed with what it's linked to until you move it: under it, or beside it (see tree.ts)
+  auto?: true | 'left' | 'right' | 'band'
+  also?: string[] // more windows a wire runs to, for something several things depend on
+  port?: number // instead of link: a wire to the dock's left edge, this far down the window
+  solid?: boolean // its wire is solid: what it joins is connected
   needsYou?: boolean // waiting on the user: an orange tab on its top edge
+  working?: boolean // an agent is working on it: a waveform over the frame
+  kind?: CardKind // what this window is: its look and its tag (kinds.tsx)
   // the one exception to growing with its content: a chat, which could run forever. Its body
   // starts this tall and scrolls inside; dragging the corner makes it taller or shorter too.
   height?: number
   menu?: MenuItem[] // right-click on the card's header
+  onRename?: (name: string) => void // double-click the header, or right-click, to rename
 }
 
 const HEADER = 44
@@ -48,12 +62,30 @@ interface Props {
   obstacles?: Rect[] // things on the board under the cards that cards must keep clear of
   top?: React.ReactNode // screen-space note under the top bar, e.g. an error
   focus?: string // a card to bring into view, e.g. one just opened
+  onFocused?: () => void // it's on its way: clear focus so the same card can be asked for again
   preview?: boolean // the book's small live copy: no chrome, nothing saved
   right?: React.ReactNode // more controls in the top bar, before Tidy
   // right-click on empty board: what can be added here, at that spot in board px, for the
   // selected card if there is one (click a card to select it: its border goes bold). Every
   // board's menu ends with Ask the Orchestrator… when the screen has the bar.
   addMenu?: (at: { x: number; y: number }, selected?: string) => MenuItem[]
+  dock?: { width: number; node: React.ReactNode } // a panel floating by the window's right edge
+  // wires between things inside cards, by the data-port value on each end's element
+  wires?: { from: string; to: string; solid?: boolean; onCut?: () => void }[]
+  // drag from an element with data-out to one with data-in to connect them
+  onPick?: (from: string, to: string) => void
+  locked?: React.ReactNode // the board is shown greyed out and can't be used; this says why
+  anchored?: React.ReactNode // held in place over the board, like the New card
+  // named groups of windows: a blue frame around them, moved and renamed by its label
+  frames?: {
+    id: string
+    name: string
+    members: string[]
+    port?: string // a dot on its right edge that wires can be pulled from
+    onRename?: (name: string) => void
+    onMenu?: () => void
+  }[]
+  hidden?: string[] // windows not drawn, though they keep their place in the layout
 }
 
 export function Board({
@@ -68,9 +100,17 @@ export function Board({
   obstacles = [],
   top,
   focus,
+  onFocused,
   preview,
   right,
-  addMenu
+  addMenu,
+  dock,
+  wires,
+  onPick,
+  locked,
+  frames,
+  anchored,
+  hidden = []
 }: Props): React.JSX.Element {
   const [layout, setLayout] = useState<BoardLayout | null>(null)
   const [tidying, setTidying] = useState(false)
@@ -84,13 +124,57 @@ export function Board({
     c.collapsed ? HEADER : (heights[c.id] ?? HEADER + GUESS)
   // where each card wants to be (its saved place, else its default), then settled so nothing
   // overlaps: cards you placed keep their spot first, the rest move beside them
-  const wanted = cards.map((c) => ({ ...c, ...layout?.[c.id], h: 0 }))
+  const tree = treeLayout(
+    cards
+      .filter((c) => c.auto)
+      .map((c) => ({
+        id: c.id,
+        parent: c.link,
+        side: c.auto === true ? undefined : c.auto,
+        x: c.x,
+        y: c.y,
+        w: layout?.[c.id]?.w ?? c.w,
+        h: tall({ ...c, collapsed: layout?.[c.id]?.collapsed })
+      }))
+  )
+  const wanted = cards.map((c) => ({ ...c, ...tree[c.id], ...layout?.[c.id], h: 0 }))
   const order = [...wanted].sort((a, b) => Number(!layout?.[a.id]) - Number(!layout?.[b.id]))
   const settled = settle(
     order.map((c) => ({ ...c, h: tall(c) })),
     obstacles
   )
-  const placed = wanted.map((c) => settled.find((s) => s.id === c.id)!)
+  const fitted = wanted.map((c) => settled.find((s) => s.id === c.id)!)
+  // a group moves whole, so what's in one bounding box never lands in another's
+  const framed = new Set(frames?.flatMap((f) => f.members))
+  const pad = 28
+  const shifts = frames?.length
+    ? separate([
+        ...frames.flatMap((f) => {
+          const inside = fitted.filter((c) => f.members.includes(c.id))
+          if (!inside.length) return []
+          const x = Math.min(...inside.map((c) => c.x)) - pad
+          const y = Math.min(...inside.map((c) => c.y)) - pad
+          return [
+            {
+              ids: f.members,
+              rect: {
+                x,
+                y,
+                w: Math.max(...inside.map((c) => c.x + c.w)) + pad - x,
+                h: Math.max(...inside.map((c) => c.y + c.h)) + pad - y
+              }
+            }
+          ]
+        }),
+        ...fitted
+          .filter((c) => !framed.has(c.id))
+          .map((c) => ({ ids: [c.id], rect: { x: c.x, y: c.y, w: c.w, h: c.h }, fixed: true })),
+        ...obstacles.map((rect) => ({ ids: [], rect, fixed: true }))
+      ])
+    : {}
+  const placed = fitted.map((c) =>
+    shifts[c.id] ? { ...c, x: c.x + shifts[c.id].dx, y: c.y + shifts[c.id].dy } : c
+  )
   const rectOf = (c: (typeof placed)[number]): Rect => ({ x: c.x, y: c.y, w: c.w, h: c.h })
   const rects: Rect[] = [...placed.map(rectOf), ...(worldRect ? [worldRect] : [])]
   const bounds = (): Rect => {
@@ -107,15 +191,112 @@ export function Board({
     preview ? fit(bounds(), innerWidth, innerHeight, 40, 1) : fitBelow(bounds())
   )
 
+  // where each data-port is, in board px, so a wire can end on a row inside a card
+  const [ports, setPorts] = useState<Record<string, Rect>>({})
+  useLayoutEffect(() => {
+    const root = cam.ref.current
+    if (!root || (!wires?.length && !onPick)) return
+    const box = root.getBoundingClientRect()
+    const { x, y, z } = cam.camera
+    const near = (v: number): number => Math.round(v / 4) * 4 // ignores rounding mid-zoom
+    const found: Record<string, Rect> = {}
+    root.querySelectorAll<HTMLElement>('[data-port]').forEach((el) => {
+      const r = el.getBoundingClientRect()
+      found[el.dataset.port!] = {
+        x: near(x + (r.left - box.left) / z),
+        y: near(y + (r.top - box.top) / z),
+        w: near(r.width / z),
+        h: near(r.height / z)
+      }
+    })
+    setPorts((old) => (JSON.stringify(old) === JSON.stringify(found) ? old : found))
+  })
+
+  // the wire being pulled out of a data-out handle, ending at the pointer in board px
+  const [pick, setPick] = useState<{ from: string; x: number; y: number } | null>(null)
+  const latest = useRef({ onPick, camera: cam.camera })
+  useEffect(() => {
+    latest.current = { onPick, camera: cam.camera }
+  })
+  const pickable = !preview && !!onPick
+  useEffect(() => {
+    const root = cam.ref.current
+    if (!root || !pickable) return
+    const down = (e: PointerEvent): void => {
+      const handle = (e.target as HTMLElement).closest<HTMLElement>('[data-out]')
+      if (!handle || e.button !== 0) return
+      e.stopPropagation()
+      e.preventDefault()
+      root.setPointerCapture(e.pointerId)
+      const from = handle.dataset.out!
+      let over: HTMLElement | null = null
+      const move = (m: PointerEvent): void => {
+        const box = root.getBoundingClientRect()
+        const { x, y, z } = latest.current.camera
+        setPick({
+          from,
+          x: x + (m.clientX - box.left) / z,
+          y: y + (m.clientY - box.top) / z
+        })
+        const el =
+          document.elementFromPoint(m.clientX, m.clientY)?.closest<HTMLElement>('[data-in]') ?? null
+        if (el === over) return
+        over?.classList.remove('pick-over')
+        el?.classList.add('pick-over')
+        over = el
+      }
+      const up = (u: PointerEvent): void => {
+        root.removeEventListener('pointermove', move)
+        root.removeEventListener('pointerup', up)
+        root.removeEventListener('pointercancel', up)
+        setPick(null)
+        over?.classList.remove('pick-over')
+        // where the pointer let go, which the last move may not have reached
+        const end = document
+          .elementFromPoint(u.clientX, u.clientY)
+          ?.closest<HTMLElement>('[data-in]')
+        if (end && u.type === 'pointerup') latest.current.onPick?.(from, end.dataset.in!)
+      }
+      root.addEventListener('pointermove', move)
+      root.addEventListener('pointerup', up)
+      root.addEventListener('pointercancel', up)
+    }
+    root.addEventListener('pointerdown', down, true)
+    return () => root.removeEventListener('pointerdown', down, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the root element is stable
+  }, [pickable])
+
   // a card asked for (just opened) flies into view once it is on the board
   const shown = useRef<string | undefined>(undefined)
+  // focus can also name a frame: the view takes in everything in it
   const target = placed.find((c) => c.id === focus)
+  const frameRects = placed
+    .filter((c) => frames?.find((f) => f.id === focus)?.members.includes(c.id))
+    .map(rectOf)
+  const focusRect: Rect | undefined = target
+    ? rectOf(target)
+    : frameRects.length
+      ? {
+          x: Math.min(...frameRects.map((r) => r.x)) - 28,
+          y: Math.min(...frameRects.map((r) => r.y)) - 28,
+          w:
+            Math.max(...frameRects.map((r) => r.x + r.w)) -
+            Math.min(...frameRects.map((r) => r.x)) +
+            56,
+          h:
+            Math.max(...frameRects.map((r) => r.y + r.h)) -
+            Math.min(...frameRects.map((r) => r.y)) +
+            56
+        }
+      : undefined
   useEffect(() => {
-    if (preview || !target || !layout || shown.current === focus) return
+    if (!focus) shown.current = undefined
+    if (preview || !focusRect || !layout || shown.current === focus) return
     shown.current = focus
-    void cam.fly(fitBelow(rectOf(target), 1), 450)
+    void cam.fly(fitBelow(focusRect, 1), 450)
+    onFocused?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fly once per focused card
-  }, [focus, layout, target])
+  }, [focus, layout, !!focusRect])
 
   function save(next: BoardLayout): void {
     if (preview) return
@@ -140,10 +321,42 @@ export function Board({
   }
   // the card you're working with: clicking a card selects it, clicking empty board or Escape
   // lets go; right-click on the board then offers what pertains to it
-  const [selected, setSelected] = useState<string>()
+  const [selected, setSelected] = useState<string[]>([])
+  // the window being dragged, for those moving with it and any frame around it
+  const [groupDrag, setGroupDrag] = useState<{ id: string; dx: number; dy: number } | null>(null)
+  const [frameDrag, setFrameDrag] = useState<{ ids: string[]; dx: number; dy: number } | null>(null)
+  const together = (id: string): boolean =>
+    selected.length > 1 && selected.includes(id) && !!groupDrag && selected.includes(groupDrag.id)
+  /** Where a window is right now, part-way through any drag. */
+  const moved = (c: (typeof placed)[number]): Rect => {
+    const d = frameDrag?.ids.includes(c.id)
+      ? frameDrag
+      : groupDrag?.id === c.id || together(c.id)
+        ? groupDrag
+        : null
+    return { ...rectOf(c), x: c.x + (d?.dx ?? 0), y: c.y + (d?.dy ?? 0) }
+  }
+  function moveBy(ids: string[], dx: number, dy: number): void {
+    const next = { ...layout }
+    for (const c of placed.filter((p) => ids.includes(p.id)))
+      next[c.id] = {
+        ...layout?.[c.id],
+        x: snap(c.x + dx),
+        y: snap(c.y + dy),
+        w: c.w,
+        collapsed: c.collapsed
+      }
+    save(next)
+  }
+  /** Moves every selected window by what the one you dragged moved. */
+  function moveTo(id: string, x: number, y: number): void {
+    if (selected.length < 2 || !selected.includes(id)) return change(id, { x, y })
+    const lead = placed.find((c) => c.id === id)!
+    moveBy(selected, x - lead.x, y - lead.y)
+  }
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setSelected(undefined)
+      if (e.key === 'Escape') setSelected([])
     }
     addEventListener('keydown', key)
     return () => removeEventListener('keydown', key)
@@ -158,28 +371,47 @@ export function Board({
   return (
     <Canvas
       cam={cam}
+      scrollable=".overflow-y-auto"
       className={preview ? '' : 'animate-[area-in_550ms_var(--ease)_both]'}
-      onPress={() => setSelected(undefined)}
+      onPress={() => setSelected([])}
+      onMarquee={
+        preview || locked
+          ? undefined
+          : (r) =>
+              setSelected(
+                placed
+                  .filter((c) => !hidden.includes(c.id) && touches(rectOf(c), r))
+                  .map((c) => c.id)
+              )
+      }
       content={
         preview
           ? undefined
           : () => {
-              const sel = placed.find((c) => c.id === selected)
-              return { all: bounds(), selected: sel && rectOf(sel) }
+              const sel = placed.filter((c) => selected.includes(c.id)).map(rectOf)
+              if (!sel.length) return { all: bounds() }
+              const x = Math.min(...sel.map((r) => r.x))
+              const y = Math.min(...sel.map((r) => r.y))
+              const w = Math.max(...sel.map((r) => r.x + r.w)) - x
+              const h = Math.max(...sel.map((r) => r.y + r.h)) - y
+              return { all: bounds(), selected: { x, y, w, h } }
             }
       }
       onContextMenu={
         addMenu &&
         ((e) => {
+          if (locked) return
           const box = e.currentTarget.getBoundingClientRect()
           const { x, y, z } = cam.camera
-          const sel = placed.find((c) => c.id === selected)
+          const sel = selected.length === 1 ? placed.find((c) => c.id === selected[0]) : undefined
           const items = addMenu(
             { x: snap(x + (e.clientX - box.left) / z), y: snap(y + (e.clientY - box.top) / z) },
             sel?.id
           )
           // the menu says what it's for: the selected card's name, greyed, on top
           if (sel) items.unshift({ label: sel.title }, { label: '', separator: true })
+          else if (selected.length > 1)
+            items.unshift({ label: `${selected.length} windows` }, { label: '', separator: true })
           const field = barInput()
           if (field)
             items.push(
@@ -219,10 +451,27 @@ export function Board({
               />
             }
           >
+            {anchored}
+            {locked && (
+              <div
+                className="absolute left-1/2 z-20 -translate-x-1/2"
+                style={{ top: TOP_BAR + 54 }}
+              >
+                {locked}
+              </div>
+            )}
+            {dock && (
+              <aside
+                className="absolute z-20"
+                style={{ top: DOCK_TOP, right: DOCK_GAP, width: dock.width }}
+              >
+                {dock.node}
+              </aside>
+            )}
             {top && (
               <div
                 className="absolute left-1/2 z-20 -translate-x-1/2"
-                style={{ top: TOP_BAR + 12 }}
+                style={{ top: TOP_BAR + (pages ? 54 : 12) }} // below the pages when they're there
               >
                 {top}
               </div>
@@ -231,47 +480,166 @@ export function Board({
         )
       }
     >
-      {world}
-      {layout && (
-        <svg
-          aria-hidden
-          className="pointer-events-none absolute overflow-visible"
-          style={{ left: 0, top: 0, width: 1, height: 1 }}
-        >
-          {placed.flatMap((c) => {
-            const to = c.link && placed.find((p) => p.id === c.link)
-            if (!to) return []
-            return [
+      <div
+        inert={!!locked}
+        className={locked ? 'pointer-events-none opacity-40 grayscale' : 'contents'}
+      >
+        {world}
+        {layout && (
+          <svg
+            aria-hidden
+            className="pointer-events-none absolute overflow-visible"
+            style={{ left: 0, top: 0, width: 1, height: 1 }}
+          >
+            {pick && ports[pick.from] && (
               <Wire
-                key={c.id}
-                x1={c.x + c.w / 2}
-                y1={c.y + c.h / 2}
-                x2={to.x + to.w / 2}
-                y2={to.y + to.h / 2}
-                tone={c.needsYou ? 'needs-you' : 'wire'}
+                x1={ports[pick.from].x + ports[pick.from].w}
+                y1={ports[pick.from].y + ports[pick.from].h / 2}
+                x2={pick.x}
+                y2={pick.y}
+                solid
               />
-            ]
+            )}
+            {wires?.flatMap((w) => {
+              const a = ports[w.from]
+              const b = ports[w.to]
+              if (!a || !b) return []
+              return [
+                // from whichever sides face each other
+                <Wire
+                  key={`${w.from}>${w.to}`}
+                  x1={b.x + b.w < a.x ? a.x : a.x + a.w}
+                  y1={a.y + a.h / 2}
+                  x2={b.x + b.w < a.x ? b.x + b.w : b.x}
+                  y2={b.y + b.h / 2}
+                  solid={w.solid}
+                  onCut={w.onCut}
+                />
+              ]
+            })}
+            {placed.flatMap((c) => {
+              if (c.port !== undefined && dock) {
+                // the dock stays put on screen, so this end moves with the camera
+                const { x, y, z } = cam.camera
+                return [
+                  <Wire
+                    key={c.id}
+                    x1={c.x + c.w}
+                    y1={c.y + c.h / 2}
+                    x2={x + (cam.viewport.w - dock.width - DOCK_GAP) / z}
+                    y2={y + c.port / z}
+                    solid={c.solid}
+                  />
+                ]
+              }
+              if (hidden.includes(c.id)) return []
+              const extra = (c.also ?? [])
+                .map((id) => placed.find((p) => p.id === id))
+                .filter((p): p is (typeof placed)[number] => !!p && !hidden.includes(p.id))
+                .map((p) => (
+                  <Wire
+                    key={`${c.id}>${p.id}`}
+                    x1={c.x + c.w / 2}
+                    y1={c.y + c.h}
+                    x2={p.x + p.w / 2}
+                    y2={p.y}
+                  />
+                ))
+              const to = c.link && placed.find((p) => p.id === c.link)
+              if (!to || hidden.includes(to.id)) return extra
+              return [
+                ...extra,
+                <Wire
+                  key={c.id}
+                  x1={c.x + c.w / 2}
+                  y1={c.y + c.h / 2}
+                  x2={to.x + to.w / 2}
+                  y2={to.y + to.h / 2}
+                  tone={c.needsYou ? 'needs-you' : 'wire'}
+                  solid={c.solid}
+                />
+              ]
+            })}
+          </svg>
+        )}
+        {layout &&
+          frames?.map((f) => {
+            const inside = placed
+              .filter((c) => f.members.includes(c.id) && !hidden.includes(c.id))
+              .map(moved)
+            if (!inside.length) return null
+            const pad = 28
+            const x = Math.min(...inside.map((r) => r.x)) - pad
+            const y = Math.min(...inside.map((r) => r.y)) - pad
+            return (
+              <div
+                key={f.id}
+                className="pointer-events-none absolute border border-brand/40 bg-brand/5"
+                style={{
+                  left: x,
+                  top: y,
+                  width: Math.max(...inside.map((r) => r.x + r.w)) + pad - x,
+                  height: Math.max(...inside.map((r) => r.y + r.h)) + pad - y
+                }}
+              >
+                <GroupLabel
+                  name={f.name}
+                  z={cam.camera.z}
+                  onRename={f.onRename}
+                  onMenu={f.onMenu}
+                  onDrag={(dx, dy) => setFrameDrag({ ids: f.members, dx, dy })}
+                  onDrop={(dx, dy) => {
+                    setFrameDrag(null)
+                    moveBy(f.members, dx, dy)
+                  }}
+                />
+                {f.port && (
+                  <span className="pointer-events-auto">
+                    <Port out={f.port} side="right" hint="Drag to an Interpret box to connect" />
+                  </span>
+                )}
+              </div>
+            )
           })}
-        </svg>
-      )}
-      {layout &&
-        placed.map((c) => (
-          <Card
-            key={c.id}
-            card={c}
-            savedH={layout?.[c.id]?.h}
-            onHeight={(hh) =>
-              setHeights((all) => (all[c.id] === hh ? all : { ...all, [c.id]: hh }))
-            }
-            z={cam.camera.z}
-            tidying={tidying}
-            selected={selected === c.id}
-            onSelect={() => setSelected(c.id)}
-            onMove={(x, y) => change(c.id, { x, y })}
-            onResize={(w, h) => change(c.id, h ? { w, h } : { w })}
-            onCollapse={() => change(c.id, { collapsed: !c.collapsed })}
-          />
-        ))}
+        {layout &&
+          placed
+            .filter((c) => !hidden.includes(c.id))
+            .map((c) => (
+              <Card
+                key={c.id}
+                card={c}
+                savedH={layout?.[c.id]?.h}
+                onHeight={(hh) =>
+                  setHeights((all) => (all[c.id] === hh ? all : { ...all, [c.id]: hh }))
+                }
+                z={cam.camera.z}
+                tidying={tidying}
+                selected={selected.includes(c.id)}
+                onSelect={(shift) =>
+                  setSelected((s) =>
+                    shift
+                      ? s.includes(c.id)
+                        ? s.filter((x) => x !== c.id)
+                        : [...s, c.id]
+                      : s.includes(c.id)
+                        ? s
+                        : [c.id]
+                  )
+                }
+                nudge={
+                  frameDrag?.ids.includes(c.id)
+                    ? frameDrag
+                    : together(c.id)
+                      ? (groupDrag ?? undefined)
+                      : undefined
+                }
+                onDragBy={(d) => setGroupDrag(d && { ...d, id: c.id })}
+                onMove={(x, y) => moveTo(c.id, x, y)}
+                onResize={(w, h) => change(c.id, h ? { w, h } : { w })}
+                onCollapse={() => change(c.id, { collapsed: !c.collapsed })}
+              />
+            ))}
+      </div>
     </Canvas>
   )
 }
@@ -284,6 +652,8 @@ export function Card({
   tidying,
   selected,
   onSelect,
+  nudge,
+  onDragBy,
   onMove,
   onResize,
   onCollapse
@@ -294,15 +664,18 @@ export function Card({
   z: number
   tidying: boolean
   selected?: boolean // the card right-click on the board is about: a bold blue border
-  onSelect?: () => void
+  onSelect?: (shift: boolean) => void
+  nudge?: { dx: number; dy: number } // moved along with the selected window being dragged
+  onDragBy?: (d: { dx: number; dy: number } | null) => void
   onMove: (x: number, y: number) => void
   onResize: (w: number, h?: number) => void
   onCollapse: () => void
 }): React.JSX.Element {
   // while dragging, the card follows the pointer locally; it is saved once, on release
   const [live, setLive] = useState<{ x: number; y: number; w: number; h?: number } | null>(null)
-  const x = live?.x ?? card.x
-  const y = live?.y ?? card.y
+  const [renaming, setRenaming] = useState(false)
+  const x = live?.x ?? card.x + (nudge?.dx ?? 0)
+  const y = live?.y ?? card.y + (nudge?.dy ?? 0)
   const w = live?.w ?? card.w
   // a tall card's body height: dragged now, else saved, else its starting height
   const bodyH = card.height ? (live?.h ?? savedH ?? card.height) : undefined
@@ -346,6 +719,7 @@ export function Card({
   }, [onHeight])
 
   const blue = card.tone === 'blue'
+  const look = card.kind && KIND[card.kind]
   const dragging = live !== null
   const stop = (e: React.PointerEvent): void => e.stopPropagation()
   return (
@@ -353,12 +727,23 @@ export function Card({
       ref={box}
       data-card={card.id}
       aria-label={card.title}
+      onContextMenu={(e) => {
+        const items = [
+          ...(card.onRename ? [{ label: 'Rename', run: () => setRenaming(true) }] : []),
+          ...(card.menu ?? [])
+        ]
+        if (!items.length) return
+        e.preventDefault()
+        e.stopPropagation()
+        void popMenu(items)
+      }}
       className={`absolute flex flex-col ${
-        blue
+        look?.frame ??
+        (blue
           ? 'bg-poster-dots'
           : card.tone === 'paper'
             ? 'border-2 border-brand bg-card'
-            : 'border border-card-line bg-card'
+            : 'border border-card-line bg-card')
       } ${
         dragging
           ? 'z-10 shadow-lift outline-2 outline-brand'
@@ -367,7 +752,7 @@ export function Card({
               'shadow-card outline-2 outline-offset-8 outline-needs-you outline-dashed'
             : 'shadow-card'
       } ${selected && !dragging ? 'ring-[3px] ring-brand' : ''}`}
-      onPointerDownCapture={onSelect}
+      onPointerDownCapture={(e) => onSelect?.(e.shiftKey)}
       style={{
         left: 0,
         top: 0,
@@ -376,22 +761,27 @@ export function Card({
         transition: tidying ? 'transform 450ms var(--ease), width 450ms var(--ease)' : undefined
       }}
     >
+      {card.working && <Waveform w={w} />}
       <header
-        onContextMenu={(e) => {
-          if (!card.menu) return
-          e.preventDefault()
-          e.stopPropagation()
-          void popMenu(card.menu)
+        // on the header, not the title: dragging captures the pointer here, so clicks land here
+        onDoubleClick={(e) => {
+          if (card.onRename && !(e.target as HTMLElement).closest('button')) setRenaming(true)
         }}
         onPointerDown={(e) =>
           track(
             e,
-            (dx, dy) => ({ x: card.x + dx, y: card.y + dy, w }),
-            (r) => onMove(snap(r.x), snap(r.y))
+            (dx, dy) => {
+              if (dx || dy) onDragBy?.({ dx, dy })
+              return { x: card.x + dx, y: card.y + dy, w }
+            },
+            (r) => {
+              onDragBy?.(null)
+              onMove(snap(r.x), snap(r.y))
+            }
           )
         }
         className={`flex shrink-0 cursor-grab items-center gap-3 px-4 active:cursor-grabbing ${
-          blue ? 'text-on-brand' : 'border-b border-hair text-link'
+          look?.header ?? (blue ? 'text-on-brand' : 'border-b border-hair text-link')
         }`}
         style={{ height: HEADER }}
       >
@@ -403,7 +793,29 @@ export function Card({
         <span aria-hidden className="font-mono text-[11px] tracking-[-0.2em] opacity-50">
           ⋮⋮
         </span>
-        <h2 className="min-w-0 flex-1 truncate type-label-serif-l">{card.title}</h2>
+        {card.kind && <KindMark kind={card.kind} />}
+        {renaming ? (
+          <Rename
+            value={card.title}
+            className="min-w-0 flex-1 px-1 type-body-m"
+            onDone={(name) => {
+              setRenaming(false)
+              if (name) card.onRename?.(name)
+            }}
+          />
+        ) : (
+          <h2
+            title={card.onRename ? 'Double-click to rename' : undefined}
+            className={`min-w-0 flex-1 truncate ${look?.title ?? 'type-label-serif-l'}`}
+          >
+            {card.title}
+          </h2>
+        )}
+        {look && (
+          <span className="shrink-0 font-mono text-[10px] tracking-wide uppercase opacity-70">
+            {look.tag}
+          </span>
+        )}
         {card.count && <span className="font-mono text-[12px] opacity-70">{card.count}</span>}
         <button
           onPointerDown={stop}

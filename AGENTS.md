@@ -69,7 +69,12 @@ The main process splits into small modules:
 | `projects.ts`, `deliverables.ts`, `research.ts`, `interpret.ts`, `outputs.ts` | One project concern each, as files in the project folder. |
 | `asks.ts`, `proposals.ts` | Choices waiting on the user, and proposed new agents. |
 | `graph.ts` | Per-project knowledge graphs, built by the `graphify` CLI. |
-| `setup.ts`, `paths.ts` | First-launch state, and where the vault is. |
+| `setup.ts`, `paths.ts` | First-launch state, and where the vault is (the folder chosen in setup is kept in `~/.orchestra/home`). |
+| `research.ts` | References, their groups (`references/groups.json`, a `group:` line in each note) and the reference library. |
+| `recipes.ts`, `onboard.ts` | How each setup item really connects, and running those steps. Main runs a step only by its id in `recipes.ts`. Pure data in `recipes.ts` is shared with the renderer. |
+| `covers.ts` | A book's cover colour and artwork (`<project>/cover.json`). |
+| `previews.ts` | Where finished work lives (`.orchestra/previews.json`), its thumbnails, and starting local dev servers. `cleanPreview` is a trust boundary: agents supply the input. |
+| `keys.ts` | API keys from setup: tested with the provider, encrypted with `safeStorage`, kept in Electron's `userData`, never in the vault. |
 
 ## How the pieces talk
 
@@ -96,7 +101,7 @@ OrchestratorBar → sendChat → 'chat:send' → Conductor.send
   → 'chat:event' → every window → Create, ChatPanel, OrchestratorBar re-read what they need
 ```
 
-Event kinds are `live`, `message`, `busy`, `log`, `agents`, `asks` and `error`, defined as `EventBody` in `conductor.ts`.
+Event kinds are `live`, `message`, `busy`, `log`, `agents`, `asks`, `error` and `usage`, defined as `EventBody` in `conductor.ts`.
 
 ### The agent tree
 
@@ -183,13 +188,13 @@ Git will not flag a mismatch between these. Most of the bugs a clean merge can i
 | Model names | `providers.ts`, the `z.enum` in `orchestra-mcp.ts`, `MODELS` in `proposals.ts` |
 | A setup field | `Setup` and `cleanSetup` in `setup.ts`, `SLOTS` in `canvas/Setup.tsx` |
 
-The renderer may import from `src/main/` only the two modules with no Node dependency, `plan.ts` and `providers.ts`. Everything else from main reaches it as types through preload.
+The renderer may import from `src/main/` only the three modules with no Node dependency, `plan.ts`, `providers.ts` and `recipes.ts`. Everything else from main reaches it as types through preload.
 
 ## How to add common things
 
 **An IPC call.** Write the logic in a module under `src/main/`. In `index.ts`, add a short handler that validates ids with `projectDir()` and delegates. Add the method to `api` in preload.
 
-**A card on an existing board.** Add a `CardSpec` to that screen's `cards` array, and write its body as a component in a new file. Cards grow with their content. `height` is the single exception, reserved for chats.
+**A card on an existing board.** Add a `CardSpec` to that screen's `cards` array, and write its body as a component in a new file. Cards grow with their content. The exceptions are chats (`height`) and markdown files, capped at twice the Orchestrator's height (`DOC_BODY`).
 
 **A new board.** Render `<Board project board label crumbs pages preview cards />` with a new `board` name. Board names must match the slug rule. To add a right-click menu, pass `addMenu`, and use `popMenu` for card menus.
 
@@ -297,11 +302,13 @@ The full reference is `ideation/brand-spec.md`, and the layouts are in `ideation
 
 - **Two kinds of UI.** Artboard-bound: cards, covers, the desk, everything inside a project. Viewport-anchored and the same everywhere: breadcrumb, Back, pages (bottom left), Orchestrator bar (bottom centre), minimap (bottom right).
 - **Artboard windows never scroll.** A card grows to fit, and resizing changes only its width. Viewport chrome may scroll.
-- **Nothing on an artboard overlaps.** Use `settle` and `freeSpot`.
+- **Nothing on an artboard overlaps.** Use `settle` and `freeSpot`, which keep 72px clear around every window.
+- **A window opens with what it's connected to.** Give a card `link` and `auto`: `tree.ts` puts it under its parent, or beside it with `'left'` or `'right'`, in a column of its own. Moving a window by hand takes it out, and Tidy puts it back.
 - **Inside a project, nothing navigates to a sub-board.** Clicking something opens a window beside it.
 - **The user talks only to the Orchestrator.** Deliverable windows have no text input and are wired to the Orchestrator's window. Choices go in the Action box.
 - **Waiting items** get an orange mark on their window and appear in Needs you. Orange means this and nothing else.
 - **Wires curve** and go bold on hover.
+- **A window shows what it is.** Give a card a `kind` (`canvas/kinds.tsx`). Agents are blue with round marks, files are paper with a page mark, finished work is ink, decisions have a diamond.
 - **Labels explain themselves.** Use plain words with a one-line description. No in-joke names.
 - **Hover never moves layout.** Add `serif-on` to labels, and `serifHold.ts` holds their width.
 - **Selected, hovered or current** means Bodoni Moda italic 800, through `serif-on` or the `type-current-*` utilities.
@@ -325,7 +332,7 @@ Tokens come from `Orchestra/projects/orchestra-brand/prereqs/tokens.json`, and `
 Also not built or only partly built:
 
 - **Refine** is a placeholder card in `App.tsx`.
-- **MCP connections for agents** (Figma and others) don't exist, and `prompts.ts` tells agents so.
+- **MCP connections for agents** (Figma and others) don't exist, and `prompts.ts` tells agents so. Figma is the exception: Musicians and Instruments may use it if the user connected it (`FIGMA` in `conductor.ts`).
 - **Only Anthropic can run agents.** The other providers are listed but refused by `runnableOrThrow`.
 - **A packaged build can't find its vault** or ship a starter library. `paths.ts` depends on the working directory.
 - **The `tools` front-matter field** is parsed but not applied. Tool access is set in `conductor.ts`.

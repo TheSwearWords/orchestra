@@ -1,3 +1,4 @@
+import type { Cover } from './covers.ts'
 import { mkdir, readdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 
@@ -8,6 +9,7 @@ export interface Project {
   name: string
   client: string
   concept: string
+  cover?: Cover
 }
 
 const SUBFOLDERS = ['references', 'prereqs', 'audits']

@@ -1,6 +1,6 @@
 // What the canvas components share: constants, types and small pure helpers.
 import { createContext } from 'react'
-import type { Project, Role, StudioLayout } from '../../../preload'
+import type { Cover, Project, Role, StudioLayout } from '../../../preload'
 import type { AsciiName } from '../components/Ascii'
 import { fit, type Camera, type Rect } from './camera'
 
@@ -19,7 +19,7 @@ export const AREAS: { id: Area; numeral: string; name: string }[] = [
 export const COVER = { w: 300, h: 400 }
 
 export type CoverColor = 'blue' | 'white' | 'ink'
-const ART: AsciiName[] = ['apollo', 'violin', 'hand', 'concert']
+export const ART: AsciiName[] = ['apollo', 'violin', 'hand', 'concert']
 
 function hash(s: string): number {
   let h = 0
@@ -39,6 +39,7 @@ export interface CoverInfo {
   name: string
   client: string
   no: number
+  cover?: Cover
 }
 
 // Studio shelf: the default row of covers
@@ -60,6 +61,7 @@ export const coverInfo = (p: Project, all: Project[]): CoverInfo => ({
   id: p.id,
   name: p.name,
   client: p.client,
+  cover: p.cover,
   // shortcut: issue numbers follow the alphabetical list until project.json stores `no`
   no: all.findIndex((q) => q.id === p.id) + 1
 })
@@ -83,6 +85,8 @@ export const GENERAL = 'general'
 export const STUDIO = '_studio'
 
 export const TOP_BAR = 52 // the breadcrumb strip's height
+export const DOCK_TOP = TOP_BAR + 14 // a floating panel's top edge
+export const DOCK_GAP = 14 // and its distance from the window's right edge
 const BOTTOM = 96 // the Orchestrator bar and the pages, under a board
 
 /** The camera that shows `r` in the space between the top bar and the bottom row. */

@@ -1,7 +1,11 @@
 import { useEffect, useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
-import type { Reference, ResearchState, Tag } from '../../../preload'
-import { Board } from '../canvas/Board'
+import type { Kind, Reference, ResearchState, Tag } from '../../../preload'
+import { Board, type CardSpec } from '../canvas/Board'
 import type { Frame } from '../canvas/Book'
+import { popMenu, type MenuItem } from '../canvas/shared'
+import { NewCard } from '../canvas/Chrome'
+import { DOC_BODY } from '../canvas/stage'
+import { Port } from '../canvas/Port'
 import { Icon } from './Icon'
 
 const field =
@@ -11,13 +15,48 @@ const solidButton =
 
 // Electron prefixes IPC errors with the channel name; show only the reason
 const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
+const host = (url: string): string => new URL(url).hostname.replace(/^www\./, '')
 
-/** I · Research as one artboard (C4): reference links, inspiration and usable assets as
- * cards, the sites to look further, and the interpretation they feed. */
+/** A reference's group: null is the project's default one. */
+type Group = string | null
+
+const FULL: Kind[] = ['links', 'inspiration', 'assets']
+const KIND_LIST: Kind[] = [...FULL, 'text']
+const LABEL: Record<Kind, string> = {
+  links: 'Reference links',
+  inspiration: 'Inspiration',
+  assets: 'Usable assets',
+  text: 'Text'
+}
+// a full group's windows, side by side
+const SLOT: Record<Kind, { x: number; w: number }> = {
+  links: { x: 0, w: 432 },
+  inspiration: { x: 504, w: 576 },
+  assets: { x: 1152, w: 432 },
+  text: { x: 0, w: 480 }
+}
+const SHOW_TAGS_FROM = 8 // sites in the library before the tag filter earns its place
+
+/** I · Research as one artboard (C4): groups of references, each holding reference links,
+ * inspiration and usable assets and named for the part of the project it's about; the sites
+ * to look further, wired to the links that came from them; and the interpretation they feed. */
 export function Research({ project, frame }: { project: string; frame: Frame }): React.JSX.Element {
   const [data, setData] = useState<ResearchState | null>(null)
   const [error, setError] = useState('')
-  const [interpreting, setInterpreting] = useState(false)
+  const [interpreting, setInterpreting] = useState<string | null>(null) // the box at work
+  const [focus, setFocus] = useState<string>()
+  // pictures of any sites that don't have one yet; a slow job, so it happens in the background
+  const missing = data?.sites.filter((s) => !s.shot).length ?? 0
+  useEffect(() => {
+    if (frame.preview || missing === 0) return
+    let live = true
+    void window.api.captureSites().then((made) => {
+      if (made && live) void window.api.loadResearch(project).then(setData)
+    })
+    return () => {
+      live = false
+    }
+  }, [missing, project, frame.preview])
 
   useEffect(() => {
     window.api.loadResearch(project).then(setData, (e) => setError(reason(e)))
@@ -36,20 +75,70 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
     }
   }
 
-  async function interpret(): Promise<void> {
-    setInterpreting(true)
-    await run(() => window.api.interpret(project))
-    setInterpreting(false)
+  async function interpret(box: string): Promise<void> {
+    setInterpreting(box)
+    await run(() => window.api.interpret(project, box))
+    setInterpreting(null)
   }
 
   if (!data) return <div className="bg-dots h-full" />
   const links = data.references.filter((r) => r.kind === 'link')
-  const files = data.references.filter((r) => r.kind === 'file')
-  const inspiration = files.filter((r) => r.tag === 'inspiration')
-  const assets = files.filter((r) => r.tag === 'asset')
-  const tiles = (refs: Reference[], tag: Tag): React.ReactNode => (
-    <Tiles project={project} refs={refs} tag={tag} run={run} />
-  )
+  const groups: Group[] = [null, ...data.groups.others]
+  const defaultName = data.groups.default ?? `${frame.crumbs[1]?.label ?? 'Project'} research`
+  const nameOf = (g: Group): string => g ?? defaultName
+  const kindsOf = (g: Group): Kind[] => (g && data.groups.kinds[g]) || FULL
+  const windowId = (g: Group, k: Kind): string => `w-${g ?? ''}-${k}`
+  /** A new full group, or with `kind` a single window; the board flies to it. */
+  const create = (name: string, kind?: Kind): void =>
+    void run(async () => {
+      const made = await window.api.addGroup(project, name, kind ? [kind] : undefined)
+      setFocus(windowId(made.others[made.others.length - 1], kind ?? 'links'))
+    })
+  const newGroup = (): void => create('New research group')
+  const newBox = (): void =>
+    void run(async () => {
+      const boxes = await window.api.addBox(project)
+      setFocus(`interpret-${boxes[boxes.length - 1].id}`)
+    })
+  const addItems: MenuItem[] = [
+    { label: 'New research group', run: newGroup },
+    { label: '', separator: true },
+    ...KIND_LIST.map((k) => ({
+      label: `New ${LABEL[k].toLowerCase()} window`,
+      run: () => create(LABEL[k], k)
+    })),
+    { label: '', separator: true },
+    { label: 'New Interpret box', run: newBox }
+  ]
+  /** A text window's button: its words, through an Interpret box of their own. */
+  const interpretText = async (group: string, text: string): Promise<void> => {
+    await run(async () => {
+      await window.api.saveText(project, group, text)
+      const fresh = await window.api.loadResearch(project)
+      let id = fresh.boxes.find((b) => b.groups.length === 1 && b.groups[0] === group)?.id
+      if (!id) {
+        const boxes = await window.api.addBox(project)
+        id = boxes[boxes.length - 1].id
+        await window.api.connectBox(project, id, group, true)
+      }
+      setInterpreting(id)
+      await window.api.interpret(project, id)
+    })
+    setInterpreting(null)
+  }
+  const hosts = new Set(data.sites.map((s) => host(s.url)))
+  /** Right-click or the "Group" button on a reference: where else it can be filed. */
+  const moveMenu = (r: Reference): void => {
+    const here: Group = r.group ?? null
+    const kind: Kind = r.kind === 'link' ? 'links' : r.tag === 'asset' ? 'assets' : 'inspiration'
+    const items: MenuItem[] = groups
+      .filter((g) => g !== here && kindsOf(g).includes(kind))
+      .map((g) => ({
+        label: `Move to ${nameOf(g)}`,
+        run: () => void run(() => window.api.updateReference(project, r.id, { group: g }))
+      }))
+    void popMenu(items.length ? items : [{ label: 'Make another group to move this to' }])
+  }
 
   return (
     <Board
@@ -59,6 +148,56 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
       crumbs={frame.crumbs}
       pages={frame.pages}
       preview={frame.preview}
+      wires={[
+        ...links
+          .filter((l) => hosts.has(host(l.source)))
+          .map((l) => ({ from: `link-${l.id}`, to: `site-${host(l.source)}` })),
+        ...data.boxes.flatMap((b) =>
+          b.groups.map((g) => ({
+            from: `group-${g}`,
+            to: `box-${b.id}`,
+            solid: true,
+            onCut: () => void run(() => window.api.connectBox(project, b.id, g, false))
+          }))
+        )
+      ]}
+      onPick={(from, to) =>
+        void run(() =>
+          window.api.connectBox(project, to.replace(/^box-/, ''), from.replace(/^group-/, ''), true)
+        )
+      }
+      focus={focus}
+      onFocused={() => setFocus(undefined)}
+      frames={groups
+        .filter((g) => kindsOf(g).length > 1)
+        .map((g) => ({
+          id: g ?? '',
+          name: nameOf(g),
+          members: kindsOf(g).map((k) => windowId(g, k)),
+          port: `group-${g ?? ''}`,
+          onRename: (name) => void run(() => window.api.renameGroup(project, g, name)),
+          onMenu:
+            g === null
+              ? undefined
+              : () =>
+                  void popMenu([
+                    {
+                      label: 'Delete group',
+                      run: () => {
+                        if (confirm(`Delete "${g}"? Its references move to ${defaultName}.`))
+                          void run(() => window.api.removeGroup(project, g))
+                      }
+                    }
+                  ])
+        }))}
+      addMenu={() => addItems}
+      anchored={
+        <NewCard
+          title="New asset"
+          hint="A group, a window or an Interpret box."
+          onClick={() => void popMenu(addItems)}
+        />
+      }
       top={
         error && (
           <p
@@ -70,102 +209,214 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
         )
       }
       cards={[
-        {
-          id: 'links',
-          title: 'Reference links',
-          count: String(links.length),
-          x: 0,
-          y: 0,
-          w: 432,
-          body: <Links project={project} refs={links} run={run} />
-        },
-        {
-          id: 'inspiration',
-          title: 'Inspiration',
-          count: String(inspiration.length),
-          x: 480,
-          y: 0,
-          w: 576,
-          body: tiles(inspiration, 'inspiration')
-        },
-        {
-          id: 'assets',
-          title: 'Usable assets',
-          count: String(assets.length),
-          x: 1104,
-          y: 0,
-          w: 432,
-          body: tiles(assets, 'asset')
-        },
-        {
-          id: 'interpretation',
-          title: 'research.md',
-          count: data.interpretation ? undefined : 'not written yet',
-          x: 1584,
-          y: 0,
-          w: 672,
-          tone: 'paper',
-          body: <Interpretation text={data.interpretation} />
-        },
+        ...groups.flatMap((g, i): CardSpec[] => {
+          const inGroup = data.references.filter((r) => (r.group ?? null) === g)
+          const kinds = kindsOf(g)
+          const alone = kinds.length === 1
+          const refs: Record<Kind, Reference[]> = {
+            links: inGroup.filter((r) => r.kind === 'link'),
+            inspiration: inGroup.filter((r) => r.kind === 'file' && r.tag === 'inspiration'),
+            assets: inGroup.filter((r) => r.kind === 'file' && r.tag === 'asset'),
+            text: inGroup.filter((r) => r.kind === 'text')
+          }
+          return kinds.map((k) => {
+            const inner =
+              k === 'links' ? (
+                <Links project={project} group={g} refs={refs.links} run={run} onMove={moveMenu} />
+              ) : k === 'text' ? (
+                <TextWindow
+                  value={refs.text[0]?.note ?? ''}
+                  busy={interpreting !== null}
+                  onSave={(text) => run(() => window.api.saveText(project, g!, text))}
+                  onInterpret={(text) => void interpretText(g!, text)}
+                />
+              ) : (
+                <Tiles
+                  project={project}
+                  group={g}
+                  refs={refs[k]}
+                  tag={k === 'assets' ? 'asset' : 'inspiration'}
+                  run={run}
+                  onMove={moveMenu}
+                />
+              )
+            return {
+              id: windowId(g, k),
+              kind: 'reference' as const,
+              title: alone ? nameOf(g) : LABEL[k],
+              count: k === 'text' ? undefined : String(refs[k].length),
+              x: alone ? 0 : SLOT[k].x,
+              y: i * 960,
+              w: alone ? 480 : SLOT[k].w,
+              ...(alone
+                ? {
+                    onRename: (name: string) =>
+                      void run(() => window.api.renameGroup(project, g, name)),
+                    menu: [
+                      {
+                        label: 'Delete window',
+                        run: () => {
+                          if (confirm(`Delete "${nameOf(g)}"?`))
+                            void run(() => window.api.removeGroup(project, g!))
+                        }
+                      }
+                    ]
+                  }
+                : {}),
+              body: alone ? (
+                <div className="relative">
+                  <Port
+                    out={`group-${g ?? ''}`}
+                    side="right"
+                    hint="Drag to an Interpret box to connect"
+                  />
+                  {inner}
+                </div>
+              ) : (
+                inner
+              )
+            }
+          })
+        }),
+        ...data.boxes.flatMap((b, i): CardSpec[] => [
+          {
+            id: `interpret-${b.id}`,
+            kind: 'process',
+            title: b.name,
+            x: 1680,
+            y: i * 720,
+            w: 480,
+            tone: 'blue',
+            onRename: (name) => void run(() => window.api.renameBox(project, b.id, name)),
+            menu:
+              b.id === 'main'
+                ? undefined
+                : [
+                    {
+                      label: 'Delete box',
+                      run: () => void run(() => window.api.removeBox(project, b.id))
+                    }
+                  ],
+            body: (
+              <InterpretBoxBody
+                port={`box-${b.id}`}
+                groups={groups.map((g) => ({
+                  key: g ?? '',
+                  name: nameOf(g),
+                  count: data.references.filter((r) => (r.group ?? null) === g).length
+                }))}
+                wired={b.groups}
+                written={!!b.text}
+                busy={interpreting === b.id}
+                blocked={interpreting !== null && interpreting !== b.id}
+                onRun={() => void interpret(b.id)}
+              />
+            )
+          },
+          {
+            id: `direction-${b.id}`,
+            kind: 'file',
+            title: b.id === 'main' ? 'research.md' : `research/${b.id}.md`,
+            count: b.text ? undefined : 'not written yet',
+            x: 2304,
+            y: i * 720,
+            w: 672,
+            tone: 'paper',
+            link: `interpret-${b.id}`,
+            body: <Interpretation text={b.text} />
+          }
+        ]),
         {
           id: 'sites',
+          kind: 'reference',
           title: 'Reference library',
           count: String(data.sites.length),
-          x: 0,
-          y: 720,
-          w: 624,
+          x: -1152,
+          y: 0,
+          w: 1008,
           body: <Sites sites={data.sites} onAdd={(site) => run(() => window.api.addSite(site))} />
-        },
-        {
-          id: 'interpret',
-          title: 'Interpret',
-          x: 480,
-          y: 720,
-          w: 576,
-          tone: 'blue',
-          body: (
-            <Ready
-              links={links.length}
-              inspiration={inspiration.length}
-              assets={assets.length}
-              written={!!data.interpretation}
-              busy={interpreting}
-              onRun={interpret}
-            />
-          )
         }
       ]}
     />
   )
 }
 
+/** A window of the user's own words, read by Interpret like any other reference. */
+function TextWindow({
+  value,
+  busy,
+  onSave,
+  onInterpret
+}: {
+  value: string
+  busy: boolean
+  onSave: (text: string) => Promise<boolean>
+  onInterpret: (text: string) => void
+}): React.JSX.Element {
+  const [text, setText] = useState(value)
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => text.trim() !== value.trim() && void onSave(text)}
+        placeholder="Describe what you're after: a mood, a reference, how it should feel."
+        aria-label="Your own words"
+        className="field-sizing-content min-h-40 w-full resize-none border border-card-line bg-transparent p-3 type-body-m text-link outline-none placeholder:text-placeholder focus:border-brand"
+      />
+      <button
+        onClick={() => onInterpret(text)}
+        disabled={busy || !text.trim()}
+        className={`${solidButton} self-end`}
+      >
+        {busy ? 'Interpreting…' : 'Interpret'}
+      </button>
+    </div>
+  )
+}
+
 /** A stack of link blocks (Board/Link block), with a field to paste the next one. */
 function Links({
   project,
+  group,
   refs,
-  run
+  run,
+  onMove
 }: {
   project: string
+  group: Group
   refs: Reference[]
   run: Run
+  onMove: (r: Reference) => void
 }): React.JSX.Element {
   const [url, setUrl] = useState('')
 
   async function add(e: FormEvent): Promise<void> {
     e.preventDefault()
     if (!url.trim()) return
-    if (await run(() => window.api.addLink(project, { url, note: '', tag: 'inspiration' })))
-      setUrl('')
+    const added = await run(async () => {
+      const r = await window.api.addLink(project, { url, note: '', tag: 'inspiration' })
+      if (group !== null) await window.api.updateReference(project, r.id, { group })
+    })
+    if (added) setUrl('')
   }
 
   return (
     <div className="flex flex-col gap-3 p-4">
       {refs.map((r) => {
-        const host = r.source.replace(/^https?:\/\/(www\.)?/, '')
+        const shown = r.source.replace(/^https?:\/\/(www\.)?/, '')
         return (
-          <div key={r.id} className="group flex gap-3 border border-card-line p-3">
+          <div
+            key={r.id}
+            data-port={`link-${r.id}`}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              onMove(r)
+            }}
+            className="group flex gap-3 border border-card-line p-3"
+          >
             <span className="flex size-[46px] shrink-0 items-center justify-center bg-brand font-display text-[24px] font-extrabold text-on-brand italic">
-              {host[0]?.toUpperCase()}
+              {shown[0]?.toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
               <a
@@ -175,7 +426,7 @@ function Links({
                 title={r.source}
                 className="block truncate type-body-m-strong text-link hover:underline"
               >
-                {host}
+                {shown}
               </a>
               <NoteField
                 key={r.note}
@@ -188,7 +439,7 @@ function Links({
                 href={r.source}
                 target="_blank"
                 rel="noreferrer"
-                aria-label={`Open ${host}`}
+                aria-label={`Open ${shown}`}
                 className="flex size-7 items-center justify-center bg-brand/15 text-link hover:bg-brand hover:text-on-brand"
               >
                 <Icon name="arrow-right-up-line" size={14} />
@@ -215,22 +466,33 @@ function Links({
  * to add them here; a tile moves to the other card with its "Move" button. */
 function Tiles({
   project,
+  group,
   refs,
   tag,
-  run
+  run,
+  onMove
 }: {
   project: string
+  group: Group
   refs: Reference[]
   tag: Tag
   run: Run
+  onMove: (r: Reference) => void
 }): React.JSX.Element {
   const [over, setOver] = useState(false)
   const other: Tag = tag === 'asset' ? 'inspiration' : 'asset'
 
   async function adopt(added: Reference[]): Promise<void> {
-    // new files arrive as inspiration; ones dropped on Usable assets are retagged straight away
-    if (tag === 'asset')
-      await Promise.all(added.map((r) => window.api.updateReference(project, r.id, { tag })))
+    // new files arrive as inspiration and ungrouped; they're filed where they were dropped
+    if (tag === 'asset' || group !== null)
+      await Promise.all(
+        added.map((r) =>
+          window.api.updateReference(project, r.id, {
+            tag,
+            ...(group !== null ? { group } : {})
+          })
+        )
+      )
   }
   function drop(e: DragEvent): void {
     e.preventDefault()
@@ -252,7 +514,14 @@ function Tiles({
       className={`grid grid-cols-2 gap-3 p-4 transition-colors duration-150 ${over ? 'bg-selected' : ''}`}
     >
       {refs.map((r) => (
-        <figure key={r.id} className="group m-0 flex flex-col border border-card-line">
+        <figure
+          key={r.id}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            onMove(r)
+          }}
+          className="group m-0 flex flex-col border border-card-line"
+        >
           <button
             onClick={() => run(() => window.api.openReferenceFile(project, r.source))}
             title={`Open ${r.source}`}
@@ -328,8 +597,13 @@ function Sites({
   onAdd
 }: {
   sites: ResearchState['sites']
-  onAdd: (site: { name: string; url: string; about: string }) => Promise<boolean>
+  onAdd: (site: { name: string; url: string; about: string; tags: string[] }) => Promise<boolean>
 }): React.JSX.Element {
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [tagText, setTagText] = useState('')
+  const allTags = [...new Set(sites.flatMap((s) => s.tags ?? []))].sort()
+  const showTags = sites.length >= SHOW_TAGS_FROM && allTags.length > 0
+  const shown = showTags && tagFilter ? sites.filter((s) => s.tags?.includes(tagFilter)) : sites
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
@@ -337,7 +611,12 @@ function Sites({
 
   async function submit(e: FormEvent): Promise<void> {
     e.preventDefault()
-    if (await onAdd({ name, url, about })) {
+    const tags = tagText
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+    if (await onAdd({ name, url, about, tags })) {
+      setTagText('')
       setAdding(false)
       setName('')
       setUrl('')
@@ -346,16 +625,42 @@ function Sites({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 p-4">
-      {sites.map((s) => (
+    <div className="grid grid-cols-3 gap-3 p-4">
+      {showTags && (
+        <div className="col-span-3 flex flex-wrap gap-1.5">
+          {[null, ...allTags].map((t) => (
+            <button
+              key={t ?? 'all'}
+              aria-pressed={tagFilter === t}
+              onClick={() => setTagFilter(t)}
+              className={`serif-on rounded-full border px-3 py-1 type-label-s ${
+                tagFilter === t
+                  ? 'border-brand bg-brand text-on-brand'
+                  : 'border-card-line text-link hover:bg-selected'
+              }`}
+            >
+              {t ?? 'All'}
+            </button>
+          ))}
+        </div>
+      )}
+      {shown.map((s) => (
         <a
           key={s.url}
+          data-port={`site-${host(s.url)}`}
           href={s.url}
           target="_blank"
           rel="noreferrer"
           title={s.url}
           className="group flex flex-col gap-2 border border-card-line p-4 text-link transition-colors duration-150 hover:border-brand hover:bg-selected"
         >
+          {s.shot && (
+            <img
+              alt=""
+              src={`orchestra://site/${host(s.url)}.png`}
+              className="-mx-4 -mt-4 mb-1 aspect-[16/10] w-[calc(100%+2rem)] max-w-none border-b border-card-line object-cover object-top"
+            />
+          )}
           <span className="flex items-start justify-between">
             <span className="flex size-11 items-center justify-center bg-brand font-display text-[22px] font-extrabold text-on-brand italic">
               {s.name[0]}
@@ -371,6 +676,9 @@ function Sites({
             {s.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
           </span>
           {s.about && <span className="type-body-s text-fg">{s.about}</span>}
+          {s.tags && s.tags.length > 0 && (
+            <span className="font-mono text-[11px] text-dim">{s.tags.join(' · ')}</span>
+          )}
         </a>
       ))}
       {adding ? (
@@ -397,6 +705,13 @@ function Sites({
             onChange={(e) => setAbout(e.target.value)}
             placeholder="What it's good for"
             aria-label="What the site is for"
+            className={`h-9 ${field}`}
+          />
+          <input
+            value={tagText}
+            onChange={(e) => setTagText(e.target.value)}
+            placeholder="Tags, with commas"
+            aria-label="Tags for the site"
             className={`h-9 ${field}`}
           />
           <span className="flex gap-2">
@@ -429,47 +744,59 @@ function Sites({
 type Run = (change: () => Promise<unknown>) => Promise<boolean>
 
 /** The blue card: what Interpret will read, and the button. */
-function Ready({
-  links,
-  inspiration,
-  assets,
+function InterpretBoxBody({
+  port,
+  groups,
+  wired,
   written,
   busy,
+  blocked,
   onRun
 }: {
-  links: number
-  inspiration: number
-  assets: number
+  port: string
+  groups: { key: string; name: string; count: number }[]
+  wired: string[]
   written: boolean
   busy: boolean
+  blocked: boolean // another box is reading; one runs at a time
   onRun: () => void
 }): React.JSX.Element {
-  const total = links + inspiration + assets
+  const connected = groups.filter((g) => wired.includes(g.key))
+  const total = connected.reduce((n, g) => n + g.count, 0)
   return (
-    <div className="flex items-center gap-5 px-5 pt-1 pb-5">
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white text-link">
-        <Icon name="logo-mark" size={28} />
-      </span>
-      <div className="min-w-0 flex-1">
+    <div data-port={port} data-in={port} className="relative flex flex-col gap-4 px-5 pt-1 pb-5">
+      <Port side="left" />
+      <div>
         <p className="type-heading-m">
           {busy
             ? 'Reading…'
             : total === 0
-              ? 'Add references first'
+              ? 'Connect a group'
               : written
                 ? 'Interpreted'
                 : 'Ready to interpret'}
         </p>
         <p className="mt-1 font-mono text-[12px] text-poster-dim">
           {busy
-            ? `The Orchestrator is reading ${total} reference${total === 1 ? '' : 's'}. A minute or two.`
-            : `${links} links · ${inspiration} inspiration · ${assets} assets`}
+            ? `Reading ${total} reference${total === 1 ? '' : 's'}. A minute or two.`
+            : `${total} reference${total === 1 ? '' : 's'} connected`}
         </p>
       </div>
+      {connected.length > 0 ? (
+        <ul className="flex flex-col gap-0.5 font-mono text-[12px]">
+          {connected.map((g) => (
+            <li key={g.key}>{g.name}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="type-body-s text-poster-dim">
+          Drag from the dot on a group to this box to connect it.
+        </p>
+      )}
       <button
         onClick={onRun}
-        disabled={busy || total === 0}
-        className="serif-on h-11 shrink-0 bg-white px-5 type-label-m text-link hover:bg-inverse hover:text-on-brand disabled:opacity-50"
+        disabled={busy || blocked || total === 0}
+        className="serif-on h-11 self-start bg-white px-5 type-label-m text-link hover:bg-inverse hover:text-on-brand disabled:opacity-50"
       >
         {written ? 'Interpret again' : 'Interpret'}
       </button>
@@ -480,7 +807,7 @@ function Ready({
 /** research.md on paper (Board/Paper card): its direction and themes, as written. */
 function Interpretation({ text }: { text: string | null }): React.JSX.Element {
   return (
-    <div className="p-6">
+    <div className="overflow-y-auto p-6" style={{ maxHeight: DOC_BODY }}>
       {text ? (
         <Markdown text={text} />
       ) : (

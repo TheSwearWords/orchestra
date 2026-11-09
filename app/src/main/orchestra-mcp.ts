@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
 import type { InstrumentDraft, MusicianDraft } from './proposals.ts'
+import type { PreviewInput } from './previews.ts'
 import type { OptionInput } from './asks.ts'
 
 // Orchestra's own tools, served to each agent's session over localhost (Pitcrew's pattern). The
@@ -38,6 +39,7 @@ export interface Hub {
   ): Promise<string>
   proposeMusician(project: string, chat: string, draft: MusicianDraft): Promise<string>
   queryGraph(project: string, question: string): Promise<string>
+  setPreview(project: string, chat: string, musician: string, input: PreviewInput): Promise<string>
   openWindow(
     project: string,
     chat: string,
@@ -119,7 +121,7 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
       'open_window',
       {
         description:
-          "Put a choice in the Action box beside your window on the user's Create board, only when seeing the options helps them choose (colour palettes, type pairings, logo routes) and only once you know enough from their research and answers to offer good ones. Ask in plain text first; most questions don't need this. Give each option a few words, and colours (hex) for palettes so the box shows swatches. Call again with the same id to replace the options after they refine. Their pick, or their refinement, comes back as a message starting with the title in brackets, and a picked choice leaves the box.",
+          "Put a choice in the Action box beside your window on the user's Create board, whenever the user has to pick between options, once you know enough from their research and answers to offer good ones. Show the options themselves rather than describing them: colours (hex) for palettes, font (a Google Fonts family name) and sample for typefaces, image for anything visual. Plain words are fine for choices that aren't visual, such as where to start. Call again with the same id to replace the options after they refine. Their pick, or their refinement, comes back as a message starting with the title in brackets, and a picked choice leaves the box.",
         inputSchema: {
           id: z.string().describe('lowercase-with-dashes, one per topic, e.g. "colours"'),
           title: z.string().describe('Short, e.g. "Colours"'),
@@ -131,6 +133,19 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
                 z.object({
                   label: z.string(),
                   colors: z.array(z.string()).optional().describe('Hex swatches, e.g. #0538FF'),
+                  font: z
+                    .string()
+                    .optional()
+                    .describe(
+                      'A Google Fonts family, e.g. Playfair Display: the option is set in it'
+                    ),
+                  sample: z.string().optional().describe('The words to set the font in'),
+                  image: z
+                    .string()
+                    .optional()
+                    .describe(
+                      'https address of a picture, or a png, jpg, gif, webp or svg in the project, e.g. prereqs/logo/a.png'
+                    ),
                   detail: z.string().optional().describe('One short line under the option')
                 })
               ])
@@ -164,6 +179,21 @@ async function build(hub: Hub, project: string, chat: string, agent: string): Pr
         inputSchema: { text: z.string(), done: z.boolean().optional() }
       },
       ({ text, done }) => run(() => hub.report(project, chat, agent, text, done ?? false))
+    )
+    mcp.registerTool(
+      'set_preview',
+      {
+        description:
+          'Show finished work on the board, as a picture the user clicks to go to it. For Figma: the url of the page or frame, and image_url from get_screenshot (its short-lived url) of something representative, such as the buttons or a layout. For a website running locally: the localhost url, dev (the command that serves it) and dir (its folder in the project); Orchestra starts it when clicked and takes the picture itself. Call again with the same label to update it.',
+        inputSchema: {
+          label: z.string().describe('Short, e.g. "Brand kit"'),
+          url: z.string().describe('https, or http on localhost'),
+          image_url: z.string().optional().describe('https address of a png, jpeg or webp'),
+          dev: z.string().optional().describe('e.g. "npm run dev"; localhost only'),
+          dir: z.string().optional().describe('Folder inside the project to run dev in')
+        }
+      },
+      (input) => run(() => hub.setPreview(project, chat, agent, input))
     )
     mcp.registerTool(
       'propose_instrument',

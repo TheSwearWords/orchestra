@@ -296,14 +296,17 @@ function App(): React.JSX.Element {
         <Icon name="arrow-left-line" size={14} />
         Back
       </button>
-      <NeedsYou
-        side={side}
-        projects={projects}
-        onOpen={(project, card) => {
-          requestFocus(project, card)
-          go({ at: 'book', id: project, area: 'create' })
-        }}
-      />
+      {current && (
+        <NeedsYou
+          key={current.id}
+          side={side}
+          project={current}
+          onOpen={(project, card) => {
+            requestFocus(project, card)
+            go({ at: 'book', id: project, area: 'create' })
+          }}
+        />
+      )}
       <OrchestratorBar
         to={to}
         projects={projects}
@@ -318,10 +321,10 @@ function App(): React.JSX.Element {
             ? [
                 { id: 'research', label: 'I Research', hint: current.name },
                 { id: 'create', label: 'II Create', hint: current.name },
-                { id: 'refine', label: 'III Refine', hint: current.name }
+                { id: 'refine', label: 'III Refine', hint: current.name },
+                { id: 'needs', label: 'Needs you', hint: 'What is waiting in this project' }
               ]
-            : []),
-          { id: 'needs', label: 'Needs you', hint: 'Everywhere you are needed' }
+            : [])
         ]}
         onCommand={command}
         onGo={(p) => go({ at: 'book', id: p.project, area: p.area })}

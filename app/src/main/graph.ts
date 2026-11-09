@@ -1,5 +1,5 @@
-import { execFile } from 'child_process'
-import { existsSync } from 'fs'
+import { execFile, spawn } from 'child_process'
+import { existsSync, statSync } from 'fs'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 
@@ -49,6 +49,9 @@ const run = (args: string[], cwd: string, timeout = 30 * 60_000): Promise<string
   )
 
 export interface Graphs {
+  builtAt(project: string): number | null // when its graph file was last written
+  flush(): void // hands any waiting rebuilds to processes that outlive the app
+  refreshVault(): void
   /** Something changed in a project: rebuild its graph soon, then the vault's. */
   touch(project: string): void
   /** Answers a question from a project's graph, or the vault's (project null). */
@@ -133,6 +136,27 @@ export function graphs(opts: {
       return (
         await run(queryArgs(question, file), project ? opts.projectDir(project) : opts.home)
       ).trim()
+    },
+    builtAt(project) {
+      const file = graphFile(opts.projectDir(project))
+      return existsSync(file) ? statSync(file).mtimeMs : null
+    },
+    flush() {
+      // waiting for their turn: finish after the app has gone, so the next launch is up to date
+      for (const [project, timer] of timers) {
+        clearTimeout(timer)
+        const dir = opts.projectDir(project)
+        spawn(GRAPHIFY, ['extract', dir, '--backend', 'claude-cli'], {
+          cwd: dir,
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true
+        }).unref()
+      }
+      timers.clear()
+    },
+    refreshVault() {
+      void merge().catch(() => {}) // only the everything-at-once graph waits for the next build
     },
     status(project) {
       if (running.has(project)) return 'building'

@@ -1,7 +1,8 @@
-// Where you're needed, across every project, like Figma's comments: a button anchored to the
+// Where you're needed in the project you're in, like Figma's comments: a button anchored to the
 // window (bright orange while something unread waits) opens the list; picking one takes you to
-// the window on the board that's waiting, and marks it read.
-import { useEffect, useState } from 'react'
+// the window on the board that's waiting, and marks it read. The Studio doesn't have the button:
+// each cover there carries an orange tag, from the same list.
+import { useEffect, useMemo, useState } from 'react'
 import type { Ask, Project, Proposal } from '../../../preload'
 import { GENERAL, TOP_BAR, chip } from './shared'
 
@@ -42,19 +43,9 @@ const ago = (iso: string): string => {
         : `${Math.round(mins / 1440)}d`
 }
 
-export function NeedsYou({
-  projects,
-  side,
-  onOpen
-}: {
-  projects: Project[]
-  side: number // how far in to sit, clearing the page-turn strip
-  onOpen: (project: string, card: string) => void
-}): React.JSX.Element {
+/** Everything waiting on you in these projects, newest first, kept up to date. */
+export function useNeeds(projects: Project[]): Need[] {
   const [needs, setNeeds] = useState<Need[]>([])
-  const [open, setOpen] = useState(false)
-  const [seen, setSeen] = useState(seenSet)
-
   useEffect(() => {
     let live = true
     const load = (): void =>
@@ -70,7 +61,7 @@ export function NeedsYou({
               .map((a) => ({
                 key: `${p.id}/ask/${a.id}/${a.t}`,
                 project: p.id,
-                card: 'actions',
+                card: `ask-${a.id}`,
                 title: a.title,
                 what: a.question,
                 t: a.t
@@ -99,6 +90,22 @@ export function NeedsYou({
       removeEventListener('focus', load)
     }
   }, [projects])
+  return needs
+}
+
+export function NeedsYou({
+  project,
+  side,
+  onOpen
+}: {
+  project: Project
+  side: number // how far in to sit, clearing the page-turn strip
+  onOpen: (project: string, card: string) => void
+}): React.JSX.Element {
+  const here = useMemo(() => [project], [project])
+  const needs = useNeeds(here)
+  const [open, setOpen] = useState(false)
+  const [seen, setSeen] = useState(seenSet)
 
   useEffect(() => {
     const show = (): void => setOpen(true)
@@ -107,13 +114,12 @@ export function NeedsYou({
   }, [])
 
   const unread = needs.filter((n) => !seen.has(n.key)).length
-  const name = (id: string): string => projects.find((p) => p.id === id)?.name ?? id
   return (
     <div className="absolute z-30" style={{ top: TOP_BAR + 10, right: 14 + side }}>
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        title="Everywhere you're needed"
+        title="What's waiting on you in this project"
         className={`${chip} h-9 gap-2 px-3 type-label-s ${
           unread
             ? 'border-needs-you bg-needs-you text-on-needs-you'
@@ -165,9 +171,7 @@ export function NeedsYou({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="flex justify-between gap-3">
-                          <span className="truncate type-label-s text-link">
-                            {name(n.project)} · {n.title}
-                          </span>
+                          <span className="truncate type-label-s text-link">{n.title}</span>
                           <span className="shrink-0 type-caption text-dim">{ago(n.t)}</span>
                         </span>
                         <span className="mt-0.5 line-clamp-2 block type-body-s text-fg">

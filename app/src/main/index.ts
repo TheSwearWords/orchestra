@@ -1,7 +1,7 @@
 import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { existsSync, mkdirSync } from 'fs'
 import { mkdir, readdir, readFile, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -9,8 +9,23 @@ import { Conductor, GENERAL, STUDIO, readChat, readLog } from './conductor'
 import { agentPrompt, orchestratorPrompt, studioPrompt } from './prompts'
 import { readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
-import { onPath, providerStatus } from './connections'
-import { readSetup, saveSetup } from './setup'
+import { providerStatus } from './connections'
+import { addCoverImage, COVER_TYPES, readCover, saveCover } from './covers'
+import { ensureServer, isLocal, readPreviews, saveThumbnail, stopServers } from './previews'
+import { forgetKey, loadKeys, saveKey } from './keys'
+import { captureSites, shotFile } from './siteshots'
+import {
+  addBox,
+  connectBox,
+  outputFor,
+  readBoxes,
+  removeBox,
+  renameBox,
+  renameBoxGroup
+} from './interprets'
+import { machineCheck, moveHome, readUsageFile, runStep } from './onboard'
+import { findStep } from './recipes'
+import { cleanSetup, readSetup, saveSetup } from './setup'
 import {
   agentFile,
   checkLibrary,
@@ -26,12 +41,18 @@ import { runnableOrThrow } from './providers'
 import { listOutputs, outputPath } from './outputs'
 import { adopt } from './proposals'
 import { graphs } from './graph'
-import { ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
+import { HOME_POINTER, ORCHESTRA_HOME, PROJECTS_DIR } from './paths'
 import { createProject, editProject, listProjects, renameProject, type Project } from './projects'
 import {
   addFiles,
   addLink,
+  addGroup,
   addSite,
+  ensureSite,
+  saveText,
+  readGroups,
+  removeGroup,
+  renameGroup,
   FILE_TYPES,
   listReferences,
   listSites,
@@ -280,7 +301,25 @@ app.whenReady().then(async () => {
       })
     }
   )
-  ipcMain.handle('projects:list', () => listProjects(PROJECTS_DIR))
+  ipcMain.handle('projects:list', async () =>
+    Promise.all(
+      (await listProjects(PROJECTS_DIR)).map(async (p) => ({
+        ...p,
+        cover: await readCover(projectDir(p.id))
+      }))
+    )
+  )
+  ipcMain.handle('projects:setCover', (_, id: string, cover: unknown) =>
+    saveCover(projectDir(id), cover)
+  )
+  ipcMain.handle('projects:pickCover', async (e, id: string) => {
+    const win = BrowserWindow.fromWebContents(e.sender)!
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: COVER_TYPES }]
+    })
+    return canceled || !filePaths[0] ? null : addCoverImage(projectDir(id), filePaths[0])
+  })
   ipcMain.handle(
     'projects:edit',
     (_, id: string, change: { name?: string; client?: string; concept?: string }) => {
@@ -301,10 +340,11 @@ app.whenReady().then(async () => {
 
   // Right-click on a cover. Opening a window and deleting happen here; Enter and Edit are
   // answered so the Studio can play the opening or zoom into the cover editor.
-  ipcMain.handle('projects:menu', (e, id: string, name: string) => {
+  ipcMain.handle('projects:menu', (e, id: string, name: string, groups: unknown) => {
     const dir = projectDir(id)
     const win = BrowserWindow.fromWebContents(e.sender)!
-    return new Promise<'enter' | 'edit' | 'opened' | 'deleted' | null>((resolve) => {
+    const items = (Array.isArray(groups) ? groups : []) as { id: string; label: string }[]
+    return new Promise<string | null>((resolve) => {
       Menu.buildFromTemplate([
         { label: 'Enter project', click: () => resolve('enter') },
         { label: 'Edit project', click: () => resolve('edit') },
@@ -315,6 +355,11 @@ app.whenReady().then(async () => {
             resolve('opened')
           }
         },
+        { type: 'separator' },
+        ...items.map((g) => ({
+          label: String(g.label),
+          click: () => resolve(`group:${String(g.id)}`)
+        })),
         { type: 'separator' },
         {
           label: 'Delete…',
@@ -350,7 +395,7 @@ app.whenReady().then(async () => {
     }
   })
   ipcMain.handle('studio:save', (_, layout: unknown) => {
-    const l = layout as { covers?: unknown; labels?: unknown }
+    const l = layout as { covers?: unknown; labels?: unknown; groups?: unknown }
     const num = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v)
     const covers = Object.entries((l?.covers ?? {}) as Record<string, unknown>).filter(
       ([, v]) => Array.isArray(v) && v.length === 3 && v.every(num)
@@ -359,7 +404,16 @@ app.whenReady().then(async () => {
       (b: { x?: unknown; y?: unknown; text?: unknown }) =>
         num(b?.x) && num(b?.y) && typeof b?.text === 'string'
     )
-    const out = { covers: Object.fromEntries(covers), labels }
+    const groups = (Array.isArray(l?.groups) ? l.groups : [])
+      .filter(
+        (g: { name?: unknown; ids?: unknown }) =>
+          typeof g?.name === 'string' && g.name.trim() && Array.isArray(g.ids)
+      )
+      .map((g: { name: string; ids: unknown[] }) => ({
+        name: g.name.replace(/\s+/g, ' ').trim().slice(0, 60),
+        ids: g.ids.filter((x) => typeof x === 'string')
+      }))
+    const out = { covers: Object.fromEntries(covers), labels, groups }
     return writeFile(studioFile, JSON.stringify(out, null, 2) + '\n')
   })
   // A board's arrangement (an area's or a deliverable's): each card's place, size and whether
@@ -395,17 +449,33 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('research:load', async (_, project: string) => {
     const dir = projectDir(project)
-    const [references, interpretation, sites] = await Promise.all([
+    const boxes = await Promise.all(
+      (await readBoxes(dir)).map(async (b) => ({
+        ...b,
+        text: await readFile(join(dir, outputFor(b.id)), 'utf8').catch(() => null)
+      }))
+    )
+    const [references, interpretation, sites, groups] = await Promise.all([
       listReferences(dir),
       readInterpretation(dir),
-      listSites(ORCHESTRA_HOME)
+      listSites(ORCHESTRA_HOME),
+      readGroups(dir)
     ])
-    return { references, interpretation, sites }
+    return {
+      references,
+      interpretation,
+      sites: sites.map((s) => ({ ...s, shot: existsSync(shotFile(ORCHESTRA_HOME, s.url)) })),
+      groups,
+      boxes
+    }
   })
   ipcMain.handle(
     'research:addLink',
-    (_, project: string, input: { url: string; note: string; tag: Tag }) =>
-      addLink(projectDir(project), input)
+    async (_, project: string, input: { url: string; note: string; tag: Tag }) => {
+      const ref = await addLink(projectDir(project), input)
+      await ensureSite(ORCHESTRA_HOME, ref.source)
+      return ref
+    }
   )
   ipcMain.handle('research:addFiles', (_, project: string, paths: string[]) =>
     addFiles(projectDir(project), paths)
@@ -430,10 +500,15 @@ app.whenReady().then(async () => {
     const error = await shell.openPath(referenceFilePath(projectDir(project), file))
     if (error) throw new Error(error)
   })
-  ipcMain.handle('research:interpret', async (_, project: string) => {
-    const result = await interpret(projectDir(project))
+  ipcMain.handle('research:interpret', async (_, project: string, box: string) => {
+    const result = await interpret(projectDir(project), String(box))
     knowledge.touch(project) // research.md is the graph's best source
     return result
+  })
+  knowledge.refreshVault() // picks up anything finished after the last quit
+  ipcMain.handle('graph:builtAt', (_, project: string) => {
+    projectDir(project)
+    return knowledge.builtAt(project)
   })
   ipcMain.handle('graph:status', (_, project: string) => {
     projectDir(project)
@@ -452,6 +527,39 @@ app.whenReady().then(async () => {
     })
   })
   ipcMain.handle('sites:add', (_, site: Site) => addSite(ORCHESTRA_HOME, site))
+  ipcMain.handle('research:addGroup', (_, project: string, name: unknown, kinds: unknown) =>
+    addGroup(projectDir(project), name, kinds)
+  )
+  ipcMain.handle('research:saveText', (_, project: string, group: unknown, text: unknown) =>
+    saveText(projectDir(project), group, text)
+  )
+  ipcMain.handle('sites:capture', async () =>
+    captureSites(ORCHESTRA_HOME, await listSites(ORCHESTRA_HOME))
+  )
+  ipcMain.handle(
+    'research:renameGroup',
+    async (_, project: string, from: unknown, name: unknown) => {
+      const groups = await renameGroup(projectDir(project), from, name)
+      if (typeof from === 'string')
+        await renameBoxGroup(projectDir(project), from, String(name).trim())
+      return groups
+    }
+  )
+  ipcMain.handle('research:addBox', (_, project: string) => addBox(projectDir(project)))
+  ipcMain.handle('research:renameBox', (_, project: string, id: unknown, name: unknown) =>
+    renameBox(projectDir(project), id, name)
+  )
+  ipcMain.handle('research:removeBox', (_, project: string, id: unknown) =>
+    removeBox(projectDir(project), id)
+  )
+  ipcMain.handle(
+    'research:connectBox',
+    (_, project: string, id: unknown, group: unknown, on: unknown) =>
+      connectBox(projectDir(project), id, group, on === true)
+  )
+  ipcMain.handle('research:removeGroup', (_, project: string, name: unknown) =>
+    removeGroup(projectDir(project), name)
+  )
 
   ipcMain.handle('create:load', async (_, project: string) => {
     const dir = projectDir(project)
@@ -490,16 +598,38 @@ app.whenReady().then(async () => {
     await writeFile(file, editAgent(md, role, key as EditKey, String(value)))
   })
   ipcMain.handle('providers:status', () => providerStatus())
-  // first-time setup, plus what this machine already has, so the cards can say so
+  ipcMain.handle('usage:read', () => readUsageFile())
+  void loadKeys().catch(() => {}) // a key that won't decrypt just has to be entered again
+  // first-time setup
   ipcMain.handle('setup:load', async () => ({
     setup: await readSetup(ORCHESTRA_HOME),
-    home: ORCHESTRA_HOME,
-    gh: onPath('gh'),
-    obsidian:
-      onPath('obsidian') ||
-      existsSync(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Obsidian', 'Obsidian.exe'))
+    home: ORCHESTRA_HOME
   }))
-  ipcMain.handle('setup:save', (_, v: unknown) => saveSetup(ORCHESTRA_HOME, v))
+  ipcMain.handle('setup:check', () => machineCheck())
+  ipcMain.handle('setup:run', (_, id: string) => runStep(String(id)))
+  ipcMain.handle('setup:open', async (_, id: string) => {
+    const step = findStep(String(id))
+    if (step?.how === 'open' && step.url) await shell.openExternal(step.url)
+  })
+  ipcMain.handle('setup:pickFolder', async (e, current: string) => {
+    const win = BrowserWindow.fromWebContents(e.sender)!
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      defaultPath: String(current),
+      properties: ['openDirectory', 'createDirectory', 'promptToCreate']
+    })
+    return canceled ? null : (filePaths[0] ?? null)
+  })
+  ipcMain.handle('setup:saveKey', (_, id: string, key: unknown) => saveKey(String(id), key))
+  ipcMain.handle('setup:forgetKey', (_, id: string) => forgetKey(String(id)))
+  ipcMain.handle('setup:finish', async (_, v: unknown) => {
+    const s = cleanSetup(v)
+    if (resolve(s.workspace || ORCHESTRA_HOME) === resolve(ORCHESTRA_HOME))
+      return void (await saveSetup(ORCHESTRA_HOME, s))
+    await moveHome(ORCHESTRA_HOME, s.workspace, s, HOME_POINTER)
+    // the data root is read once at launch
+    app.relaunch()
+    app.exit(0)
+  })
   ipcMain.handle('agents:newInstrument', (_, musician: string) =>
     newInstrument(ORCHESTRA_HOME, String(musician))
   )
@@ -584,6 +714,35 @@ app.whenReady().then(async () => {
     return conductor.agentStates(project)
   })
   ipcMain.handle('create:outputs', (_, project: string) => listOutputs(projectDir(project)))
+  ipcMain.handle('previews:list', (_, project: string) => readPreviews(projectDir(project)))
+  ipcMain.handle(
+    'previews:open',
+    async (_, project: string, deliverable: string, label: string) => {
+      const dir = projectDir(project)
+      const p = (await readPreviews(dir))[String(deliverable)]?.find((x) => x.label === label)
+      if (!p) throw new Error('That preview is gone.')
+      if (isLocal(p.url)) await ensureServer(dir, p)
+      await shell.openExternal(p.url)
+      if (!isLocal(p.url) || p.image) return
+      // a local site has no picture yet: take one from a window nobody sees
+      const shot = new BrowserWindow({ show: false, width: 1280, height: 800 })
+      try {
+        await shot.loadURL(p.url)
+        await new Promise((r) => setTimeout(r, 2000))
+        const img = await shot.webContents.capturePage()
+        await saveThumbnail(dir, deliverable, label, img.resize({ width: 800 }).toPNG())
+        BrowserWindow.getAllWindows().forEach((w) =>
+          w.webContents.send('chat:event', { project, chat: 'general', kind: 'agents' })
+        )
+      } finally {
+        shot.destroy()
+      }
+    }
+  )
+  ipcMain.handle('create:readOutput', (_, project: string, rel: string) => {
+    if (!String(rel).endsWith('.md')) throw new Error('Only markdown files can be shown here.')
+    return readFile(outputPath(projectDir(project), String(rel)), 'utf8')
+  })
   ipcMain.handle('create:openOutput', async (_, project: string, rel: string) => {
     const error = await shell.openPath(outputPath(projectDir(project), String(rel)))
     if (error) throw new Error(error)
@@ -595,6 +754,11 @@ app.whenReady().then(async () => {
     try {
       const { host, pathname } = new URL(req.url)
       const [project, file] = pathname.slice(1).split('/').map(decodeURIComponent)
+      // pictures the Orchestrator offers in the Action box, from anywhere in the project
+      if (host === 'file' && /\.(png|jpe?g|gif|webp|svg)$/i.test(file))
+        return net.fetch(pathToFileURL(outputPath(projectDir(project), file)).href)
+      if (host === 'site' && /^[a-z0-9.-]+\.png$/.test(project))
+        return net.fetch(pathToFileURL(join(ORCHESTRA_HOME, 'sites', project)).href)
       if (host !== 'ref') throw new Error()
       return net.fetch(pathToFileURL(referenceFilePath(projectDir(project), file)).href)
     } catch {
@@ -609,7 +773,11 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('before-quit', () => conductor.stopAll())
+app.on('before-quit', () => {
+  conductor.stopAll()
+  stopServers()
+  knowledge.flush()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

@@ -11,7 +11,7 @@ export interface Output {
 }
 
 const TOP_FILES = ['research.md', 'deliverables.md']
-const FOLDERS = ['prereqs', 'exports']
+const FOLDERS = ['prereqs', 'exports', 'research']
 
 async function walk(root: string, dir: string, depth: number): Promise<Output[]> {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])

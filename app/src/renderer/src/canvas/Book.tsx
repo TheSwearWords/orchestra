@@ -16,6 +16,7 @@ export interface Frame {
   crumbs: Step[]
   pages: React.ReactNode
   preview: boolean
+  go?: (a: Area) => void // to another area of the book
 }
 
 interface Props {
@@ -177,7 +178,8 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
           {render(open, {
             crumbs: [...base, { label: `${current.numeral} ${current.name}` }],
             pages: pages(open),
-            preview: false
+            preview: false,
+            go: onArea
           })}
         </div>
       )}

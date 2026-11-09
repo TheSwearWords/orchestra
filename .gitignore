@@ -21,3 +21,19 @@ graphify-out/
 # Client projects stay out of the app repo; only Orchestra's own brand project is tracked
 Orchestra/projects/*
 !Orchestra/projects/orchestra-brand/
+
+# The product site has its own private repo (orchestra-site)
+Site/
+website/
+
+# What running the app writes: one person's setup and working files
+Orchestra/setup.json
+Orchestra/setup.json.*
+Orchestra/studio.json
+Orchestra/sites.json
+Orchestra/sites/
+Orchestra/studio/
+Orchestra/projects/orchestra-brand/.orchestra/
+Orchestra/projects/orchestra-brand/boards/
+Orchestra/projects/orchestra-brand/references/
+app/*.tsbuildinfo

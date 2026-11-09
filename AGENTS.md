@@ -242,13 +242,13 @@ Other habits that prevent conflicts:
 
 ## What never gets committed
 
-Stage files by name. `.gitignore` doesn't yet cover these:
+Stage files by name. `.gitignore` covers most of these, but not library edits:
 
 - `Orchestra/setup.json`, `setup.json.bak`, `studio.json`, `sites.json` and `Orchestra/studio/`
 - Anything new under `Orchestra/projects/orchestra-brand/` from running the app (`boards/`, `references/`, `.orchestra/`, `.graphifyignore`)
 - Library edits made by clicking around in the app, such as `library/instruments/new-instrument*.md`
 - `app/tsconfig.*.tsbuildinfo`
-- `Site/`
+- `Site/` and `website/`: the product site has its own private repo, `orchestra-site`
 
 Commit changes to `Orchestra/library/` only when the agent content is what you meant to change.
 

@@ -24,7 +24,6 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 - A usage meter under the bar shows your 5-hour and weekly Claude limits.
 - Full-height buttons on the left and right of the window move between Research, Create and Refine.
 - Zoom shortcuts: `+` and `-`, Ctrl or Shift+0 for 100%, Shift+1 to fit everything, Shift+2 to fit the selected window.
-- The product site redesign and deployment files are in the repo, under `Site/`.
 
 ### Changed
 

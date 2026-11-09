@@ -58,6 +58,50 @@ export const RUNNABLE: ProviderId[] = ['anthropic']
 
 export type ProviderStatus = Record<ProviderId, { connected: boolean; via: string }>
 
+export interface ProviderLink {
+  connected: boolean | null // null: still checking this machine
+  note: string
+  undo?: 'key' | 'account' // what Disconnect removes; none means it isn't Orchestra's to remove
+}
+
+/** What Settings says about one provider. `via` is its ProviderStatus.via. */
+export function providerLink(
+  p: ProviderInfo,
+  via: string,
+  savedKey: boolean,
+  signedIn: boolean | null,
+  plan = ''
+): ProviderLink {
+  const envKey = p.env.includes(via)
+  if (savedKey && envKey) {
+    const first = p.id === 'anthropic' ? ' It’s used instead of any Claude subscription.' : ''
+    return {
+      connected: true,
+      note: `Using the API key saved on this computer.${first}`,
+      undo: 'key'
+    }
+  }
+  if (savedKey)
+    return {
+      connected: false,
+      note: 'The saved key can’t be read on this computer. Disconnect, then add it again.',
+      undo: 'key'
+    }
+  if (envKey)
+    return {
+      connected: true,
+      note: `Using ${via} from this computer’s environment. Change it there.`
+    }
+  if (signedIn === null) return { connected: null, note: 'Checking…' }
+  if (!signedIn) return { connected: false, note: p.connectHint }
+  if (p.id === 'anthropic')
+    return { connected: true, note: `Signed in${plan ? ` · ${plan}` : ''}`, undo: 'account' }
+  return {
+    connected: true,
+    note: `${p.cli} is installed. Orchestra can’t tell whether you’re signed in.`
+  }
+}
+
 /** Refuses, with a reason the user can act on, to start an agent on a provider Orchestra can't
  * run yet, instead of passing a foreign model name to Claude Code. */
 export function runnableOrThrow(agent: { name: string; provider: string }): void {

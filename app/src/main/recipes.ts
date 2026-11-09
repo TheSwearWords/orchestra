@@ -163,7 +163,15 @@ export const GRAPHIFY: SetupStep = {
   cmd: 'pip install graphifyy'
 }
 
+export const SIGN_OUT: SetupStep = {
+  id: 'anthropic-logout',
+  text: 'Sign Claude Code out on this computer.',
+  how: 'run',
+  cmd: 'claude auth logout'
+}
+
 export const ALL_STEPS: SetupStep[] = [
+  SIGN_OUT,
   ...RECIPES.flatMap((r) => r.steps),
   ...Object.values(ACCOUNTS).flatMap((a) => [a.install, a.login, a.getKey]),
   GITHUB.install,

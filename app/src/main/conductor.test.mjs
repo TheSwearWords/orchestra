@@ -3,8 +3,21 @@ import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { describeTool, handoffFile, readChat, readLog } from './conductor.ts'
+import { Conductor, describeTool, handoffFile, readChat, readLog } from './conductor.ts'
 import { listOutputs, outputPath } from './outputs.ts'
+
+test('restartAll stops each chat with a running session once', async () => {
+  const c = Object.create(Conductor.prototype)
+  c.orchestrators = new Map([['p/general', {}]])
+  c.agents = new Map([
+    ['p/site--logo', { chat: 'general' }],
+    ['q/site', { chat: 't-1' }]
+  ])
+  const stopped = []
+  c.stop = async (project, chat) => void stopped.push(`${project}/${chat}`)
+  await c.restartAll()
+  assert.deepEqual(stopped.sort(), ['p/general', 'q/t-1'])
+})
 
 test('readChat keeps good lines, skips a half-written one, and refuses odd chat ids', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'orchestra-chat-'))

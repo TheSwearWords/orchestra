@@ -6,7 +6,7 @@ Last checked against commit `d2d501f` on branch `canvas` (2026-11-08). If you ch
 
 ## The ten rules
 
-1. Branch from `canvas`, and open your pull request against `canvas` (see [Branches and merging](#branches-and-merging)).
+1. Branch from `main`, and open your pull request against `main` (see [Branches and merging](#branches-and-merging)).
 2. Keep one concern per branch. Never reformat, rename or reorganise a file as part of a feature.
 3. Put new logic in a new file. Touch the shared files below with as few lines as possible.
 4. Everything that touches the disk, a process or the network runs in the main process. The renderer only calls `window.api`.
@@ -74,7 +74,7 @@ The main process splits into small modules:
 | `recipes.ts`, `onboard.ts` | How each setup item really connects, and running those steps. Main runs a step only by its id in `recipes.ts`. Pure data in `recipes.ts` is shared with the renderer. |
 | `covers.ts` | A book's cover colour and artwork (`<project>/cover.json`). |
 | `previews.ts` | Where finished work lives (`.orchestra/previews.json`), its thumbnails, and starting local dev servers. `cleanPreview` is a trust boundary: agents supply the input. |
-| `keys.ts` | API keys from setup: tested with the provider, encrypted with `safeStorage`, kept in Electron's `userData`, never in the vault. |
+| `keys.ts` | API keys from setup: tested with the provider, encrypted with `safeStorage`, kept in Electron's `userData`, never in the vault. Changing a key or signing out ends running agent sessions (`Conductor.restartAll`), because a session keeps the credentials it started with. |
 
 ## How the pieces talk
 
@@ -209,12 +209,12 @@ The renderer may import from `src/main/` only the three modules with no Node dep
 
 ## Branches and merging
 
-**Base branch.** All current work is on `canvas`. GitHub's default branch, `main`, is 12 commits behind it and still has the old sidebar UI. Run `git log origin/main..origin/canvas` before you start. If it prints nothing, `canvas` has been merged and you should use `main`.
+**Base branch.** All current work is on `main`. The `canvas` branch has been merged into it.
 
 **Landing a change.**
 
 1. Branch from the latest base. If several agents work at once, give each its own `git worktree` and run `npm install` in each one's `app/`.
-2. Before opening the pull request, and again before merging, run `git merge origin/canvas`. Don't rebase or force-push a branch you've already published.
+2. Before opening the pull request, and again before merging, run `git merge origin/main`. Don't rebase or force-push a branch you've already published.
 3. Changes land as merge commits. Don't squash.
 
 **Where collisions happen.** These files changed most often across the last 60 commits touching `app/`:

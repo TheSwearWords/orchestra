@@ -2,6 +2,17 @@
 
 What changed in Orchestra, newest first. Add to the top section with each push.
 
+## 2026-11-09
+
+### Added
+
+- Settings has a Providers section: see what each provider is really connected through, disconnect it, and reconnect with an account or API key, without going back through onboarding.
+
+### Changed
+
+- The Canvas build is now on `main`.
+- Providers moved from the MCPs window to Settings. A provider counts as connected only when you're signed in or have a key, not just because its tool is installed.
+
 ## 2026-11-08
 
 ### Added

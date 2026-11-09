@@ -10,10 +10,9 @@ type Saved = Partial<Record<ProviderId, string>> // base64 of the encrypted key
 
 const file = (): string => join(app.getPath('userData'), 'keys.json')
 const read = (): Promise<Saved> =>
-  readFile(file(), 'utf8').then(
-    (t) => JSON.parse(t) as Saved,
-    () => ({})
-  )
+  readFile(file(), 'utf8')
+    .then((t) => JSON.parse(t) as Saved)
+    .catch(() => ({})) // missing, or damaged: a damaged file mustn't block adding a key again
 
 const CHECK: Record<ProviderId, (key: string) => [string, Record<string, string>]> = {
   anthropic: (k) => [
@@ -51,6 +50,8 @@ export async function saveKey(id: string, raw: unknown): Promise<void> {
   await writeFile(file(), JSON.stringify(saved))
   process.env[p.env[0]] = key
 }
+
+export const savedKeys = async (): Promise<string[]> => Object.keys(await read())
 
 export async function forgetKey(id: string): Promise<void> {
   const p = provider(id)

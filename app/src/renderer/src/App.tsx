@@ -312,9 +312,9 @@ function App(): React.JSX.Element {
         projects={projects}
         commands={[
           { id: 'agents', label: 'Agents', hint: 'Opens on the Studio desk' },
-          { id: 'mcps', label: 'MCPs and providers', hint: 'Opens on the Studio desk' },
+          { id: 'mcps', label: 'MCPs', hint: 'Opens on the Studio desk' },
           { id: 'graph', label: 'Knowledge graph', hint: 'Opens on the Studio desk' },
-          { id: 'settings', label: 'Settings', hint: 'Opens on the Studio desk' },
+          { id: 'settings', label: 'Settings and providers', hint: 'Opens on the Studio desk' },
           { id: 'studio', label: 'Studio', hint: 'Every project' },
           { id: 'new', label: 'New project', hint: 'A blank cover' },
           ...(current

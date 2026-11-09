@@ -263,6 +263,19 @@ export class Conductor implements Hub {
     this.opts.emit({ project, chat, kind: 'busy', busy: false })
   }
 
+  /** A running session keeps the credentials it started with, so a provider change ends them
+   * all. Conversations are kept; the next message resumes on the new credentials. */
+  async restartAll(): Promise<void> {
+    const chats = new Set([
+      ...this.orchestrators.keys(),
+      ...[...this.agents].map(([key, a]) => `${key.split('/')[0]}/${a.chat}`)
+    ])
+    for (const c of chats) {
+      const [project, chat] = c.split('/')
+      await this.stop(project, chat)
+    }
+  }
+
   stopAll(): void {
     for (const o of this.orchestrators.values()) o.s.kill()
     for (const a of this.agents.values()) a.s.kill()

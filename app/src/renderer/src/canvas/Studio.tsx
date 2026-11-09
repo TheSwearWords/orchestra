@@ -26,7 +26,7 @@ import { GroupLabel } from './GroupLabel'
 import { AgentFile, Agents } from '../components/Agents'
 import { Knowledge } from './Knowledge'
 import { Icon } from '../components/Icon'
-import { PROVIDERS, type ProviderId } from '../../../main/providers'
+import { ProviderSettings } from './ProviderSettings'
 
 interface Props {
   projects: Project[]
@@ -641,56 +641,30 @@ const GRAPH_WIDE = 1344 // the Knowledge window, expanded
 const DESK_H = 156
 const DESK: { id: Desk; name: string; note: string; icon: string }[] = [
   { id: 'agents', name: 'Agents', note: 'The Ensemble: who plays what', icon: 'team-line' },
-  { id: 'mcps', name: 'MCPs', note: 'Providers and the tools agents use', icon: 'shapes-line' },
+  { id: 'mcps', name: 'MCPs', note: 'The tools agents use', icon: 'shapes-line' },
   {
     id: 'graph',
     name: 'Knowledge graph',
     note: 'What your work keeps coming back to',
     icon: 'layout-grid-line'
   },
-  { id: 'settings', name: 'Settings', note: 'You, and this machine', icon: 'settings-3-line' }
+  { id: 'settings', name: 'Settings', note: 'Providers, and this machine', icon: 'settings-3-line' }
 ]
 // the windows the desk opens, on the board below it
 // shortcut: their places last for the session only; save them in studio.json if people move them
 // (guess: about how tall each grows, for bringing it into view)
 const WINDOW: Record<Desk, Omit<CardSpec, 'id' | 'x' | 'y' | 'body'> & { guess: number }> = {
   agents: { title: 'Agents · the Ensemble', w: 1152, guess: 1100 },
-  mcps: { title: 'MCPs and providers', w: 528, guess: 360 },
+  mcps: { title: 'MCPs', w: 528, guess: 140 },
   graph: { title: 'Knowledge graph', w: 704, guess: 1100 },
-  settings: { title: 'Settings', w: 480, guess: 160 }
+  settings: { title: 'Settings', w: 480, guess: 480 }
 }
 
-/** Who agents can run on, and the tool servers they can reach. */
+/** The tool servers agents can reach. */
 function Connections(): React.JSX.Element {
-  const [status, setStatus] = useState<Record<
-    ProviderId,
-    { connected: boolean; via: string }
-  > | null>(null)
-  useEffect(() => {
-    void window.api.providerStatus().then(setStatus, () => {})
-  }, [])
   return (
     <div className="p-5">
-      <h3 className="type-label-mono text-link">Providers</h3>
-      <ul className="mt-2 divide-y divide-hair">
-        {PROVIDERS.map((p) => {
-          const s = status?.[p.id]
-          return (
-            <li key={p.id} className="flex items-center justify-between gap-4 py-3">
-              <span>
-                <span className="block type-body-m-strong text-link">{p.name}</span>
-                <span className="type-caption text-dim">{s?.via ?? '…'}</span>
-              </span>
-              <span
-                className={`rounded-full px-2.5 py-0.5 type-label-s ${s?.connected ? 'bg-success-subtle text-success-fg' : 'border border-dashed border-wire text-link'}`}
-              >
-                {s?.connected ? 'Connected' : 'Not connected'}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-      <h3 className="mt-5 type-label-mono text-link">MCP servers</h3>
+      <h3 className="type-label-mono text-link">MCP servers</h3>
       <p className="mt-2 type-body-s text-dim">
         Figma first, then Blender and Fusion: connecting tool servers for agents is next on the
         build plan. Until then agents work in files.
@@ -702,7 +676,9 @@ function Connections(): React.JSX.Element {
 function Settings(): React.JSX.Element {
   return (
     <div className="p-5">
-      <p className="type-body-s text-dim">
+      <ProviderSettings />
+      <h3 className="mt-5 type-label-mono text-link">Shortcuts</h3>
+      <p className="mt-2 type-body-s text-dim">
         Theme, account and shortcuts come here. For now: / jumps to the Orchestrator, Esc steps out,
         1 2 3 move between the movements, and the mouse&apos;s back and forward buttons retrace your
         steps.

@@ -12,7 +12,7 @@ import { interpret, readInterpretation } from './interpret'
 import { providerStatus } from './connections'
 import { addCoverImage, COVER_TYPES, readCover, saveCover } from './covers'
 import { ensureServer, isLocal, readPreviews, saveThumbnail, stopServers } from './previews'
-import { forgetKey, loadKeys, saveKey } from './keys'
+import { forgetKey, loadKeys, savedKeys, saveKey } from './keys'
 import { captureSites, shotFile } from './siteshots'
 import {
   addBox,
@@ -24,7 +24,7 @@ import {
   renameBoxGroup
 } from './interprets'
 import { machineCheck, moveHome, readUsageFile, runStep } from './onboard'
-import { findStep } from './recipes'
+import { findStep, SIGN_OUT } from './recipes'
 import { cleanSetup, readSetup, saveSetup } from './setup'
 import {
   agentFile,
@@ -606,7 +606,11 @@ app.whenReady().then(async () => {
     home: ORCHESTRA_HOME
   }))
   ipcMain.handle('setup:check', () => machineCheck())
-  ipcMain.handle('setup:run', (_, id: string) => runStep(String(id)))
+  ipcMain.handle('setup:run', async (_, id: string) => {
+    const result = await runStep(String(id))
+    if (id === SIGN_OUT.id && result.ok) await conductor.restartAll()
+    return result
+  })
   ipcMain.handle('setup:open', async (_, id: string) => {
     const step = findStep(String(id))
     if (step?.how === 'open' && step.url) await shell.openExternal(step.url)
@@ -619,8 +623,15 @@ app.whenReady().then(async () => {
     })
     return canceled ? null : (filePaths[0] ?? null)
   })
-  ipcMain.handle('setup:saveKey', (_, id: string, key: unknown) => saveKey(String(id), key))
-  ipcMain.handle('setup:forgetKey', (_, id: string) => forgetKey(String(id)))
+  ipcMain.handle('setup:savedKeys', () => savedKeys())
+  ipcMain.handle('setup:saveKey', async (_, id: string, key: unknown) => {
+    await saveKey(String(id), key)
+    await conductor.restartAll()
+  })
+  ipcMain.handle('setup:forgetKey', async (_, id: string) => {
+    await forgetKey(String(id))
+    await conductor.restartAll()
+  })
   ipcMain.handle('setup:finish', async (_, v: unknown) => {
     const s = cleanSetup(v)
     if (resolve(s.workspace || ORCHESTRA_HOME) === resolve(ORCHESTRA_HOME))

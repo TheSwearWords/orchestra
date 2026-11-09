@@ -241,6 +241,7 @@ const api = {
   saveKey: (provider: string, key: string): Promise<void> =>
     ipcRenderer.invoke('setup:saveKey', provider, key),
   forgetKey: (provider: string): Promise<void> => ipcRenderer.invoke('setup:forgetKey', provider),
+  savedKeys: (): Promise<string[]> => ipcRenderer.invoke('setup:savedKeys'),
   finishSetup: (s: Setup): Promise<void> => ipcRenderer.invoke('setup:finish', s),
   // a blank Instrument in a Musician's crew; returns its id
   newInstrument: (musician: string): Promise<string> =>

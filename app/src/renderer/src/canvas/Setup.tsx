@@ -53,20 +53,20 @@ const spot = (i: number): { x: number; y: number } => ({
   y: Math.floor(i / 2) * 528
 })
 
-const primary =
+export const primary =
   'serif-on h-10 bg-brand px-4 type-label-m text-on-brand hover:bg-inverse disabled:bg-placeholder disabled:text-on-brand'
 const secondary =
   'serif-on h-10 border-[1.5px] border-brand px-4 type-label-m text-link hover:bg-brand hover:text-on-brand'
-const small =
+export const small =
   'serif-on h-8 shrink-0 border border-chip-line px-2.5 type-label-s text-link hover:bg-selected'
-const input =
+export const input =
   'w-full border-0 border-b-2 border-brand bg-transparent pb-2 type-body-l text-link outline-none placeholder:text-placeholder'
 const choice = (on: boolean): string =>
   `flex flex-col items-start gap-0.5 p-2.5 text-left disabled:opacity-50 ${
     on ? 'serif-on bg-brand text-on-brand' : 'bg-card text-link enabled:hover:bg-selected'
   }`
 
-const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
+export const reason = (err: unknown): string => String(err).replace(/^.*Error: /, '')
 
 /** One instruction: what to do, the command if there is one, and the way to do it from here. */
 export function StepRow({

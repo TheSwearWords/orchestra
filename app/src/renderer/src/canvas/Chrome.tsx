@@ -2,6 +2,8 @@
 import { Icon } from '../components/Icon'
 import { AREAS, TOP_BAR, chip, type Area } from './shared'
 import { clampZoom, type Camera, type Rect } from './camera'
+import { Taper } from './Taper'
+import { MODE_ICON } from './tabList'
 
 export type Step = { label: string; onClick?: () => void }
 
@@ -33,7 +35,7 @@ export function Shell({
         <div className="flex items-center gap-2">{right}</div>
       </header>
       {pages && (
-        <div className="absolute left-1/2 z-20 -translate-x-1/2" style={{ top: TOP_BAR + 10 }}>
+        <div className="absolute left-1/2 z-20 -translate-x-1/2" style={{ top: TOP_BAR }}>
           {pages}
         </div>
       )}
@@ -119,43 +121,48 @@ export function Breadcrumb({ steps }: { steps: Step[] }): React.JSX.Element {
   )
 }
 
-/** The pages, centred under the top bar where you look to see where you are: a blue label
- * naming the page beside three small page icons, I to III, the current one filled. */
+/** The area switch: a notch hanging from the header's bottom edge, with the book and its three
+ * areas as icons. The one you are on is a chalk pill that also names it. */
 export function AreaSwitch({
   current,
   onGo
 }: {
   current: Area | null
-  onGo: (a: Area) => void
+  onGo: (a: Area | null) => void
 }): React.JSX.Element {
-  const here = AREAS.find((a) => a.id === current)
+  const slots: { id: Area | null; label: string; key?: number }[] = [
+    { id: null, label: 'The whole book' },
+    ...AREAS.map((a, i) => ({ id: a.id, label: `${a.numeral} · ${a.name}`, key: i + 1 }))
+  ]
   return (
-    <div className="glass flex h-9 items-stretch border border-chip-line bg-chip shadow-float">
-      <span className="flex w-36 items-center justify-center bg-brand px-3 type-label-mono whitespace-nowrap text-on-brand">
-        {here ? `${here.numeral} · ${here.name}` : 'The whole book'}
-      </span>
-      <div role="tablist" aria-label="Movements" className="flex items-center gap-1 px-1.5">
-        {AREAS.map((a, i) => {
-          const on = a.id === current
-          return (
-            <button
-              key={a.id}
-              role="tab"
-              aria-selected={on}
-              aria-label={`${a.numeral} ${a.name}`}
-              title={`${a.numeral} · ${a.name} (${i + 1})`}
-              onClick={() => onGo(a.id)}
-              className={`relative h-7 w-[22px] border transition-colors duration-200 ease-(--ease) ${
-                on ? 'border-brand bg-brand/30' : 'border-brand/25 bg-brand/8 hover:bg-brand/18'
-              }`}
-            >
-              <span className="absolute top-0.5 left-[3px] font-mono text-[8px] leading-none text-link">
-                {a.numeral}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+    <div
+      role="tablist"
+      aria-label="Areas"
+      className="glass relative flex items-center gap-1 rounded-b-[14px] border border-t-0 border-chip-line bg-chip px-2 pt-1 pb-1.5"
+    >
+      <Taper solid="tr" className="top-0 -left-2.5 text-chip" />
+      <Taper solid="tl" className="top-0 -right-2.5 text-chip" />
+      {slots.map((s) => {
+        const on = s.id === current
+        return (
+          <button
+            key={s.id ?? 'book'}
+            role="tab"
+            aria-selected={on}
+            aria-label={s.label}
+            title={s.key ? `${s.label} (${s.key})` : s.label}
+            onClick={() => onGo(s.id)}
+            className={`flex h-[30px] items-center justify-center gap-2 rounded-full transition-colors duration-200 ease-(--ease) ${
+              on
+                ? 'bg-inverse px-3 type-body-s font-medium whitespace-nowrap text-inverse'
+                : 'w-[30px] text-dim hover:bg-selected hover:text-fg'
+            }`}
+          >
+            <Icon name={MODE_ICON[s.id ?? 'book']} size={16} />
+            {on && s.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -183,7 +190,9 @@ export function NewCard({
   )
 }
 
-export const SIDE = 56 // width of the page-turn strips, which the corners move in to clear
+// The page-turn strips are gone (EdgeTab.tsx), so the corners no longer move in.
+// shortcut: kept at 0 for its callers; remove with PageTurn in the clean-up phase
+export const SIDE = 0
 
 /** A full-height strip at the window's edge that goes to the neighbouring area. At the first
  * and last area it stays as an empty strip, so the frame doesn't change as you go. */

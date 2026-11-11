@@ -44,8 +44,9 @@ import {
   seatColumns,
   windowX
 } from '../canvas/stage'
-import { splitDecision, type Decision } from '../decide'
+import { splitDecision, waitingOnUser, type Decision } from '../decide'
 import { splitSuggestion } from '../suggest'
+import { OpenQuestion } from './OpenQuestion'
 import { splitGoTo, type Place } from '../goto'
 import { Icon } from './Icon'
 import { DeliverableEditor } from './DeliverableEditor'
@@ -285,6 +286,9 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     w: lockX + LOCK_R + 56 - stageLeft,
     h: stageBottom - stageTop
   }
+  // the frame on the left: Lock in stands outside it, between it and the research
+  const deliverablesRight = PREREQ.x + PREREQ.w / 2 + 56
+  const deliverablesGroup = { ...stageGroup, w: deliverablesRight - stageLeft }
   const windowsY = stageGroup.y + stageGroup.h + 160
   const spot = new Map(foundations.map((f, i) => [f.id, spots[i]]))
   // one that names no file can't be checked, so it never holds anything up (same in the conductor)
@@ -415,7 +419,20 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         x2: lockX - LOCK_R,
         y2: lockY,
         on: !hover || hover === f.id
-      }))
+      })),
+    // with no prerequisites lit, the group itself still feeds Lock in
+    ...(lit.size
+      ? []
+      : [
+          {
+            key: 'deliverables-lock',
+            x1: deliverablesRight,
+            y1: lockY,
+            x2: lockX - LOCK_R,
+            y2: lockY,
+            on: false
+          }
+        ])
   ]
 
   const extent = stageGroup
@@ -648,7 +665,20 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     .filter((a) => a.status === 'open')
     .sort((a, b) => a.t.localeCompare(b.t))
   // questions each get a window of their own; this is what's left for the Action box
-  const waiting = approvals.length + (question ? 1 : 0) + (suggested.length ? 1 : 0)
+  const openEnded =
+    question || suggested.length
+      ? null
+      : waitingOnUser(general, new Set(plan.musicians.map((m) => m.id)), plan.selected)
+  const answerInChat = (text: string): Promise<boolean> =>
+    window.api.sendChat(project, GENERAL, text).then(
+      () => true,
+      (e) => {
+        setError(reason(e))
+        return false
+      }
+    )
+  const waiting =
+    approvals.length + (question ? 1 : 0) + (suggested.length ? 1 : 0) + (openEnded ? 1 : 0)
   /** Whose group a question sits in: the deliverable it's about, or the one that needs it. */
   const askOwner = (about?: string): string | undefined =>
     about && spawned.includes(about)
@@ -735,18 +765,16 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               ))}
               {question && (
                 <div className="p-5">
-                  <DecisionCard
-                    decision={question}
+                  <DecisionCard decision={question} disabled={generalBusy} onPick={answerInChat} />
+                </div>
+              )}
+              {openEnded && (
+                <div className="p-5">
+                  <OpenQuestion
+                    key={openEnded.t}
+                    question={openEnded.question}
                     disabled={generalBusy}
-                    onPick={(label) =>
-                      window.api.sendChat(project, GENERAL, label).then(
-                        () => true,
-                        (e) => {
-                          setError(reason(e))
-                          return false
-                        }
-                      )
-                    }
+                    onSend={answerInChat}
                   />
                 </div>
               )}
@@ -891,7 +919,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     x: stageGroup.x + stageGroup.w + 112 + i * 672,
     y: stageGroup.y,
     pin: true,
-    bottom: stageBottom,
+    bottom: stageBottom - 28, // its group's frame then ends level with the Deliverables frame
     w: 600,
     body: <DocWindow project={project} path={d.path} stamp={d.stamp} />
   }))
@@ -938,8 +966,9 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       preview={frame.preview}
       world={world}
       worldRect={extent}
-      worldGroup={{ name: 'Select your deliverables', rect: stageGroup }}
+      worldGroup={{ name: 'Deliverables', rect: deliverablesGroup }}
       worldWire={confirmed ? { x: lockX, y: lockY + LOCK_R, to: 'orchestrator' } : undefined}
+      worldFeeds={{ x: lockX + LOCK_R, y: lockY, from: researchCards.map((c) => c.id) }}
       spawn={spawn}
       onSpawned={() => setSpawn(undefined)}
       obstacles={obstacles}
@@ -1009,11 +1038,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         )
       }
       cards={cards}
-      frames={layers.map((l) => ({
-        id: `group:${l.id}`,
-        name: l.name,
-        members: l.members.map((m) => m.id)
-      }))}
+      frames={[
+        { id: 'research', name: 'Research', fixed: true, members: researchCards.map((c) => c.id) },
+        ...layers.map((l) => ({
+          id: `group:${l.id}`,
+          name: l.name,
+          members: l.members.map((m) => m.id)
+        }))
+      ]}
       hidden={layers
         .filter((l) => hiddenLayers.includes(l.id))
         .flatMap((l) => l.members.map((m) => m.id))}

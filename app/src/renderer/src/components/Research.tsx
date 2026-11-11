@@ -349,9 +349,9 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
           kind: 'reference',
           title: 'Reference library',
           count: String(data.sites.length),
-          x: -1152,
+          x: -1640,
           y: 0,
-          w: 1008,
+          w: 1490, // two columns of 720px pictures, the size they're captured at
           body: <Sites sites={data.sites} onAdd={(site) => run(() => window.api.addSite(site))} />
         }
       ]}
@@ -643,9 +643,9 @@ function Sites({
   }
 
   return (
-    <div className="grid grid-cols-3 gap-3 p-4">
+    <div className="grid grid-cols-2 gap-3 p-4">
       {showTags && (
-        <div className="col-span-3 flex flex-wrap gap-1.5">
+        <div className="col-span-2 flex flex-wrap gap-1.5">
           {[null, ...allTags].map((t) => (
             <button
               key={t ?? 'all'}
@@ -676,7 +676,7 @@ function Sites({
             <img
               alt=""
               src={`orchestra://site/${host(s.url)}.png`}
-              className="-mx-4 -mt-4 mb-1 aspect-[16/10] w-[calc(100%+2rem)] max-w-none border-b border-card-line object-cover object-top"
+              className="-mx-4 -mt-4 mb-1 aspect-video w-[calc(100%+2rem)] max-w-none border-b border-card-line object-cover object-top"
             />
           )}
           <span className="flex items-start justify-between">

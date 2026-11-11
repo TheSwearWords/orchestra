@@ -22,7 +22,7 @@ const SLOTS = [
 ] as const
 type Slot = (typeof SLOTS)[number]['id']
 
-const TOOLS = [
+export const TOOLS = [
   ['figma', 'Figma'],
   ['blender', 'Blender'],
   ['notion', 'Notion'],
@@ -175,7 +175,7 @@ export function Setup({ onDone }: { onDone: () => void }): React.JSX.Element {
   function add(id: string, at?: { x: number; y: number }): void {
     if (open.some((c) => c.id === id)) return setFocus(id)
     setOpen((o) => [...o, { id, ...(at ?? spot(o.length)) }])
-    if (!at) setFocus(id) // opened from a row or Skip: fly to it
+    setFocus(id) // always show the window you just opened
   }
   function addProvider(at?: { x: number; y: number }): void {
     let n = 1

@@ -53,3 +53,13 @@ export const STATUS_WORDS: Record<DockStatus, string> = {
   done: 'Done',
   idle: 'Idle'
 }
+
+/** What each Musician was last seen doing: its own latest log line, or one of its Instruments'. */
+export function latestNotes(log: { agent: string; text: string }[]): Record<string, string> {
+  const notes: Record<string, string> = {}
+  for (const e of log) {
+    const text = e.text.trim().split('\n')[0]
+    if (text && e.agent !== 'orchestrator') notes[e.agent.split('--')[0]] = text
+  }
+  return notes
+}

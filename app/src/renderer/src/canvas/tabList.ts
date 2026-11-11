@@ -23,3 +23,12 @@ export function closeTab(tabs: string[], id: string): { tabs: string[]; next: st
   const rest = tabs.filter((t) => t !== id)
   return { tabs: rest, next: rest[i - 1] ?? rest[0] ?? null }
 }
+
+/** Dragging a tab onto another puts it in that one's place; the rest close up around it. */
+export function moveTab(tabs: string[], id: string, onto: string): string[] {
+  const to = tabs.indexOf(onto)
+  if (id === onto || to < 0 || !tabs.includes(id)) return tabs
+  const rest = tabs.filter((t) => t !== id)
+  rest.splice(to, 0, id)
+  return rest
+}

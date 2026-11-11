@@ -15,6 +15,7 @@ interface Props {
   onHome: () => void
   onTab: (id: string) => void
   onClose: (id: string) => void
+  onMove: (id: string, onto: string) => void // a tab dragged onto another
   onNew: () => void
 }
 
@@ -28,6 +29,7 @@ export function Tabs({
   onHome,
   onTab,
   onClose,
+  onMove,
   onNew
 }: Props): React.JSX.Element {
   const bare =
@@ -66,6 +68,19 @@ export function Tabs({
           return (
             <div
               key={t.id}
+              // drag a tab onto another to reorder them
+              draggable={t.id !== DRAFT}
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData('text/orchestra-tab', t.id)
+              }}
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes('text/orchestra-tab')) e.preventDefault()
+              }}
+              onDrop={(e) => {
+                const id = e.dataTransfer.getData('text/orchestra-tab')
+                if (id && t.id !== DRAFT) onMove(id, t.id)
+              }}
               // middle-click closes, as in a browser
               onAuxClick={(e) => e.button === 1 && onClose(t.id)}
               className={`flex h-10 max-w-56 min-w-[120px] shrink items-center ${

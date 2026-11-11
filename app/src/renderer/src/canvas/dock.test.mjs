@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { dockAgents, dockStatus } from './dock.ts'
+import { dockAgents, dockStatus, latestNotes } from './dock.ts'
 
 const musicians = [
   { id: 'logo', name: 'Logo' },
@@ -32,4 +32,14 @@ test('stopped and unknown statuses read as idle', () => {
   assert.equal(dockStatus('stopped'), 'idle')
   assert.equal(dockStatus('something-new'), 'idle')
   assert.equal(dockStatus(undefined), 'idle')
+})
+
+test('the latest log line of a Musician or its Instruments is its note', () => {
+  const log = [
+    { agent: 'orchestrator', text: 'Briefing Logo' },
+    { agent: 'logo', text: 'Reading the brand spec' },
+    { agent: 'logo--sketcher', text: 'Drafting lockups\nsecond line' },
+    { agent: 'brand-kit', text: '  ' }
+  ]
+  assert.deepEqual(latestNotes(log), { logo: 'Drafting lockups' })
 })

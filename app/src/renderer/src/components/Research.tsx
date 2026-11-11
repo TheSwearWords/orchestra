@@ -87,7 +87,7 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
   if (!data) return <div className="bg-dots h-full" />
   const links = data.references.filter((r) => r.kind === 'link')
   const groups: Group[] = [null, ...data.groups.others]
-  const defaultName = data.groups.default ?? `${frame.crumbs[1]?.label ?? 'Project'} research`
+  const defaultName = data.groups.default ?? `${frame.name} research`
   const nameOf = (g: Group): string => g ?? defaultName
   const kindsOf = (g: Group): Kind[] => (g && data.groups.kinds[g]) || FULL
   const windowId = (g: Group, k: Kind): string => `w-${g ?? ''}-${k}`
@@ -163,7 +163,6 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
       project={project}
       board="research"
       label="I · Research"
-      crumbs={frame.crumbs}
       pages={frame.pages}
       preview={frame.preview}
       wires={[

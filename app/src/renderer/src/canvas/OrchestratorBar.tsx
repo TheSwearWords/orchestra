@@ -5,6 +5,9 @@
 // the bar, your conversations line the left of the window, and the agents (their status, and
 // what the Orchestrator tells them) the right. A click anywhere else puts it all away.
 import { useEffect, useRef, useState } from 'react'
+import { OrchestratorFace } from './OrchestratorFace'
+import { signal, useFaceState } from './faceState'
+import { ripple } from './liquid'
 import type { CreateState, Thread, Usage } from '../../../preload'
 import { ChatPanel } from '../components/Create'
 import { Icon } from '../components/Icon'
@@ -122,6 +125,12 @@ export function OrchestratorBar({
     return () => clearInterval(timer)
   }, [])
   const [error, setError] = useState('')
+  // the face follows what the bar is doing; the session dock reports the agents' side
+  const face = useFaceState()
+  useEffect(
+    () => signal({ busy, error: !!error, typing: text.length > 0 && !text.startsWith('/') }),
+    [busy, error, text]
+  )
   const [plan, setPlan] = useState<CreateState | undefined>(undefined)
   const [threads, setThreads] = useState<Thread[]>([])
   // the conversation shown, per place (General until you start or pick another)
@@ -257,6 +266,7 @@ export function OrchestratorBar({
     setText('')
     setOpen(true)
     try {
+      signal({ sentAt: Date.now() })
       await window.api.sendChat(to.project, chat, sent)
     } catch (err) {
       setText(sent) // keep what they wrote if it didn't go
@@ -528,9 +538,7 @@ export function OrchestratorBar({
           className={`${chip} glass relative w-full gap-3 rounded-b-none! pr-3 pl-2.5 ${open ? 'rounded-t-none! shadow-none' : ''}`}
           style={{ height: BAR_H }}
         >
-          <span className="orb orb-blue flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand">
-            <Icon name="logo-mark" size={20} />
-          </span>
+          <OrchestratorFace size={36} state={face} />
           <button
             type="button"
             onClick={() => setPicking(!picking)}
@@ -547,6 +555,7 @@ export function OrchestratorBar({
             value={text}
             onChange={(e) => {
               setText(e.target.value)
+              ripple()
               setHi(0)
               // a command, not a message: the menu shows instead of the conversation
               if (e.target.value.startsWith('/')) setOpen(false)

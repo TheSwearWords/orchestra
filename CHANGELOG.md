@@ -4,7 +4,17 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 
 ## 2026-11-11
 
+### Added
+
+- The Orchestrator has a live face: the integral in a bead of liquid glass, in the bar and the session dock. It leans in while you type, ripples on each key, turns when you send, swirls while it thinks, sends out droplets while agents work, glows amber when something needs you, fills green when work finishes and goes grey on an error. It rests while the window is in the background.
+- Drag a header tab onto another to reorder them.
+- In the session dock, a working agent shows what it is doing, from its latest log line.
+- The whole-book view says what you are looking at and how to move.
+
 ### Changed
+
+- Create: the group frame is a quiet dashed outline, locked-in deliverables have a soft outline, and file windows are fully paper inside.
+- The breadcrumb and page-strip code is removed.
 
 - The header tab, the area switch, the side tabs and the session dock are each drawn as one shape, and their outline now follows the curve where they meet the edge. The dock has its rounded corners back.
 - Moving between areas slides the next board in from its side, and the pill in the area switch grows and shrinks as it moves.

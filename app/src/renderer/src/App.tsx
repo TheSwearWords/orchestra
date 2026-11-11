@@ -7,10 +7,9 @@ import { Board } from './canvas/Board'
 import { Book, type Frame } from './canvas/Book'
 import { Landscape } from './canvas/Landscape'
 import { Tabs } from './canvas/Tabs'
-import { DRAFT, closeTab, openTab } from './canvas/tabList'
+import { DRAFT, closeTab, moveTab, openTab } from './canvas/tabList'
 import { STUDIO, TOP_BAR, chip, coverInfo, requestFocus, type Area } from './canvas/shared'
 import { SessionDock } from './canvas/SessionDock'
-import { SIDE } from './canvas/Chrome'
 import { CoverEditor } from './canvas/CoverEditor'
 import { Opening } from './canvas/Opening'
 import { OrchestratorBar, type BarTarget } from './canvas/OrchestratorBar'
@@ -62,6 +61,7 @@ function SetupHome(): React.JSX.Element {
       onHome={none}
       onTab={none}
       onClose={none}
+      onMove={none}
       onNew={none}
     />
   )
@@ -127,30 +127,6 @@ function App(): React.JSX.Element {
 
   useEffect(() => remember('areas', areas), [areas])
 
-  // Ctrl+Tab and Ctrl+Shift+Tab walk the open tabs; Ctrl+1 to 9 jump straight to one
-  useEffect(() => {
-    const keys = (e: KeyboardEvent): void => {
-      if (!e.ctrlKey || e.altKey || e.metaKey) return
-      const open = tabs.filter((id) => projects?.some((p) => p.id === id))
-      const v = now.current.view
-      const i = v.at === 'book' ? open.indexOf(v.id) : -1
-      let n = -1
-      if (e.key === 'Tab' && open.length)
-        n =
-          i < 0
-            ? e.shiftKey
-              ? open.length - 1
-              : 0
-            : (i + (e.shiftKey ? -1 : 1) + open.length) % open.length
-      else if (/^[1-9]$/.test(e.key) && !e.shiftKey) n = Number(e.key) - 1
-      if (n < 0 || n >= open.length || n === i) return
-      e.preventDefault()
-      go({ at: 'book', id: open[n], area: areas[open[n]] ?? null })
-    }
-    addEventListener('keydown', keys)
-    return () => removeEventListener('keydown', keys)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- go is stable; it is declared below
-  }, [tabs, projects, areas])
   useEffect(() => remember('open-tabs', tabs), [tabs])
 
   const current = view.at === 'book' ? projects?.find((p) => p.id === view.id) : undefined
@@ -201,6 +177,30 @@ function App(): React.JSX.Element {
     },
     [show]
   )
+
+  // Ctrl+Tab and Ctrl+Shift+Tab walk the open tabs; Ctrl+1 to 9 jump straight to one
+  useEffect(() => {
+    const keys = (e: KeyboardEvent): void => {
+      if (!e.ctrlKey || e.altKey || e.metaKey) return
+      const open = tabs.filter((id) => projects?.some((p) => p.id === id))
+      const v = now.current.view
+      const i = v.at === 'book' ? open.indexOf(v.id) : -1
+      let n = -1
+      if (e.key === 'Tab' && open.length)
+        n =
+          i < 0
+            ? e.shiftKey
+              ? open.length - 1
+              : 0
+            : (i + (e.shiftKey ? -1 : 1) + open.length) % open.length
+      else if (/^[1-9]$/.test(e.key) && !e.shiftKey) n = Number(e.key) - 1
+      if (n < 0 || n >= open.length || n === i) return
+      e.preventDefault()
+      go({ at: 'book', id: open[n], area: areas[open[n]] ?? null })
+    }
+    addEventListener('keydown', keys)
+    return () => removeEventListener('keydown', keys)
+  }, [tabs, projects, areas, go])
 
   // the mouse's back and forward buttons, and Alt+← / Alt+→
   useEffect(() => {
@@ -269,7 +269,6 @@ function App(): React.JSX.Element {
         project={p.id}
         board="refine"
         label="III · Refine"
-        crumbs={frame.crumbs}
         pages={frame.pages}
         preview={frame.preview}
         cards={[
@@ -291,8 +290,6 @@ function App(): React.JSX.Element {
     )
   }
 
-  // Back and Needs you move in to clear the page-turn strips, which only an open area has
-  const side = view.at === 'book' && view.area ? SIDE : 0
   return (
     <div className="relative h-full overflow-hidden">
       {/* the Studio stays laid out underneath, so a closing book knows where its cover sits */}
@@ -370,6 +367,7 @@ function App(): React.JSX.Element {
                 : { at: 'studio' }
             )
         }}
+        onMove={(id, onto) => setTabs((t) => moveTab(t, id, onto))}
         onNew={() => go({ at: 'cover', id: null })}
       />
       {/* Home and the tabs get you out of the Studio; Back is for inside a book */}
@@ -380,7 +378,7 @@ function App(): React.JSX.Element {
           aria-label="Back"
           title="Back (mouse back button, Alt+←)"
           className={`${chip} glass absolute z-30 h-9 gap-2 rounded-full! px-4 type-label-m disabled:opacity-40`}
-          style={{ top: TOP_BAR + 10, left: 14 + side }}
+          style={{ top: TOP_BAR + 10, left: 14 }}
         >
           <Icon name="arrow-left-line" size={14} />
           Back

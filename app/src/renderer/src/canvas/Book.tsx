@@ -6,15 +6,15 @@ import { Canvas } from './Canvas'
 import { useCamera } from './useCamera'
 import { fit, type Rect } from './camera'
 import { AREAS, chip, typing, type Area } from './shared'
-import { AreaSwitch, Minimap, Shell, ZoomChip, type Step } from './Chrome'
+import { AreaSwitch, Minimap, Shell, ZoomChip } from './Chrome'
 import { EdgeTab } from './EdgeTab'
 
 const GAP = 160 // between areas, in world px
 
-/** What an area needs to frame its board: the breadcrumb so far and the pages switch. A preview
+/** What an area needs to frame its board: the project's name and the area switch. A preview
  * is the small live copy on the book's page, with no chrome. */
 export interface Frame {
-  crumbs: Step[]
+  name: string // the project's
   pages: React.ReactNode
   preview: boolean
   go?: (a: Area) => void // to another area of the book
@@ -98,10 +98,6 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
     return () => removeEventListener('keydown', key)
   }, [area, onArea, onStudio])
 
-  const base: Step[] = [
-    { label: 'Studio', onClick: onStudio },
-    { label: name, onClick: () => onArea(null) }
-  ]
   const current = AREAS.find((a) => a.id === open)
   const before = current && AREAS[AREAS.indexOf(current) - 1]
   const after = current && AREAS[AREAS.indexOf(current) + 1]
@@ -115,7 +111,6 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
           onBackground={() => onArea(null)}
           chrome={
             <Shell
-              crumbs={[base[0], { label: name }]}
               right={
                 <ZoomChip
                   camera={cam.camera}
@@ -143,6 +138,13 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
             className="absolute rounded-full bg-agent/70"
             style={{ left: -GAP / 2 - 24, top: -GAP / 2, width: 8, height: h + GAP }}
           />
+          <p
+            className="absolute origin-top-left type-body-m whitespace-nowrap text-dim"
+            // held at reading size however far out the book is, like the area labels
+            style={{ left: 0, top: h + 40, transform: `scale(${1 / Math.max(cam.camera.z, 0.2)})` }}
+          >
+            One book, three areas. Click one to fly in, or press 1, 2 or 3.
+          </p>
           {AREAS.map((a, i) => {
             const p = panels[i]
             return (
@@ -154,7 +156,7 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
               >
                 {/* a live, low-detail copy of the area's board; only while no board is open */}
                 <div inert className="pointer-events-none absolute inset-0">
-                  {!open && render(a.id, { crumbs: [], pages: null, preview: true })}
+                  {!open && render(a.id, { name, pages: null, preview: true })}
                 </div>
                 <button
                   onClick={() => onArea(a.id)}
@@ -185,7 +187,7 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
           style={{ '--dir': dir } as React.CSSProperties}
         >
           {render(open, {
-            crumbs: [...base, { label: `${current.numeral} ${current.name}` }],
+            name,
             pages: pages(open),
             preview: false,
             go: onArea

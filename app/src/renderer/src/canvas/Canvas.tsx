@@ -186,7 +186,7 @@ export function Canvas({
         e.preventDefault()
         onContextMenu?.(e)
       }}
-      className={`bg-dots relative h-full w-full touch-none overflow-hidden select-none ${panning ? 'cursor-grabbing' : hand ? 'cursor-grab' : ''} ${className}`}
+      className={`board bg-dots relative h-full w-full touch-none overflow-hidden select-none ${panning ? 'cursor-grabbing' : hand ? 'cursor-grab' : ''} ${className}`}
       style={{
         backgroundSize: `${s}px ${s}px`,
         backgroundPosition: `${-camera.x * camera.z}px ${-camera.y * camera.z}px`

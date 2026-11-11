@@ -26,7 +26,7 @@ export function Shell({
   return (
     <>
       <header
-        className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 border-b border-chip-line bg-chip pr-2 pl-2 shadow-float"
+        className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 border-b border-chip-line bg-chip pr-2 pl-2 shadow-float glass"
         style={{ height: TOP_BAR }}
       >
         <Breadcrumb steps={crumbs} />
@@ -130,7 +130,7 @@ export function AreaSwitch({
 }): React.JSX.Element {
   const here = AREAS.find((a) => a.id === current)
   return (
-    <div className="flex h-9 items-stretch border border-chip-line bg-chip shadow-float">
+    <div className="glass flex h-9 items-stretch border border-chip-line bg-chip shadow-float">
       <span className="flex w-36 items-center justify-center bg-brand px-3 type-label-mono whitespace-nowrap text-on-brand">
         {here ? `${here.numeral} · ${here.name}` : 'The whole book'}
       </span>
@@ -300,7 +300,7 @@ export function Minimap({
 
   return (
     <div
-      className={`${chip} hidden items-stretch min-[900px]:flex ${compact ? '' : 'h-auto flex-col'}`}
+      className={`${chip} glass hidden items-stretch min-[900px]:flex ${compact ? '' : 'h-auto flex-col'}`}
     >
       <span
         className={`px-2.5 type-label-mono ${compact ? 'flex items-center border-r border-hair' : 'border-b border-hair py-1'}`}

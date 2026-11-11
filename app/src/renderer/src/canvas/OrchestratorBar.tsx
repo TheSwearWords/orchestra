@@ -525,7 +525,7 @@ export function OrchestratorBar({
 
         <form
           onSubmit={send}
-          className={`${chip} relative w-full gap-3 pr-3 pl-2.5 ${open ? 'shadow-none' : ''}`}
+          className={`${chip} glass relative w-full gap-3 pr-3 pl-2.5 ${open ? 'shadow-none' : ''}`}
           style={{ height: BAR_H }}
         >
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand">

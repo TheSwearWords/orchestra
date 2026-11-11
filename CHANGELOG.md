@@ -7,6 +7,7 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 ### Changed
 
 - Nocturne, phase 1: the app is dark by default, with chalk type on near-black panels, set in Geist, Geist Mono and Instrument Serif Italic. The light look is still there: set `localStorage.theme = 'v2'` and reload.
+- Nocturne, phase 2: the Studio, Setup and the cover editor sit on a soft blurred landscape. Inside a book the board is flat grey with dots. The header, Back, Needs you, the area switch, the Orchestrator bar and the minimap are frosted glass.
 
 ## 2026-11-09
 

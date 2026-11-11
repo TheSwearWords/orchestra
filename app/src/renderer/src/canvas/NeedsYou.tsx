@@ -1,13 +1,13 @@
-// Where you're needed in the project you're in, like Figma's comments: a button anchored to the
-// window (bright orange while something unread waits) opens the list; picking one takes you to
-// the window on the board that's waiting, and marks it read. The Studio doesn't have the button:
-// each cover there carries an orange tag, from the same list.
-import { useEffect, useMemo, useState } from 'react'
+// Where you're needed in the project you're in, like Figma's comments: a pill beside the session
+// dock's Orchestrator dot (SessionDock.tsx places it; filled amber while something unread waits)
+// opens the list; picking one takes you to the window on the board that's waiting, and marks it
+// read. The Studio doesn't have the pill: each cover there carries a tag, from the same list.
+import { useEffect, useState } from 'react'
 import type { Ask, Project, Proposal } from '../../../preload'
 import { waitingOnUser } from '../decide'
-import { GENERAL, TOP_BAR, chip } from './shared'
+import { GENERAL } from './shared'
 
-interface Need {
+export interface Need {
   key: string // unique across projects, for read/unread
   project: string
   card: string // the window on the Create board that is waiting
@@ -111,16 +111,12 @@ export function useNeeds(projects: Project[]): Need[] {
 }
 
 export function NeedsYou({
-  project,
-  side,
+  needs,
   onOpen
 }: {
-  project: Project
-  side: number // how far in to sit, clearing the page-turn strip
+  needs: Need[]
   onOpen: (project: string, card: string) => void
 }): React.JSX.Element {
-  const here = useMemo(() => [project], [project])
-  const needs = useNeeds(here)
   const [open, setOpen] = useState(false)
   const [seen, setSeen] = useState(seenSet)
 
@@ -132,26 +128,25 @@ export function NeedsYou({
 
   const unread = needs.filter((n) => !seen.has(n.key)).length
   return (
-    <div className="absolute z-30" style={{ top: TOP_BAR + 10, right: 14 + side }}>
-      <button
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        title="What's waiting on you in this project"
-        className={`${chip} glass h-9 gap-2 px-3 type-label-s ${
-          unread
-            ? 'border-needs-you bg-needs-you text-on-needs-you'
-            : needs.length
-              ? 'border-needs-you text-link'
-              : ''
-        }`}
-      >
-        <span
-          className={`size-2 rounded-full ${unread ? 'bg-on-needs-you' : needs.length ? 'bg-needs-you' : 'border border-wire'}`}
-        />
-        Needs you{needs.length ? ` · ${needs.length}` : ''}
-      </button>
+    <div className="relative">
+      {/* nothing waiting, no pill; "/needs" in the bar still opens the list */}
+      {needs.length > 0 && (
+        <button
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          title="What's waiting on you in this project"
+          className={`glass flex h-7 items-center gap-2 rounded-full border border-needs-you px-3 type-body-s font-medium whitespace-nowrap ${
+            unread ? 'bg-needs-you text-on-needs-you' : 'bg-chip text-signal-fg'
+          }`}
+        >
+          <span
+            className={`size-1.5 rounded-full ${unread ? 'bg-on-needs-you' : 'bg-needs-you'}`}
+          />
+          Needs you · {needs.length}
+        </button>
+      )}
       {open && (
-        <div className="glass absolute right-0 mt-2 w-[360px] border border-chip-line bg-card shadow-lift animate-[rise-in_200ms_var(--ease)_both]">
+        <div className="glass absolute top-full right-0 mt-2 w-[360px] rounded-lg border border-chip-line bg-card shadow-lift animate-[rise-in_200ms_var(--ease)_both]">
           <header className="flex h-11 items-center justify-between border-b border-hair px-4 text-link">
             <span className="type-label-serif-l">Where you&apos;re needed</span>
             {unread > 0 && (

@@ -7,7 +7,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { OrchestratorFace } from './OrchestratorFace'
 import { signal, useFaceState } from './faceState'
-import { ripple } from './liquid'
 import type { CreateState, Thread, Usage } from '../../../preload'
 import { ChatPanel } from '../components/Create'
 import { Icon } from '../components/Icon'
@@ -555,7 +554,6 @@ export function OrchestratorBar({
             value={text}
             onChange={(e) => {
               setText(e.target.value)
-              ripple()
               setHi(0)
               // a command, not a message: the menu shows instead of the conversation
               if (e.target.value.startsWith('/')) setOpen(false)

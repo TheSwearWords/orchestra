@@ -435,7 +435,7 @@ export function Board({
     <Canvas
       cam={cam}
       scrollable=".overflow-y-auto"
-      className={preview ? '' : 'animate-[area-in_550ms_var(--ease)_both]'}
+      className={preview ? '' : 'animate-[area-in_180ms_ease-out_both]'}
       onPress={() => setSelected([])}
       onMarquee={
         preview || locked

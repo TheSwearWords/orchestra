@@ -140,7 +140,7 @@ Bracket prefixes such as `[Brief from the Orchestrator]` and `[Report from the â
 - `Chrome.tsx` draws the viewport-anchored frame: the header, the area switch, the minimap and zoom. `Tabs.tsx` draws Home and the project tabs in the header, `EdgeTab.tsx` the side tabs to the neighbouring areas, and `SessionDock.tsx` the agents' status dots with Needs you inside it.
 - `Book.tsx` plays the camera between the three areas and calls `render(area, frame)`. `App.tsx` chooses what each area renders.
 - `App.tsx` also owns the tabs, Back, `SessionDock` and `OrchestratorBar`, because they belong to the whole window.
-- The Orchestrator's face (`OrchestratorFace.tsx`, drawn by `liquid.ts`) shows one state everywhere. The bar and the dock report what they know through `signal()` in `faceState.ts`.
+- The Orchestrator's face (`OrchestratorFace.tsx`, a CSS glowing sphere) shows one state everywhere, as its colour. The bar and the dock report what they know through `signal()` in `faceState.ts`.
 
 Screens that don't share React state coordinate through window events: `orchestra:desk`, `orchestra:needs`, `orchestra:focus` and `orchestra:agents-changed`.
 
@@ -302,7 +302,7 @@ Put logic that needs testing in a pure file, as `place.ts`, `camera.ts` and `sta
 
 The look is Nocturne: dark, frosted, soft. Its values and decisions are in `Project Files/alt-nocturne.md`, the build plan in `Project Files/nocturne-handoff.md`, and the styles in `assets/themes/nocturne.css`. `ideation/brand-spec.md` describes the earlier v2 look and is kept for history; the layouts in `ideation/canvas-spec.md` still hold. These rules apply to every screen:
 
-- **Two kinds of UI.** Artboard-bound: cards, covers, the desk, everything inside a project. Viewport-anchored and the same everywhere: the header with Home and the project tabs, the area switch notch under it, Back, the side tabs, the session dock (right edge), the Orchestrator bar (bottom centre), the New pill and the minimap (bottom right). Only viewport chrome gets the `glass` backdrop blur; artboard cards never do.
+- **Two kinds of UI.** Artboard-bound: cards, covers, the desk, everything inside a project. Viewport-anchored and the same everywhere: the header with Home and the project tabs, the area switch notch under it, Back, the side tabs, the session dock (right edge), the Orchestrator bar (bottom centre), the New pill and the minimap (bottom right). Nothing uses `backdrop-filter` or a live CSS `filter: blur`: anything blurred over a moving board is recomputed every frame and makes panning, opening windows and switching areas stutter. `glass` is a shadow and a highlight only, and the landscape plates are blurred when they are made.
 - **Artboard windows never scroll.** A card grows to fit, and resizing changes only its width. Viewport chrome may scroll.
 - **Nothing on an artboard overlaps.** Use `settle` and `freeSpot`, which keep 72px clear around every window.
 - **A window opens with what it's connected to.** Give a card `link` and `auto`: `tree.ts` puts it under its parent, or beside it with `'left'` or `'right'`, in a column of its own. Moving a window by hand takes it out, and Tidy puts it back.
@@ -316,7 +316,7 @@ The look is Nocturne: dark, frosted, soft. Its values and decisions are in `Proj
 - **Type.** Geist for the interface, Geist Mono caps for small labels, Instrument Serif Italic for a few titles only (`type-accent`, the display styles). Labels are sentence case.
 - **Buttons.** A primary action is a chalk pill, a secondary one a glass pill. The styles key off `bg-brand` and the `border-chip-line` / `border-line` classes on a `button`.
 - **Notches.** Chrome that grows out of an edge uses the `notch-up`, `notch-down`, `notch-left` or `notch-right` class (`main.css`): one element, with the outline carried round its flares. Do not build one from separate pieces.
-- **Motion** is soft and the same everywhere: every control eases colour, shadow and scale over about 220ms on `var(--ease)`, set once in `nocturne.css`. The face and status changes use `var(--ease-calm)`. Areas slide in from their side (`page-in`). Screen entrances use `stagger`. With reduced motion, keep fades and colour changes only.
+- **Motion** is soft and the same everywhere: every control eases colour, shadow and scale over about 220ms on `var(--ease)`, set once in `nocturne.css`. The face and status changes use `var(--ease-calm)`. A board fades up quickly when its area opens; it does not slide or scale, because moving a whole board redraws every card. Screen entrances use `stagger`. With reduced motion, keep fades and colour changes only.
 - **Corners** follow the radius scale: 4, 6, 10, 14, 18, and pills. Windows are 10; controls are 6 or pills.
 
 Tokens come from `Orchestra/projects/orchestra-brand/prereqs/tokens.json`, and `npm run tokens` generates `tokens.css`. Never edit `tokens.css`. Hand-written utilities go in `main.css`. Icons are SVGs in `assets/icons/`, drawn through `Icon`.

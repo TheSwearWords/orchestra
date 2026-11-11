@@ -44,16 +44,10 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
   const [open, setOpen] = useState<Area | null>(area)
   const [seen, setSeen] = useState(area)
   const [leaving, setLeaving] = useState<Area | null>(null) // the board last closed
-  const [dir, setDir] = useState(0) // which side the next board comes from: -1 left, 1 right
   if (seen !== area) {
     // the area changed (here, or by back/forward): switch boards at once, or start the flight
     setSeen(area)
-    if (area && open) {
-      const at = (a: Area): number => AREAS.findIndex((x) => x.id === a)
-      setDir(Math.sign(at(area) - at(open)))
-      setOpen(area)
-    }
-    if (area && !open) setDir(0) // flying in from the whole book: no slide
+    if (area && open) setOpen(area)
     if (!area && open) {
       setLeaving(open)
       setOpen(null)
@@ -181,11 +175,7 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
       </div>
 
       {open && current && (
-        <div
-          key={open}
-          className="absolute inset-0 animate-[page-in_420ms_var(--ease)_both]"
-          style={{ '--dir': dir } as React.CSSProperties}
-        >
+        <div key={open} className="absolute inset-0">
           {render(open, {
             name,
             pages: pages(open),

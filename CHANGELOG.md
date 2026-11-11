@@ -2,6 +2,12 @@
 
 What changed in Orchestra, newest first. Add to the top section with each push.
 
+## 2026-11-10
+
+### Changed
+
+- Nocturne, phase 1: the app is dark by default, with chalk type on near-black panels, set in Geist, Geist Mono and Instrument Serif Italic. The light look is still there: set `localStorage.theme = 'v2'` and reload.
+
 ## 2026-11-09
 
 ### Added

@@ -54,7 +54,7 @@ export function DeliverableEditor({
 
   const label = 'type-label-s text-dim'
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse/40 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-6">
       <div
         role="dialog"
         aria-modal="true"

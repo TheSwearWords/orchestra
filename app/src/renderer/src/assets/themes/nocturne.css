@@ -1,0 +1,117 @@
+/* Nocturne: the dark theme. It redefines the same semantic variables tokens.css sets, under
+   .nocturne on <html>, so components reskin without changing. Values are from the Figma
+   collection "Orchestra/Alt · Nocturne" (Project Files/nocturne-handoff.md, section 2).
+   localStorage.theme = 'v2' drops the class and brings the light look back. */
+.nocturne {
+  color-scheme: dark;
+  /* the type-* utilities ask for 800 (Bodoni); never fake a bold Instrument Serif */
+  font-synthesis-weight: none;
+
+  --font-sans: 'Geist Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+
+  /* the face and status changes move on a calmer curve than the chrome */
+  --ease-calm: cubic-bezier(0.45, 0.05, 0.25, 1);
+
+  /* new in Nocturne */
+  --color-base: #0a0a0c;
+  --color-workspace: #1c1c20;
+  --color-frost: rgba(8, 8, 10, 0.86);
+  --color-glass-fill: rgba(255, 255, 255, 0.06);
+  --color-glass-fill-strong: rgba(255, 255, 255, 0.1);
+  --color-accent: #5b7cff;
+  --color-status-error: #ff5a5f;
+  --color-light-chalk: #ede8df;
+  --color-light-peach: #f6b89a;
+  --color-light-pink: #f2a7c3;
+  --color-light-green: #b9e4a3;
+  --color-light-lilac: #b7b5ff;
+
+  --color-bg-default: #1c1c20;
+  --color-canvas-bg: #1c1c20;
+  --color-bg-subtle: #141418;
+  /* inferred: between raised and workspace */
+  --color-bg-muted: #1d1d22;
+  --color-bg-inverse: #f4f2ee;
+  --color-surface-default: rgba(8, 8, 10, 0.86);
+  --color-chip-bg: rgba(8, 8, 10, 0.86);
+  --color-card-bg: rgba(8, 8, 10, 0.86);
+  --color-surface-raised: #141418;
+  --color-surface-sunken: #060607;
+  --color-terminal-bg: #060607;
+
+  --color-text-primary: #f4f2ee;
+  --color-logo-default: #f4f2ee;
+  --color-text-secondary: rgba(244, 242, 238, 0.64);
+  --color-text-dim: rgba(244, 242, 238, 0.64);
+  --color-text-disabled: rgba(244, 242, 238, 0.4);
+  --color-text-placeholder: rgba(244, 242, 238, 0.4);
+  --color-text-inverse: #0a0a0c;
+  --color-needs-you-on: #0a0a0c;
+  --color-status-signal-on: #0a0a0c;
+  /* labels are chalk here; a real link takes text-accent */
+  --color-text-link: #f4f2ee;
+
+  --color-border-default: rgba(255, 255, 255, 0.12);
+  --color-chip-border: rgba(255, 255, 255, 0.12);
+  --color-card-border: rgba(255, 255, 255, 0.12);
+  --color-rule-hair: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
+  --color-rule-default: rgba(255, 255, 255, 0.22);
+  --color-border-focus: #5b7cff;
+  --color-wire-live: #5b7cff;
+  --color-wire-default: rgba(244, 242, 238, 0.3);
+
+  --color-brand-default: #0538ff;
+  --color-bg-brand: #0538ff;
+  /* inferred */
+  --color-brand-hover: #2a4fff;
+  --color-brand-pressed: #0326b8;
+  --color-brand-subtle: rgba(46, 85, 255, 0.13);
+  --color-card-selected: rgba(46, 85, 255, 0.13);
+  --color-agent-subtle: rgba(46, 85, 255, 0.13);
+  --color-agent-default: #5b7cff;
+  --color-agent-text: #b9c7ff;
+
+  --color-status-info-default: #5b7cff;
+  --color-status-info-subtle: rgba(46, 85, 255, 0.13);
+  --color-status-info-text: #b9c7ff;
+  --color-status-success-default: #6fdc8c;
+  --color-status-success-subtle: rgba(111, 220, 140, 0.16);
+  --color-status-success-text: #a6ebb8;
+  --color-status-signal-default: #ffa24a;
+  --color-needs-you-default: #ffa24a;
+  --color-status-signal-hover: #ffb36b;
+  --color-status-signal-subtle: rgba(255, 162, 74, 0.16);
+  --color-status-signal-text: #ffc48a;
+  --color-status-danger-default: #ff5a5f;
+  --color-status-danger-hover: #ff8a8d;
+  --color-status-danger-pressed: #d9444a;
+  --color-status-danger-subtle: rgba(255, 90, 95, 0.14);
+  --color-status-danger-text: #ff9a9d;
+
+  --color-canvas-dot: rgba(255, 255, 255, 0.14);
+
+  --effect-float: 0 24px 64px rgba(0, 0, 0, 0.55);
+  --effect-card: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --effect-lift: 0 34px 60px -20px rgba(0, 0, 0, 0.6);
+  --effect-book: 0 14px 28px -6px rgba(0, 0, 0, 0.5);
+}
+
+/* v2 puts white type on its ink fills and blue type on white pills. Here both fills are
+   chalk, so the type on them goes dark.
+   shortcut: matches the class pairs v2 components use today; upgrade when a component
+   gets its own Nocturne styling. */
+.nocturne :is(.bg-inverse, .hover\:bg-inverse:hover, .bg-fg, .hover\:bg-fg:hover) {
+  color: var(--color-text-inverse);
+}
+.nocturne .bg-white.text-link {
+  background-color: var(--color-light-chalk);
+  color: var(--color-text-inverse);
+}

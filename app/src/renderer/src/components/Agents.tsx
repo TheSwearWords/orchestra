@@ -706,7 +706,7 @@ function FileModal({
         close()
       }}
       aria-label={`${name}: file`}
-      className="m-auto h-[min(860px,90vh)] open:flex w-[min(960px,92vw)] flex-col border border-line bg-canvas p-0 text-fg backdrop:bg-inverse/50"
+      className="m-auto h-[min(860px,90vh)] open:flex w-[min(960px,92vw)] flex-col border border-line bg-canvas p-0 text-fg backdrop:bg-overlay/50"
     >
       <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
         <div className="min-w-0">

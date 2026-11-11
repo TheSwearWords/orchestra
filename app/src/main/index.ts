@@ -141,7 +141,7 @@ function createWindow(
     ...(at ? { x: Math.round(at.x) - GRIP.x, y: Math.round(at.y) - GRIP.y } : {}),
     minWidth: 1024,
     minHeight: 640,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0A0A0C',
     title: 'Orchestra',
     show: false,
     autoHideMenuBar: true,

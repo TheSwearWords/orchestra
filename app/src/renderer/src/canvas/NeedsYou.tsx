@@ -137,7 +137,7 @@ export function NeedsYou({
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         title="What's waiting on you in this project"
-        className={`${chip} h-9 gap-2 px-3 type-label-s ${
+        className={`${chip} glass h-9 gap-2 px-3 type-label-s ${
           unread
             ? 'border-needs-you bg-needs-you text-on-needs-you'
             : needs.length
@@ -151,7 +151,7 @@ export function NeedsYou({
         Needs you{needs.length ? ` · ${needs.length}` : ''}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-[360px] border border-chip-line bg-card shadow-lift animate-[rise-in_200ms_var(--ease)_both]">
+        <div className="glass absolute right-0 mt-2 w-[360px] border border-chip-line bg-card shadow-lift animate-[rise-in_200ms_var(--ease)_both]">
           <header className="flex h-11 items-center justify-between border-b border-hair px-4 text-link">
             <span className="type-label-serif-l">Where you&apos;re needed</span>
             {unread > 0 && (

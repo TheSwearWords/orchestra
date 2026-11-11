@@ -5,6 +5,7 @@ import { Icon } from './components/Icon'
 import { Research } from './components/Research'
 import { Board } from './canvas/Board'
 import { Book, type Frame } from './canvas/Book'
+import { Landscape } from './canvas/Landscape'
 import { STUDIO, TOP_BAR, chip, coverInfo, requestFocus, type Area } from './canvas/shared'
 import { NeedsYou } from './canvas/NeedsYou'
 import { SIDE } from './canvas/Chrome'
@@ -167,7 +168,13 @@ function App(): React.JSX.Element {
   }, [step])
 
   if (!projects || !layout || setUp === null) return <div className="bg-dots h-full" />
-  if (!setUp) return <Setup onDone={() => setSetUp(true)} />
+  if (!setUp)
+    return (
+      <div className="on-landscape relative h-full">
+        <Landscape name="sunset" />
+        <Setup onDone={() => setSetUp(true)} />
+      </div>
+    )
 
   const saveLayout = (l: StudioLayout): void => {
     setLayout(l)
@@ -233,9 +240,10 @@ function App(): React.JSX.Element {
     <div className="relative h-full overflow-hidden">
       {/* the Studio stays laid out underneath, so a closing book knows where its cover sits */}
       <div
-        className="absolute inset-0"
+        className="on-landscape absolute inset-0"
         style={{ visibility: view.at === 'studio' ? 'visible' : 'hidden' }}
       >
+        <Landscape name="sunset" />
         <Studio
           projects={projects}
           layout={layout}
@@ -263,7 +271,8 @@ function App(): React.JSX.Element {
       )}
 
       {view.at === 'cover' && (
-        <div className="absolute inset-0">
+        <div className="on-landscape absolute inset-0">
+          <Landscape name="coast" />
           <CoverEditor
             key={view.id ?? 'new'}
             project={project(view.id) ?? null}
@@ -290,7 +299,7 @@ function App(): React.JSX.Element {
         disabled={history.back.length === 0}
         aria-label="Back"
         title="Back (mouse back button, Alt+←)"
-        className={`${chip} serif-on absolute z-30 h-9 gap-2 px-3 type-label-s disabled:opacity-40`}
+        className={`${chip} glass serif-on absolute z-30 h-9 gap-2 px-3 type-label-s disabled:opacity-40`}
         style={{ top: TOP_BAR + 10, left: 14 + side }}
       >
         <Icon name="arrow-left-line" size={14} />

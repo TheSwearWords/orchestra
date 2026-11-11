@@ -16,7 +16,7 @@ async function capture(url: string): Promise<Buffer> {
   const win = new BrowserWindow({
     show: false,
     width: 1440,
-    height: 900,
+    height: 810, // 16:9, the shape the reference library shows
     webPreferences: { sandbox: true, contextIsolation: true }
   })
   try {

@@ -4,6 +4,7 @@
 // each cover there carries an orange tag, from the same list.
 import { useEffect, useMemo, useState } from 'react'
 import type { Ask, Project, Proposal } from '../../../preload'
+import { waitingOnUser } from '../decide'
 import { GENERAL, TOP_BAR, chip } from './shared'
 
 interface Need {
@@ -51,11 +52,27 @@ export function useNeeds(projects: Project[]): Need[] {
     const load = (): void =>
       void Promise.all(
         projects.map(async (p) => {
-          const [asks, proposals] = await Promise.all([
+          const [asks, proposals, chat, plan] = await Promise.all([
             window.api.listAsks(p.id).catch(() => ({}) as Record<string, Ask>),
-            window.api.listProposals(p.id).catch(() => ({}) as Record<string, Proposal>)
+            window.api.listProposals(p.id).catch(() => ({}) as Record<string, Proposal>),
+            window.api.loadChat(p.id, GENERAL).catch(() => ({ messages: [] })),
+            window.api.loadCreate(p.id).catch(() => ({ musicians: [], selected: [] }))
           ])
+          const known = new Set(plan.musicians.map((m) => m.id))
+          const asked = waitingOnUser(chat.messages, known, plan.selected)
           return [
+            ...(asked
+              ? [
+                  {
+                    key: `${p.id}/question/${asked.t}`,
+                    project: p.id,
+                    card: 'actions',
+                    title: 'The Orchestrator asked',
+                    what: asked.question,
+                    t: asked.t
+                  }
+                ]
+              : []),
             ...Object.values(asks)
               .filter((a) => a.status === 'open')
               .map((a) => ({

@@ -80,12 +80,14 @@ interface Props {
   anchored?: React.ReactNode // held in place over the board, like the New card
   worldGroup?: { name: string; rect: Rect } // a frame and tag around what's under the cards
   worldWire?: { x: number; y: number; to: string } // a wire from the stage to a window
+  worldFeeds?: { x: number; y: number; from: string[] } // wires from windows into the stage
   // named groups of windows: a blue frame around them, moved and renamed by its label
   frames?: {
     id: string
     name: string
     members: string[]
     port?: string // a dot on its right edge that wires can be pulled from
+    fixed?: boolean // its windows are pinned, so its label doesn't drag them
     onRename?: (name: string) => void
     onMenu?: () => void
   }[]
@@ -118,6 +120,7 @@ export function Board({
   frames,
   anchored,
   worldGroup,
+  worldFeeds,
   worldWire,
   hidden = [],
   spawn,
@@ -238,6 +241,7 @@ export function Board({
     setPorts((old) => (JSON.stringify(old) === JSON.stringify(found) ? old : found))
   })
 
+  const [opened, setOpened] = useState<string>()
   // new windows land where they were asked for, as soon as they exist
   useEffect(() => {
     if (!spawn || !layout) return
@@ -252,6 +256,7 @@ export function Board({
     for (const m of made)
       next[m.id] = { x: snap(origin.x + m.dx), y: snap(origin.y + m.dy), w: m.c!.w }
     save(next)
+    setOpened(made[0].id) // the camera goes to it, so you see what you just opened
     onSpawned?.()
   })
 
@@ -327,9 +332,10 @@ export function Board({
   // a card asked for (just opened) flies into view once it is on the board
   const shown = useRef<string | undefined>(undefined)
   // focus can also name a frame: the view takes in everything in it
-  const target = placed.find((c) => c.id === focus)
+  const camTarget = focus ?? opened
+  const target = placed.find((c) => c.id === camTarget)
   const frameRects = placed
-    .filter((c) => frames?.find((f) => f.id === focus)?.members.includes(c.id))
+    .filter((c) => frames?.find((f) => f.id === camTarget)?.members.includes(c.id))
     .map(rectOf)
   const focusRect: Rect | undefined = target
     ? rectOf(target)
@@ -348,13 +354,14 @@ export function Board({
         }
       : undefined
   useEffect(() => {
-    if (!focus) shown.current = undefined
-    if (preview || !focusRect || !layout || shown.current === focus) return
-    shown.current = focus
+    if (!camTarget) shown.current = undefined
+    if (preview || !focusRect || !layout || shown.current === camTarget) return
+    shown.current = camTarget
     void cam.fly(fitBelow(focusRect, 1), 450)
     onFocused?.()
+    setOpened(undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fly once per focused card
-  }, [focus, layout, !!focusRect])
+  }, [camTarget, layout, !!focusRect])
 
   function save(next: BoardLayout): void {
     if (preview) return
@@ -580,6 +587,19 @@ export function Board({
                   )
                 )
               })()}
+            {worldFeeds &&
+              placed
+                .filter((c) => worldFeeds.from.includes(c.id))
+                .map((c) => (
+                  <Wire
+                    key={`feed-${c.id}`}
+                    x1={worldFeeds.x}
+                    y1={worldFeeds.y}
+                    x2={c.x}
+                    y2={c.y + c.h / 2}
+                    solid
+                  />
+                ))}
             {wires?.flatMap((w) => {
               const a = ports[w.from]
               const b = ports[w.to]
@@ -674,11 +694,17 @@ export function Board({
                   z={cam.camera.z}
                   onRename={f.onRename}
                   onMenu={f.onMenu}
-                  onDrag={(dx, dy) => setFrameDrag({ ids: f.members, dx, dy })}
-                  onDrop={(dx, dy) => {
-                    setFrameDrag(null)
-                    moveBy(f.members, dx, dy)
-                  }}
+                  onDrag={
+                    f.fixed ? undefined : (dx, dy) => setFrameDrag({ ids: f.members, dx, dy })
+                  }
+                  onDrop={
+                    f.fixed
+                      ? undefined
+                      : (dx, dy) => {
+                          setFrameDrag(null)
+                          moveBy(f.members, dx, dy)
+                        }
+                  }
                 />
                 {f.port && (
                   <span className="pointer-events-auto">

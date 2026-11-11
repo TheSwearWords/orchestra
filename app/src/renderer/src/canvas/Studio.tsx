@@ -26,6 +26,7 @@ import { GroupLabel } from './GroupLabel'
 import { AgentFile, Agents } from '../components/Agents'
 import { Knowledge } from './Knowledge'
 import { Icon } from '../components/Icon'
+import { McpSettings } from './McpSettings'
 import { ProviderSettings } from './ProviderSettings'
 
 interface Props {
@@ -113,12 +114,24 @@ export function Studio({
   const rects: Rect[] = ids.map((id) => ({ x: at(id)[0], y: at(id)[1], w: COVER.w, h: COVER.h }))
   // the desk, under the shelf: what every project shares
   const deskY = ROW_Y + COVER.h + 120
-  const desk = DESK.map((d, i) => ({ ...d, x: 96 + i * (DESK_W + 24), y: deskY }))
-  // the knowledge graph, always open, beside the desk
+  // each button sits over the window it opens, with room for that window. Agents is too wide for
+  // that to stay a tight row, so its window opens leftward from under its button instead.
+  const slot: Record<Desk, number> = {
+    agents: DESK_W,
+    mcps: WINDOW.mcps.w,
+    graph: GRAPH_W,
+    settings: WINDOW.settings.w
+  }
+  const desk = DESK.map((d, i) => ({
+    ...d,
+    x: 96 + DESK.slice(0, i).reduce((sum, o) => sum + slot[o.id] + 72, 0),
+    y: deskY
+  }))
+  // the knowledge graph, always open, under its button
   const [graphWindow, setGraphWindow] = useState({
-    x: snap(96 + DESK.length * (DESK_W + 24) + 72),
-    y: snap(deskY - 24),
-    w: 656,
+    x: desk.find((d) => d.id === 'graph')!.x,
+    y: snap(deskY + DESK_H + 48),
+    w: GRAPH_W,
     collapsed: false
   })
   const [graphExpanded, setGraphExpanded] = useState(false)
@@ -133,6 +146,7 @@ export function Studio({
   const [windows, setWindows] = useState<
     { id: string; x: number; y: number; w?: number; file?: AgentFileRef }[]
   >([])
+  const [flyTo, setFlyTo] = useState<string>()
   const look = (w: { id: string; file?: AgentFileRef }): (typeof WINDOW)[Desk] =>
     w.file ? { title: `${w.file.name} · file`, w: 760, guess: 900 } : WINDOW[w.id as Desk]
   function openFile(f: AgentFileRef): void {
@@ -145,7 +159,7 @@ export function Studio({
       y: agents ? agents.y : deskY + DESK_H + 48
     }
     if (!windows.some((o) => o.id === id)) setWindows([...windows, spot])
-    void cam.fly(fitBelow({ ...spot, w: 760, h: 900 }), 450)
+    setFlyTo(id)
   }
   // with no projects yet, the board still has the desk to look at
   const everything: Rect[] = [
@@ -175,10 +189,26 @@ export function Studio({
     // the graph already has its window on the board: this opens it up
     if (id === 'graph') return expandGraph(true)
     const d = desk.find((x) => x.id === id)!
-    const spot = windows.find((w) => w.id === id) ?? { id, x: d.x, y: d.y + DESK_H + 48 }
+    const spot = windows.find((w) => w.id === id) ?? {
+      id,
+      x: id === 'agents' ? d.x + DESK_W - WINDOW.agents.w : d.x,
+      y: d.y + DESK_H + 48
+    }
     if (!windows.some((w) => w.id === id)) setWindows([...windows, spot])
-    void cam.fly(fitBelow({ ...spot, w: WINDOW[id].w, h: WINDOW[id].guess + 44 }), 450)
+    setFlyTo(id)
   }
+  // where windows really land, clear of everything else; the camera goes to that spot
+  const settled = settle(
+    windows.map((w) => ({ ...w, w: w.w ?? look(w).w, h: look(w).guess })),
+    [...rects, ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H })), graphRect]
+  )
+  useEffect(() => {
+    const w = settled.find((o) => o.id === flyTo)
+    if (!w) return
+    void cam.fly(fitBelow({ x: w.x, y: w.y, w: w.w, h: w.h + 44 }), 450)
+    setFlyTo(undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fly once per opened window
+  }, [flyTo])
   // "/agents", "/mcps" and "/settings" in the bar open these from anywhere
   const opener = useRef<(id: Desk) => void>(() => {})
   useEffect(() => {
@@ -467,10 +497,7 @@ export function Studio({
         onResize={(w) => !graphExpanded && setGraphWindow((g) => ({ ...g, w }))}
         onCollapse={() => setGraphWindow((g) => ({ ...g, collapsed: !g.collapsed }))}
       />
-      {settle(
-        windows.map((w) => ({ ...w, w: w.w ?? look(w).w, h: look(w).guess })),
-        [...rects, ...desk.map((d) => ({ x: d.x, y: d.y, w: DESK_W, h: DESK_H })), graphRect]
-      ).map((w) => (
+      {settled.map((w) => (
         <Card
           key={w.id}
           card={{
@@ -487,7 +514,7 @@ export function Studio({
                 <Agents />
               </AgentFileOpener.Provider>
             ) : w.id === 'mcps' ? (
-              <Connections />
+              <McpSettings />
             ) : (
               <Settings />
             )
@@ -637,6 +664,7 @@ function ShelfCover({
 
 type Desk = 'agents' | 'mcps' | 'graph' | 'settings'
 const DESK_W = 216
+const GRAPH_W = 656
 const GRAPH_WIDE = 1344 // the Knowledge window, expanded
 const DESK_H = 156
 const DESK: { id: Desk; name: string; note: string; icon: string }[] = [
@@ -655,22 +683,9 @@ const DESK: { id: Desk; name: string; note: string; icon: string }[] = [
 // (guess: about how tall each grows, for bringing it into view)
 const WINDOW: Record<Desk, Omit<CardSpec, 'id' | 'x' | 'y' | 'body'> & { guess: number }> = {
   agents: { title: 'Agents · the Ensemble', w: 1152, guess: 1100 },
-  mcps: { title: 'MCPs', w: 528, guess: 140 },
+  mcps: { title: 'MCPs', w: 528, guess: 860 },
   graph: { title: 'Knowledge graph', w: 704, guess: 1100 },
   settings: { title: 'Settings', w: 480, guess: 480 }
-}
-
-/** The tool servers agents can reach. */
-function Connections(): React.JSX.Element {
-  return (
-    <div className="p-5">
-      <h3 className="type-label-mono text-link">MCP servers</h3>
-      <p className="mt-2 type-body-s text-dim">
-        Figma first, then Blender and Fusion: connecting tool servers for agents is next on the
-        build plan. Until then agents work in files.
-      </p>
-    </div>
-  )
 }
 
 function Settings(): React.JSX.Element {

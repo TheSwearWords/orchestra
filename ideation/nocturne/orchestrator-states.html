@@ -1,0 +1,593 @@
+<title>Orchestrator States</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@1&display=swap">
+<style>
+/* Layout: one fixed blurred landscape behind everything; a stage (face + state list), the live bar, then a grid of all states looping. Nocturne is dark-only by design. */
+:root{
+  --bg:#0A0A0C; --raised:#141418;
+  --frost:rgba(8,8,10,.84);
+  --glass:rgba(255,255,255,.06); --glass-strong:rgba(255,255,255,.10);
+  --stroke:rgba(255,255,255,.12); --stroke-strong:rgba(255,255,255,.22);
+  --text:#F4F2EE; --dim:rgba(244,242,238,.64); --faint:rgba(244,242,238,.40);
+  --blue:#0538FF; --blue-bright:#5B7CFF;
+  --working:#5B7CFF; --needs:#FFA24A; --done:#6FDC8C; --error:#FF5A5F;
+  --peach:#F6B89A; --pink:#F2A7C3; --green:#B9E4A3; --lilac:#B7B5FF;
+  --ease:cubic-bezier(.2,.7,.2,1);
+  --calm:cubic-bezier(.45,.05,.25,1);
+  --f-display:'Geist','Helvetica Neue',Arial,sans-serif;
+  --f-serif:'Instrument Serif','Times New Roman',serif;
+  --f-mono:'Geist Mono',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--text)}
+body{font-family:var(--f-display);font-weight:400;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blue-bright);outline-offset:2px}
+
+/* background */
+.bg{position:fixed;inset:0;z-index:0;overflow:hidden;background:var(--bg)}
+.bg canvas{position:absolute;inset:-12%;width:124%;height:124%;filter:blur(28px) saturate(.75);opacity:0;transition:opacity .8s var(--ease)}
+.bg canvas.on{opacity:1}
+.bg::after{content:"";position:absolute;inset:0;background:
+  radial-gradient(rgba(255,255,255,.14) 1px,transparent 1.4px) 0 0/24px 24px,
+  linear-gradient(180deg,rgba(10,10,12,.25),rgba(10,10,12,.38) 55%,rgba(10,10,12,.78))}
+
+.page{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding-block:40px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:40px}
+
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+h1{margin:8px 0 0;font-weight:300;font-size:clamp(34px,5vw,56px);line-height:1.02;letter-spacing:-.02em;text-wrap:balance}
+h1 em{font-family:var(--f-serif);font-style:italic;font-weight:400;letter-spacing:-.01em}
+.lede{max-width:56ch;color:var(--dim);margin:12px 0 0}
+.lands{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lands span{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-right:4px}
+.land{width:34px;height:22px;border-radius:4px;border:1px solid var(--stroke);cursor:pointer;padding:0;background-size:cover}
+.land[aria-pressed="true"]{border-color:var(--text);box-shadow:0 0 0 2px rgba(244,242,238,.25)}
+
+.glass{background:var(--frost);border:1px solid var(--stroke);border-radius:10px;backdrop-filter:blur(28px) saturate(1.2);-webkit-backdrop-filter:blur(28px) saturate(1.2);box-shadow:0 18px 40px -18px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08)}
+
+/* stage */
+.stage{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px}
+.stage-face{position:relative;min-height:420px;display:grid;place-items:center;padding:32px}
+.stage-face .now{position:absolute;left:20px;top:16px;font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);display:flex;gap:10px;align-items:center}
+.stage-face .now b{font-weight:500;color:var(--text)}
+.stage-face .play{position:absolute;right:16px;top:12px}
+.btn{border:1px solid var(--stroke-strong);background:var(--glass-strong);border-radius:999px;padding:7px 14px;font-size:13px;cursor:pointer;transition:background .2s var(--ease)}
+.btn:hover{background:rgba(255,255,255,.16)}
+.btn.primary{background:var(--text);color:#0A0A0C;border-color:transparent}
+.btn.primary:hover{background:#fff}
+.stage-face .caption{position:absolute;left:20px;right:20px;bottom:16px;font-family:var(--f-serif);font-style:italic;font-size:22px;color:var(--text);text-align:center;min-height:1.3em}
+
+.states{display:flex;flex-direction:column;padding:8px}
+.state{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:4px 12px;align-items:baseline;text-align:left;padding:11px 12px;border-radius:6px;border:1px solid transparent;background:none;cursor:pointer;transition:background .2s var(--ease),border-color .2s var(--ease)}
+.state:hover{background:rgba(255,255,255,.04)}
+.state[aria-pressed="true"]{background:var(--glass-strong);border-color:var(--stroke-strong)}
+.state .dot{width:8px;height:8px;border-radius:50%;align-self:center;background:var(--c,var(--blue-bright));box-shadow:0 0 10px var(--c,var(--blue-bright))}
+.state .name{font-weight:500;font-size:15px}
+.state .t{font-family:var(--f-mono);font-size:11px;color:var(--faint);white-space:nowrap}
+.state .how{grid-column:2 / 4;color:var(--dim);font-size:13px;line-height:1.45}
+.state .when{color:var(--text);opacity:.85}
+
+/* bar */
+.bar-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+.bar-label{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.bar{width:min(760px,100%);border-radius:10px;overflow:hidden;transition:border-color .3s var(--ease),box-shadow .3s var(--ease)}
+.bar[data-state="listening"]{border-color:rgba(91,124,255,.55);box-shadow:0 0 0 3px rgba(91,124,255,.14),0 18px 40px -18px rgba(0,0,0,.6)}
+.bar[data-state="error"]{border-color:rgba(255,90,95,.45)}
+.bar[data-state="needs"]{border-color:rgba(255,162,74,.45)}
+.bar-row{display:flex;align-items:center;gap:12px;padding:10px 12px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--stroke-strong);background:var(--glass-strong);border-radius:999px;padding:5px 11px;font-size:13px;flex:none}
+.chip::after{content:"";width:0;height:0;border:3px solid transparent;border-top-color:var(--dim);margin-top:3px}
+.bar input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--text);font:inherit;font-size:15px}
+.bar input::placeholder{color:var(--faint)}
+.key{font-family:var(--f-mono);font-size:12px;color:var(--dim);border:1px solid var(--stroke-strong);border-radius:4px;padding:1px 7px;flex:none}
+.meta{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--stroke);padding:7px 14px;font-family:var(--f-mono);font-size:11.5px;color:var(--faint);min-height:34px}
+.meta .msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .3s var(--ease)}
+.bar[data-state="error"] .meta .msg{color:#FF9A9D}
+.bar[data-state="needs"] .meta .msg{color:#FFC48A}
+.bar[data-state="done"] .meta .msg{color:#A6EBB8}
+.bar[data-state="thinking"] .meta .msg,.bar[data-state="working"] .meta .msg{color:var(--dim)}
+.retry{font-family:var(--f-mono);font-size:11px;border:1px solid rgba(255,90,95,.5);color:#FFB3B5;background:rgba(255,90,95,.1);border-radius:999px;padding:2px 10px;cursor:pointer}
+.sent-bubble{position:absolute;right:16px;bottom:100%;margin-bottom:8px;background:var(--blue);color:#fff;border-radius:10px 10px 2px 10px;padding:7px 12px;font-size:13px;max-width:70%;opacity:0;transform:translateY(10px);pointer-events:none}
+.sent-bubble.go{animation:bubble 1.6s var(--ease) forwards}
+@keyframes bubble{0%{opacity:0;transform:translateY(12px) scale(.96)}18%{opacity:1;transform:translateY(0) scale(1)}70%{opacity:1;transform:translateY(-6px)}100%{opacity:0;transform:translateY(-22px)}}
+
+/* grid */
+.grid-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h2{margin:0;font-weight:400;font-size:22px;letter-spacing:-.01em}
+h2 em{font-family:var(--f-serif);font-style:italic}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.tile{padding:18px 16px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.tile .n{font-weight:500}
+.tile .w{font-family:var(--f-mono);font-size:11px;color:var(--faint);letter-spacing:.04em}
+
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.note{padding:18px}
+.note h3{margin:0 0 6px;font-size:13px;font-weight:500;font-family:var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.note p{margin:0;color:var(--dim);font-size:13.5px}
+.note code{font-family:var(--f-mono);font-size:12px;color:var(--text)}
+
+@media (max-width:900px){.stage{grid-template-columns:minmax(0,1fr)}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.notes{grid-template-columns:minmax(0,1fr)}.stage-face{min-height:360px}}
+
+/* ============ the face ============ */
+.face{--size:96px;--hi:#8FA6FF;--core:#0538FF;--deep:#021673;--halo:rgba(5,56,255,.6);--ring:rgba(244,242,238,.16);--ink:#F4F2EE;
+  position:relative;width:var(--size);height:var(--size);flex:none;
+  transition:--x 0s}
+.face .halo,.face .pulse{position:absolute;left:50%;top:50%;width:170%;height:170%;margin:-85% 0 0 -85%;border-radius:50%;
+  background:radial-gradient(circle,var(--halo) 0%,transparent 62%);filter:blur(calc(var(--size)*.06));transition:background .5s var(--ease),opacity .5s var(--ease);
+  animation:haloBreathe 6s ease-in-out infinite}
+.face .pulse{opacity:0;animation:none}
+.face svg{position:relative;width:100%;height:100%;overflow:visible;display:block}
+.face stop{transition:stop-color 1.2s var(--calm)}
+.face .g-body,.face .g-glyph,.face .g-k,.face .ring,.face .sheen,.face .rip,.face .o{transform-box:view-box;transform-origin:50px 50px}
+.face .ring-base{fill:none;stroke:var(--ring);stroke-width:.8;transition:stroke 1.2s var(--calm)}
+.face .ring{transform:rotate(-90deg);fill:none;stroke:var(--ring);stroke-width:1.4;stroke-linecap:round;stroke-dasharray:0 100;opacity:0;transition:stroke 1.2s var(--calm),opacity 1s var(--calm)}
+.face .sheen{fill:none;stroke:rgba(255,255,255,.4);stroke-width:1.2;stroke-linecap:round;stroke-dasharray:14 86;opacity:0;transition:opacity 1s var(--calm)}
+.face .ink{fill:var(--ink);transition:fill 1.2s var(--calm),opacity 1s var(--calm)}
+.face .trace{fill:none;stroke:var(--ink);stroke-width:.55;stroke-linecap:round;stroke-dasharray:0 100;opacity:0}
+.face .badge{fill:var(--needs);stroke:#0A0A0C;stroke-width:2.5;opacity:0;transform-box:fill-box;transform-origin:center;transform:scale(.4);transition:opacity .3s var(--calm),transform .3s var(--calm)}
+.face .o{opacity:0;transition:opacity 1s var(--calm)}
+.face .rip{fill:none;stroke:var(--ring);stroke-width:1;animation:rip 1.6s var(--calm) forwards}
+.face .rip.big{stroke-width:1.6;animation:shock 2s var(--calm) forwards}
+.face .g-body{animation:breathe 6s ease-in-out infinite}
+.face .g-glyph{transition:transform .3s var(--calm)}
+.face .g-k.nudge{animation:nudge .16s var(--calm)}
+
+@keyframes haloBreathe{0%,100%{opacity:.55}50%{opacity:.85}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+@keyframes rip{from{transform:scale(1);opacity:.75}to{transform:scale(1.42);opacity:0}}
+@keyframes shock{from{transform:scale(1);opacity:.9}to{transform:scale(1.95);opacity:0}}
+@keyframes nudge{0%{transform:translateY(0) scale(1)}45%{transform:translateY(-1.6px) scale(1.05)}100%{transform:translateY(0) scale(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes ringspin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+@keyframes trace{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.4px)}}
+@keyframes squash{0%{transform:scale(1)}22%{transform:scale(.86,.82)}55%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes halfturn{0%{transform:rotate(0)}100%{transform:rotate(180deg)}}
+@keyframes pulse{0%{transform:scale(.85);opacity:.9}70%,100%{transform:scale(1.35);opacity:0}}
+@keyframes draw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}35%{transform:translateX(-1.2px) rotate(-2deg)}70%{transform:translateX(.8px) rotate(1deg)}}
+@keyframes flicker{0%,100%{opacity:1}47%{opacity:1}50%{opacity:.55}53%{opacity:1}}
+
+/* liquid (WebGL) body replaces the SVG shell, glyph, halo and orbit dots */
+.face canvas.liquid{position:absolute;left:50%;top:50%;width:170%;height:170%;margin:-85% 0 0 -85%;pointer-events:none}
+.face.gl .halo,.face.gl .g-body,.face.gl .g-glyph,.face.gl .o{display:none}
+.face.gl .ring-base{stroke:rgba(244,242,238,.10)}
+/* listening */
+.face[data-state="listening"]{--halo:rgba(91,124,255,.8);--ring:rgba(140,165,255,.75);--hi:#A9BBFF}
+.face[data-state="listening"] .g-glyph{transform:rotate(-8deg)}
+.face[data-state="listening"] .ring{opacity:1;stroke-dasharray:100 0;stroke-width:.9}
+.face[data-state="listening"] .g-body{animation-duration:2.6s}
+/* sent */
+.face[data-state="sent"]{--halo:rgba(91,124,255,.85);--ring:rgba(180,195,255,.9);--hi:#C2CFFF}
+.face[data-state="sent"] .g-body{animation:squash 1.6s var(--calm)}
+.face[data-state="sent"] .g-glyph{animation:halfturn 1.8s var(--calm)}
+/* thinking */
+.face[data-state="thinking"]{--halo:rgba(183,181,255,.7);--hi:#C9C7FF;--core:#2A3FE0;--ring:rgba(183,181,255,.5)}
+.face[data-state="thinking"] .ink{opacity:.26}
+.face[data-state="thinking"] .trace{opacity:1;stroke-dasharray:30 70;animation:trace 3.2s linear infinite}
+.face[data-state="thinking"] .sheen{opacity:1;animation:spin 6s linear infinite}
+.face[data-state="thinking"] .g-body{animation-duration:2s}
+/* working */
+.face[data-state="working"]{--halo:rgba(91,124,255,.7);--ring:var(--working);--hi:#9FB2FF}
+.face[data-state="working"] .ring{opacity:1;stroke-dasharray:24 76;animation:ringspin 4.5s linear infinite}
+.face[data-state="working"] .o{opacity:1}
+.face[data-state="working"] .g-k{animation:bob 1.8s ease-in-out infinite}
+/* needs you */
+.face[data-state="needs"]{--halo:rgba(255,162,74,.55);--ring:rgba(255,162,74,.75);--hi:#9DB0FF}
+.face[data-state="needs"] .pulse{animation:pulse 3s var(--calm) infinite}
+.face[data-state="needs"] .ring{opacity:1;stroke-dasharray:100 0;stroke-width:1}
+.face[data-state="needs"] .badge{opacity:1;transform:scale(1)}
+.face[data-state="needs"] .g-body{animation-duration:2s}
+/* done */
+.face[data-state="done"]{--halo:rgba(111,220,140,.5);--ring:var(--done)}
+.face[data-state="done"] .ring{opacity:1;stroke-dasharray:100 100;animation:draw 1.6s var(--calm) forwards}
+.face[data-state="done"] .g-glyph{animation:pop 1.2s var(--calm) .9s}
+/* error */
+.face[data-state="error"]{--hi:#5C5C68;--core:#2A2A32;--deep:#111115;--halo:rgba(255,90,95,.42);--ring:var(--error);--ink:rgba(244,242,238,.78)}
+.face[data-state="error"] .ring{opacity:1;stroke-dasharray:3 5;stroke-width:1.1}
+.face[data-state="error"] .g-glyph{animation:shake 1.6s var(--calm)}
+.face[data-state="error"] .g-body{animation:none}
+.face[data-state="error"] .halo{animation:none;opacity:.7}
+
+@media (prefers-reduced-motion:reduce){
+  .face *, .face .halo,.face .pulse{animation:none!important}
+  .face .g-glyph{transform:none!important}
+  .face .rip{display:none}
+  .sent-bubble.go{animation:none;opacity:0}
+  .bg canvas{transition:none}
+}
+</style>
+
+<div class="bg" aria-hidden="true"><canvas id="bg" width="320" height="200"></canvas></div>
+
+<main class="page">
+  <header>
+    <div>
+      <div class="eyebrow">Orchestra · Nocturne · Motion</div>
+      <h1>The Orchestrator, <em>at work</em></h1>
+      <p class="lede">The ∫ from the original mark, suspended in a bead of liquid glass. The body is rendered live: it refracts the ∫, catches light on its rim and moves like water. Colour says what a state means; the liquid shows what it is doing.</p>
+    </div>
+    <div class="lands" role="group" aria-label="Background">
+      <span>Background</span>
+    </div>
+  </header>
+
+  <section class="stage" aria-label="Preview">
+    <div class="stage-face glass">
+      <div class="now"><span>State</span><b id="nowName">Waiting</b></div>
+      <button class="btn primary play" id="play" type="button">Play a full turn</button>
+      <div id="bigFace"></div>
+      <div class="caption" id="caption">Waiting for you.</div>
+    </div>
+    <div class="states glass" id="stateList" role="group" aria-label="States"></div>
+  </section>
+
+  <section class="bar-wrap" aria-label="Orchestrator bar">
+    <div class="bar-label">Try it: type in the bar, press Enter</div>
+    <div style="position:relative;width:min(760px,100%)">
+      <div class="sent-bubble" id="bubble"></div>
+      <div class="bar glass" id="bar" data-state="idle">
+        <div class="bar-row">
+          <div id="barFace"></div>
+          <span class="chip">Work</span>
+          <input id="ask" type="text" autocomplete="off" placeholder="Ask the Orchestrator anything, or type / to go somewhere" aria-label="Message the Orchestrator">
+          <span class="key">/</span>
+        </div>
+        <div class="meta"><span class="msg" id="meta">Your Claude plan usage shows after your next message</span><span id="metaAction"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:16px" aria-label="All states">
+    <div class="grid-head">
+      <h2>All eight, <em>looping</em></h2>
+      <span class="eyebrow">One-shot states replay every 5 s here</span>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section class="notes" aria-label="Build notes">
+    <div class="note glass"><h3>Easing and timing</h3><p>The face uses a calmer curve than the rest of the UI, <code>cubic-bezier(.45,.05,.25,1)</code>. State changes ease over about a second with a slow in-out curve, so nothing snaps or jolts. Impulses (a key, a send) are soft springs that die away over a second or two. Loops are linear only where something spins.</p></div>
+    <div class="note glass"><h3>One new token</h3><p>Error needs a colour the Nocturne set doesn't have: <code>status/error #FF5A5F</code>. The shell also drains to graphite, so the state still reads without colour.</p></div>
+    <div class="note glass"><h3>In the app</h3><p><code>&lt;OrchestratorFace state size /&gt;</code>: one WebGL fragment shader for the liquid (metaball body, refraction, fresnel rim, domain-warped interior) plus an SVG layer for the ring and badge. States only change shader inputs, eased over about a second. Without WebGL it falls back to the flat SVG orb; reduced motion freezes the liquid and keeps the colour.</p></div>
+  </section>
+</main>
+
+<script>
+(function(){
+const INTEGRAL="M5.04938 9.20016C5.41453 4.86797 5.71359 0 9.30094 0C10.4972 0 11.7 1.00031 11.7 1.98469C11.7 3.5625 9.50766 3.5625 9.50766 1.98469C9.50766 1.43391 10.0317 1.13344 9.66656 0.766875C8.83594 -0.0665625 7.90594 1.36687 7.5075 2.93391C7.10859 4.50094 6.85031 6.83484 6.65062 9.20016C6.28547 13.5319 5.98641 18.3998 2.39906 18.3998C1.20281 18.3998 0 17.3995 0 16.4156C0 14.8373 2.19234 14.8373 2.19234 16.4156C2.19234 16.9664 1.66828 17.2664 2.03344 17.633C2.86406 18.4669 3.79406 17.033 4.1925 15.4659C4.59141 13.8989 4.84969 11.565 5.04938 9.20016Z";
+
+const STATES=[
+ {id:'idle',name:'Waiting',c:'#5B7CFF',t:'6 s loop',when:'Nothing is running.',how:'The liquid drifts slowly and the surface barely moves. The bead breathes on a 6 s cycle.',cap:'Waiting for you.',meta:'Your Claude plan usage shows after your next message'},
+ {id:'listening',name:'Listening',c:'#8CA5FF',t:'160 ms a key',when:'You are typing in the bar.',how:'The ∫ leans in 8° and the ring wakes. Every key drops a ripple into the surface, like a fingertip on water.',cap:'Listening.',meta:'Enter to send · Shift Enter for a new line'},
+ {id:'sent',name:'Sent',c:'#C2CFFF',t:'1.8 s once',when:'You press Enter.',how:'The bead squashes and springs back, a wave runs round its edge and the ∫ turns half a circle. It is symmetric, so it lands looking the same.',cap:'Got it.',meta:'Sent'},
+ {id:'thinking',name:'Thinking',c:'#B7B5FF',t:'liquid loop',when:'Planning, before any tool runs.',how:'The liquid swirls faster and the ∫ dissolves like ink in water, then gathers itself again.',cap:'Reading research.md and the brand spec…',meta:'Thinking · reading research/art-direction.md'},
+ {id:'working',name:'Working',c:'#5B7CFF',t:'droplets',when:'Musicians are playing.',how:'A ring arc spins. One droplet per active Musician buds off the bead, orbits, and merges back, carrying its colour into the liquid.',cap:'4 Musicians playing: Brand Kit, Logo, Motion, Slide Deck.',meta:'Working · Brand Kit, Logo, Motion, Slide Deck'},
+ {id:'needs',name:'Needs you',c:'#FFA24A',t:'3 s swell',when:'A question or approval is waiting.',how:'The halo turns amber and swells every 3 s. A badge sits on the bead until you answer.',cap:'Which palette should Brand Kit build on?',meta:'Needs you · 1 question from Brand Kit'},
+ {id:'done',name:'Done',c:'#6FDC8C',t:'1.6 s, holds 3 s',when:'A run finishes.',how:'Green rises through the liquid from the bottom, the ring draws closed and the ∫ pops once. Then it settles back to Waiting.',cap:'Brand Kit is ready.',meta:'Done · Brand Kit ready in outputs/brand-kit'},
+ {id:'error',name:'Error',c:'#FF5A5F',t:'slow sway, holds',when:'Something failed.',how:'The liquid goes grey and still, the ring breaks into dashes and the bead sways once, slowly, then settles. The bar says what failed and offers Retry.',cap:'Couldn’t reach Figma.',meta:'Couldn’t reach Figma. Check the Figma MCP is running, then retry.'}
+];
+const BY=Object.fromEntries(STATES.map(s=>[s.id,s]));
+/* ---------- liquid orb (WebGL2). Falls back to the SVG body when unavailable ---------- */
+const LIQ=(function(){
+const VS=`#version 300 es
+in vec2 a;out vec2 v;void main(){v=a;gl_Position=vec4(a,0.,1.);}`;
+const FS=`#version 300 es
+precision highp float;
+in vec2 v;out vec4 o;
+uniform float uT,uR,uFlow,uSwirl,uWob,uSat,uInk,uDisp,uRot,uScale,uHaloA,uFlood,uPx;
+uniform vec2 uOff,uSquash,uImp;
+uniform vec3 uDeep,uMid,uHi,uHalo,uRim,uInkCol,uFloodCol;
+uniform vec4 uDrops[4];uniform vec3 uDropCol[4];
+uniform sampler2D uGlyph;
+float hs(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float ns(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);
+ return mix(mix(hs(i),hs(i+vec2(1,0)),u.x),mix(hs(i+vec2(0,1)),hs(i+vec2(1,1)),u.x),u.y);}
+float fbm(vec2 p){float s=0.,a=.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);for(int i=0;i<5;i++){s+=a*ns(p);p=m*p;a*=.5;}return s;}
+float field(vec2 p){
+ vec2 q=(p-uOff)/uSquash;
+ float an=atan(q.y,q.x);
+ float w=(ns(vec2(cos(an),sin(an))*1.4+uT*.16)-.5)*2.;
+ float w2=(ns(vec2(cos(an),sin(an))*3.1-uT*.2)-.5);
+ float rip=uImp.y*exp(-uImp.x*1.3)*sin(an*3.-uImp.x*3.5);
+ float r=uR*(1.+uWob*(w*.045+w2*.02)+rip*.035);
+ float F=r*r/max(dot(q,q),1e-5);
+ for(int i=0;i<4;i++){vec2 d=p-uDrops[i].xy;F+=uDrops[i].w*uDrops[i].z*uDrops[i].z/max(dot(d,d),1e-5);}
+ return F;}
+float zf(float F){return sqrt(max(0.,1.-1./F));}
+void main(){
+ vec2 p=v;
+ float F=field(p);
+ float hz=sqrt(1./max(F,1e-6));
+ float inside=clamp((1.-hz)/max(fwidth(hz),1e-4)+.5,0.,1.);
+ float halo=exp(-max(hz-1.,0.)*3.2)*uHaloA*(1.-inside);
+ if(inside<=0.){o=vec4(uHalo*halo,halo);return;}
+ float e=uPx*1.5;
+ float z=zf(F);
+ float zx=zf(field(p+vec2(e,0.))),zy=zf(field(p+vec2(0.,e)));
+ vec3 n=normalize(vec3(-(zx-z)/e*.5,-(zy-z)/e*.5,1.));
+ float t=uT*uFlow;
+ // surface micro-waves and key ripples
+ vec2 sw=vec2(fbm(p*6.+t*.8),fbm(p*6.-t*.7+3.1))-.5;
+ n.xy+=sw*.12*(.35+uDisp);
+ float rr=length(p-uOff)/uR;
+ n.xy+=normalize(p-uOff+1e-5)*sin(rr*9.-uImp.x*4.5)*exp(-uImp.x*1.2)*uImp.y*.08*step(rr,1.);
+ n=normalize(n);
+ // refraction: magnify the interior like a glass bead
+ vec2 q=(p-uOff)*(.72+.28*(1.-z))-n.xy*.05;
+ // swirling liquid interior (domain warp)
+ float c=cos(uSwirl*t*.5),s=sin(uSwirl*t*.5);
+ vec2 w=mat2(c,-s,s,c)*q*2.4;
+ vec2 w1=vec2(fbm(w+vec2(0.,t)),fbm(w+vec2(5.2,1.3)-t*.7));
+ vec2 w2=vec2(fbm(w+2.2*w1+vec2(1.7,9.2)+t*.3),fbm(w+2.2*w1+vec2(8.3,2.8)-t*.25));
+ float m=fbm(w+2.4*w2);
+ vec3 liq=mix(uDeep,uMid,smoothstep(.2,.7,m));
+ liq=mix(liq,uHi,smoothstep(.55,.95,m)*.85);
+ // droplets carry their musician's colour into the body
+ for(int i=0;i<4;i++){vec2 d=p-uDrops[i].xy;float k=uDrops[i].w*uDrops[i].z*uDrops[i].z/max(dot(d,d),1e-5);
+  liq=mix(liq,uDropCol[i],clamp(k*1.4-.15,0.,.85)*uDrops[i].w);}
+ // done: colour floods up from the bottom
+ float lvl=mix(-1.25,1.25,uFlood)+.05*sin((p.x/uR)*6.+uT*1.1);
+ float fl=smoothstep(lvl+.12,lvl-.12,(p.y-uOff.y)/uR)*step(.001,uFlood);
+ liq=mix(liq,mix(uFloodCol,uFloodCol*(.5+m),.5),fl*.75);
+ // light passing through: a bright crescent low in the bead
+ float cr=smoothstep(.1,.95,-q.y/uR)*pow(1.-z,1.5);
+ liq+=uHi*cr*.55;
+ liq*=mix(.6,1.05,z);
+ // the integral, suspended in the liquid
+ vec2 g=q;float cr2=cos(-uRot),sr2=sin(-uRot);g=mat2(cr2,-sr2,sr2,cr2)*g/uScale;
+ vec2 gd=(vec2(fbm(g*5.+t*1.3),fbm(g*5.-t*1.1+4.))-.5)*uDisp*.16;
+ vec2 tuv=(g+gd)/.6+.5;tuv.y=1.-tuv.y;
+ float ink=texture(uGlyph,tuv).a*uInk;
+ float shd=texture(uGlyph,tuv+vec2(-.022,-.035)).a*uInk;
+ vec3 col=mix(liq,liq*.45,shd*.55);
+ col=mix(col,uInkCol*mix(.9,1.05,z),ink);
+ float l=dot(col,vec3(.299,.587,.114));col=mix(vec3(l),col,uSat);
+ // glass lighting
+ float fr=pow(1.-n.z,2.6);
+ col+=uRim*fr*.85;
+ vec3 L=normalize(vec3(-.45,.62,.72));vec3 H=normalize(L+vec3(0.,0.,1.));
+ float sp=pow(max(dot(n,H),0.),110.)*1.5+pow(max(dot(n,H),0.),14.)*.16;
+ vec3 L2=normalize(vec3(.6,-.5,.6));vec3 H2=normalize(L2+vec3(0.,0.,1.));
+ sp+=pow(max(dot(n,H2),0.),60.)*.35;
+ col+=vec3(sp);
+ vec3 outc=col*inside+uHalo*halo;
+ o=vec4(outc,inside+halo);
+}`;
+const hex=h=>[parseInt(h.slice(1,3),16)/255,parseInt(h.slice(3,5),16)/255,parseInt(h.slice(5,7),16)/255];
+const BASE={deep:'#021673',mid:'#0538FF',hi:'#8FA6FF',halo:'#0538FF',rim:'#9DB2FF',inkc:'#F4F2EE',floodc:'#6FDC8C',
+ haloA:.42,flow:.11,swirl:.2,wob:.45,sat:1,ink:1,disp:.12,lean:0,drops:0,flood:0};
+const T={
+ idle:{},
+ listening:{hi:'#A9BBFF',halo:'#5B7CFF',haloA:.55,flow:.14,wob:.55,lean:-.12,rim:'#B9C7FF'},
+ sent:{hi:'#C2CFFF',halo:'#5B7CFF',haloA:.62,flow:.2,wob:.6,rim:'#C9D4FF'},
+ thinking:{deep:'#0E1452',mid:'#2A3FE0',hi:'#C9C7FF',halo:'#B7B5FF',haloA:.5,rim:'#D4D2FF',flow:.3,swirl:.45,wob:.7,ink:.85,disp:.9},
+ working:{hi:'#9FB2FF',halo:'#5B7CFF',haloA:.5,flow:.22,wob:.5,drops:1,disp:.25},
+ needs:{halo:'#FFA24A',haloA:.45,rim:'#FFC48A',hi:'#B4BFFF',flow:.13,wob:.5},
+ done:{halo:'#6FDC8C',haloA:.42,rim:'#B5F0C4',flood:1,flow:.16},
+ error:{deep:'#0E0E12',mid:'#2A2A32',hi:'#5C5C68',halo:'#FF5A5F',haloA:.32,rim:'#FF8A8D',inkc:'#C9C7C2',sat:.35,flow:.02,swirl:0,wob:.12,disp:0}
+};
+const DROPS=[{c:'#F6B89A',sp:.36,ph:0},{c:'#F2A7C3',sp:.28,ph:1.6},{c:'#B9E4A3',sp:.22,ph:3.3},{c:'#B7B5FF',sp:.32,ph:4.7}];
+const INTEGRAL_SRC=typeof INTEGRAL!=='undefined'?INTEGRAL:'';
+let glyphCanvas=null;
+function glyph(){if(glyphCanvas)return glyphCanvas;const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+ const s=.918*256/18.4;x.translate(128,128);x.scale(s,s);x.translate(-5.85,-9.2);x.fillStyle='#fff';x.fill(new Path2D(INTEGRAL_SRC));return glyphCanvas=c;}
+const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const all=[];
+class Liquid{
+ constructor(face,size){
+  this.face=face;this.size=size;
+  const cv=document.createElement('canvas');cv.className='liquid';cv.setAttribute('aria-hidden','true');
+  const dpr=Math.min(2,window.devicePixelRatio||1);const css=size*1.7;cv.width=cv.height=Math.round(css*dpr);
+  const gl=cv.getContext('webgl2',{premultipliedAlpha:true,antialias:false,alpha:true});
+  if(!gl)throw new Error('no webgl2');
+  const sh=(t,src)=>{const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;};
+  const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(pr));
+  gl.useProgram(pr);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const la=gl.getAttribLocation(pr,'a');gl.enableVertexAttribArray(la);gl.vertexAttribPointer(la,2,gl.FLOAT,false,0,0);
+  const tx=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tx);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,glyph());
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  this.gl=gl;this.pr=pr;this.cv=cv;this.u={};
+  ['uT','uR','uFlow','uSwirl','uWob','uSat','uInk','uDisp','uRot','uScale','uHaloA','uFlood','uPx','uOff','uSquash','uImp','uDeep','uMid','uHi','uHalo','uRim','uInkCol','uFloodCol','uDrops','uDropCol','uGlyph'].forEach(k=>this.u[k]=gl.getUniformLocation(pr,k));
+  this.cur={};this.tgt={};this.setState(face.dataset.state||'idle',true);
+  for(const k in this.tgt)this.cur[k]=Array.isArray(this.tgt[k])?[...this.tgt[k]]:this.tgt[k];
+  this.t=Math.random()*20;this.imp=[9,0];this.spin=0;this.spinTgt=0;this.squashAge=9;this.shakeAge=9;this.popAge=9;this.pulseT=0;this.dropW=[0,0,0,0];
+  face.prepend(cv);face.classList.add('gl');all.push(this);
+ }
+ setState(s,init){
+  const d=Object.assign({},BASE,T[s]||{});this.state=s;
+  for(const k in d)this.tgt[k]=typeof d[k]==='string'?hex(d[k]):d[k];
+  if(init)return;
+  if(s==='sent'){this.kick(.9);this.squashAge=0;this.spinTgt+=Math.PI;}
+  if(s==='error'){this.shakeAge=0;}
+  if(s==='done'){this.cur.flood=0;this.popAge=-.9;}
+ }
+ kick(a){if(reduced())return;const amp=this.imp[1]*Math.exp(-this.imp[0]*1.3);this.imp=[0,Math.min(1.1,amp+a)];}
+ frame(dt){
+  const gl=this.gl,u=this.u,c=this.cur,g=this.tgt,rm=reduced();
+  const k=1-Math.exp(-dt*(rm?30:1.7));
+  for(const key in g){if(Array.isArray(g[key])){for(let i=0;i<3;i++)c[key][i]+=(g[key][i]-c[key][i])*k;}else{const kk=key==='flood'?1-Math.exp(-dt*.85):k;c[key]+=(g[key]-c[key])*kk;}}
+  if(!rm){this.t+=dt;this.imp[0]+=dt;this.squashAge+=dt;this.shakeAge+=dt;this.popAge+=dt;}
+  this.spin+=(this.spinTgt-this.spin)*(1-Math.exp(-dt*1.8));
+  const R=.4235;
+  const sq=rm?0:.05*Math.exp(-this.squashAge*1.6)*Math.cos(this.squashAge*4.2);
+  const shake=rm?0:.014*Math.exp(-this.shakeAge*1.1)*Math.sin(this.shakeAge*3.2);
+  const pop=(this.popAge>0&&!rm)?.05*Math.exp(-this.popAge*1.8)*Math.sin(this.popAge*3.5):0;
+  const bob=this.state==='working'&&!rm?Math.sin(this.t*1.3)*.006:0;
+  const breathe=rm?0:Math.sin(this.t*(this.state==='idle'?1.05:1.4))*.012;
+  let haloA=c.haloA;if(this.state==='needs'&&!rm){haloA*=.75+.45*Math.pow(.5+.5*Math.sin(this.t*Math.PI/1.5),2);}
+  gl.viewport(0,0,this.cv.width,this.cv.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.uniform1f(u.uT,this.t);gl.uniform1f(u.uR,R*(1+breathe));gl.uniform1f(u.uFlow,c.flow);gl.uniform1f(u.uSwirl,c.swirl);gl.uniform1f(u.uWob,c.wob);
+  gl.uniform1f(u.uSat,c.sat);gl.uniform1f(u.uInk,c.ink);gl.uniform1f(u.uDisp,c.disp);gl.uniform1f(u.uRot,c.lean+this.spin+shake*2);
+  gl.uniform1f(u.uScale,1+pop);gl.uniform1f(u.uHaloA,haloA);gl.uniform1f(u.uFlood,c.flood);gl.uniform1f(u.uPx,2/this.cv.width);
+  gl.uniform2f(u.uOff,shake,bob);gl.uniform2f(u.uSquash,1+sq*.8,1-sq);gl.uniform2f(u.uImp,this.imp[0],this.imp[1]);
+  gl.uniform3fv(u.uDeep,c.deep);gl.uniform3fv(u.uMid,c.mid);gl.uniform3fv(u.uHi,c.hi);gl.uniform3fv(u.uHalo,c.halo);gl.uniform3fv(u.uRim,c.rim);
+  gl.uniform3fv(u.uInkCol,c.inkc);gl.uniform3fv(u.uFloodCol,c.floodc);
+  const dv=new Float32Array(16),dc=new Float32Array(12);
+  DROPS.forEach((d,i)=>{this.dropW[i]+=(c.drops-this.dropW[i])*(1-Math.exp(-dt*(.7+i*.25)));
+   const a=this.t*d.sp+d.ph,dist=R*(1.2+.24*Math.sin(this.t*.38+i*1.9));
+   dv.set([Math.cos(a)*dist,Math.sin(a)*dist*.92,R*(i%2?.24:.2),this.dropW[i]],i*4);dc.set(hex(d.c),i*3);});
+  gl.uniform4fv(u.uDrops,dv);gl.uniform3fv(u.uDropCol,dc);gl.uniform1i(u.uGlyph,0);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+ }
+}
+let last=performance.now();
+function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+ for(const l of all){if(l.visible!==false)l.frame(dt);}requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+const io='IntersectionObserver' in window?new IntersectionObserver(es=>es.forEach(e=>{const l=all.find(x=>x.cv===e.target);if(l)l.visible=e.isIntersecting;})):null;
+return{attach(face,size){try{const l=new Liquid(face,size);face._liq=l;if(io)io.observe(l.cv);return l;}catch(e){console.warn('Liquid orb unavailable, using SVG:',e.message);return null;}}};
+})();
+
+const ORBIT=[{c:'#F6B89A',r:47,d:3.2,o:0},{c:'#F2A7C3',r:49.5,d:4.4,o:-1.6},{c:'#B9E4A3',r:46,d:5.6,o:-3.1},{c:'#B7B5FF',r:50.5,d:3.8,o:-2.4}];
+let uid=0;
+function makeFace(size,state){
+  const id='f'+(uid++);
+  const el=document.createElement('div');el.className='face';el.dataset.state=state||'idle';el.style.setProperty('--size',size+'px');
+  el.setAttribute('role','img');el.setAttribute('aria-label','Orchestrator: '+BY[state||'idle'].name);
+  const dots=ORBIT.map(o=>`<g class="o" style="animation:spin ${o.d}s linear infinite;animation-delay:${o.o}s"><circle cx="50" cy="${50-o.r}" r="2.4" fill="${o.c}"/></g>`).join('');
+  el.innerHTML=`<div class="halo"></div><div class="pulse"></div>
+  <svg viewBox="0 0 100 100" aria-hidden="true">
+   <defs>
+    <radialGradient id="${id}c" cx="38%" cy="30%" r="75%"><stop offset="0" style="stop-color:var(--hi)"/><stop offset=".55" style="stop-color:var(--core)"/><stop offset="1" style="stop-color:var(--deep)"/></radialGradient>
+    <radialGradient id="${id}h" cx="40%" cy="22%" r="45%"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+   </defs>
+   ${dots}
+   <circle class="ring-base" cx="50" cy="50" r="44"/>
+   <circle class="ring" cx="50" cy="50" r="44" pathLength="100"/>
+   <g class="rips"></g>
+   <g class="g-body">
+     <circle cx="50" cy="50" r="36" fill="url(#${id}c)"/>
+     <circle cx="50" cy="50" r="36" fill="url(#${id}h)"/>
+     <circle cx="50" cy="50" r="35.5" fill="none" stroke="rgba(255,255,255,.22)" stroke-width=".6"/>
+     <circle class="sheen" cx="50" cy="50" r="30" pathLength="100"/>
+   </g>
+   <g class="g-glyph"><g class="g-k"><g transform="translate(50 50) scale(2.55) translate(-5.85 -9.2)">
+     <path class="ink" d="${INTEGRAL}"/>
+     <path class="trace" d="${INTEGRAL}" pathLength="100"/>
+   </g></g></g>
+   <circle class="badge" cx="82" cy="20" r="7"/>
+  </svg>`;
+  el._size=size;return el;
+}
+function liquify(el){LIQ.attach(el,el._size);return el;}
+function setState(face,s){if(face._liq)face._liq.setState(s);face.dataset.state='';void face.offsetWidth;face.dataset.state=s;face.setAttribute('aria-label','Orchestrator: '+BY[s].name);}
+function ripple(face,big){
+  if(face._liq&&!big){face._liq.kick(.6);return;}
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const g=face.querySelector('.rips');const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c.setAttribute('cx',50);c.setAttribute('cy',50);c.setAttribute('r',big?37:36);c.setAttribute('class','rip'+(big?' big':''));
+  c.addEventListener('animationend',()=>c.remove());g.appendChild(c);
+  if(!big){const k=face.querySelector('.g-k');k.classList.remove('nudge');void k.getBoundingClientRect();k.classList.add('nudge');}
+}
+
+/* ---------- stage, list, bar ---------- */
+const big=makeFace(200,'idle');document.getElementById('bigFace').appendChild(big);liquify(big);
+const small=makeFace(36,'idle');document.getElementById('barFace').appendChild(small);liquify(small);
+const list=document.getElementById('stateList');
+const bar=document.getElementById('bar'),meta=document.getElementById('meta'),metaAction=document.getElementById('metaAction');
+const caption=document.getElementById('caption'),nowName=document.getElementById('nowName');
+STATES.forEach(s=>{
+  const b=document.createElement('button');b.type='button';b.className='state';b.dataset.s=s.id;b.style.setProperty('--c',s.c);
+  b.setAttribute('aria-pressed',s.id==='idle');
+  b.innerHTML=`<span class="dot"></span><span class="name">${s.name}</span><span class="t">${s.t}</span><span class="how"><span class="when">${s.when}</span> ${s.how}</span>`;
+  b.addEventListener('click',()=>{stopFlow();go(s.id,true);});
+  list.appendChild(b);
+});
+let current='idle';
+function go(s,manual){
+  current=s;setState(big,s);setState(small,s);bar.dataset.state=s;
+  const d=BY[s];caption.textContent=d.cap;nowName.textContent=d.name;meta.textContent=d.meta;
+  metaAction.innerHTML='';
+  if(s==='error'){const r=document.createElement('button');r.className='retry';r.type='button';r.textContent='Retry';r.onclick=()=>{stopFlow();go('working');};metaAction.appendChild(r);}
+  list.querySelectorAll('.state').forEach(b=>b.setAttribute('aria-pressed',b.dataset.s===s));
+  if(s==='sent'){ripple(big,true);ripple(small,true);}
+  if(s==='listening'&&manual){burst();}
+}
+function burst(){let n=0;const iv=setInterval(()=>{if(current!=='listening'||n++>6){clearInterval(iv);return;}ripple(big);ripple(small);},320);}
+
+/* flow */
+let timers=[];
+function stopFlow(){timers.forEach(clearTimeout);timers=[];typing=false;}
+function at(ms,fn){timers.push(setTimeout(fn,ms));}
+let typing=false;
+function send(text){
+  const bub=document.getElementById('bubble');bub.textContent=text;bub.classList.remove('go');void bub.offsetWidth;bub.classList.add('go');
+  go('sent');
+  at(1600,()=>go('thinking'));
+  at(5200,()=>go('working'));
+  at(10200,()=>go('needs'));
+  at(14200,()=>go('working'));
+  at(17200,()=>go('done'));
+  at(21000,()=>go('idle'));
+}
+document.getElementById('play').addEventListener('click',()=>{
+  stopFlow();const ask=document.getElementById('ask');ask.value='';
+  const msg='Make the logo bolder and try a warmer palette';
+  go('listening');typing=true;let i=0;
+  const step=()=>{if(!typing)return;if(i<msg.length){ask.value+=msg[i++];ripple(big);ripple(small);at(70+Math.random()*90,step);}else{at(400,()=>{ask.value='';typing=false;send(msg);});}};
+  at(300,step);
+});
+const ask=document.getElementById('ask');
+ask.addEventListener('focus',()=>{if(current==='idle'||current==='done'||current==='error'){stopFlow();go('listening');}});
+ask.addEventListener('blur',()=>{if(current==='listening'&&!ask.value&&!typing)go('idle');});
+ask.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();const v=ask.value.trim();if(!v)return;stopFlow();ask.value='';send(v);return;}
+  if(e.key.length===1||e.key==='Backspace'){if(current!=='listening'){stopFlow();go('listening');}ripple(big);ripple(small);}
+});
+
+/* grid */
+const grid=document.getElementById('grid');const tiles={};
+STATES.forEach(s=>{const t=document.createElement('div');t.className='tile glass';const f=makeFace(88,s.id);tiles[s.id]=f;t.appendChild(f);liquify(f);
+  t.insertAdjacentHTML('beforeend',`<div><div class="n">${s.name}</div><div class="w">${s.t}</div></div>`);grid.appendChild(t);});
+setInterval(()=>{['sent','done','error'].forEach(id=>setState(tiles[id],id));ripple(tiles.sent,true);},5000);
+setInterval(()=>ripple(tiles.listening),700);
+
+/* ---------- landscapes (same renderer as the Figma plates) ---------- */
+const W=320,H=200,S=W/1440;const hx=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+const L=(a,b,t)=>a+(b-a)*t,cl=v=>Math.max(0,Math.min(1,v));
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+let img;const px=(x,y)=>(y*W+x)*3;
+function sky(st){img=new Float32Array(W*H*3);for(let y=0;y<H;y++){const t=y/(H-1);let c=hx(st[st.length-1][1]);for(let i=0;i<st.length-1;i++){const[p0,c0]=st[i],[p1,c1]=st[i+1];if(t>=p0&&t<=p1){const u=cl((t-p0)/Math.max(p1-p0,1e-6)),a=hx(c0),b=hx(c1);c=[L(a[0],b[0],u),L(a[1],b[1],u),L(a[2],b[2],u)];break;}}for(let x=0;x<W;x++){const i=px(x,y);img[i]=c[0];img[i+1]=c[1];img[i+2]=c[2];}}}
+function blend(i,c,g){img[i]=img[i]*(1-g)+c[0]*g;img[i+1]=img[i+1]*(1-g)+c[1]*g;img[i+2]=img[i+2]*(1-g)+c[2]*g;}
+function sun(cx,cy,r,col,st){cx*=S;cy*=S;r*=S;const c=hx(col);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const d=Math.hypot(x-cx,(y-cy)*1.3);blend(px(x,y),c,Math.exp(-((d/r)**2))*st);}}
+function ridge(base,amp,rough,seed,smooth,mesa){const r=rng(seed),y=new Float32Array(W);for(let k=1;k<9;k++){const f=k*(smooth?1.2:2.2),a=amp/(k**(smooth?1.6:rough)),m=.6+r()*.8,ph=r()*6.28;for(let x=0;x<W;x++)y[x]+=a*Math.sin(2*Math.PI*f*(x/(W-1))*m+ph);}
+ if(mesa){const s=[...y].sort((a,b)=>a-b),p=s[Math.floor(.62*(W-1))];for(let x=0;x<W;x++)y[x]=Math.min(y[x],p);}const o=new Float32Array(W);for(let x=0;x<W;x++)o[x]=(base-y[x])*S;return o;}
+function layer(line,col,hz,haze){const c=hx(col),h=hz?hx(hz):c;for(let x=0;x<W;x++)for(let y=Math.max(0,Math.ceil(line[x]));y<H;y++){const t=hz?cl((y-line[x])/(180*S)):1,i=px(x,y);for(let k=0;k<3;k++)img[i+k]=L(L(c[k],h[k],haze||0),c[k],t);}}
+function mist(y0,h,col,a){y0*=S;h*=S;const c=hx(col);for(let y=0;y<H;y++){const g=Math.exp(-(((y-y0)/h)**2))*a;for(let x=0;x<W;x++)blend(px(x,y),c,g);}}
+function vig(b){for(let y=0;y<H;y++){const d=(cl((y/(H-1)-.45)/.55)**1.4)*b;for(let x=0;x<W;x++){const i=px(x,y);img[i]*=1-d;img[i+1]*=1-d;img[i+2]*=1-d;}}}
+const SCENES={
+ Sunset:()=>{sky([[0,'#1A1033'],[.38,'#5A2E5C'],[.58,'#E0857A'],[.68,'#F6B89A'],[1,'#F6B89A']]);sun(900,560,160,'#FFD9B0',.9);
+  [[560,40,'#8E5A7A',.5],[610,55,'#5B3A66',.4],[680,60,'#33264D',.3],[760,70,'#1C1530',.2],[840,50,'#0E0B18',0]].forEach(([b,a,c,h],i)=>{layer(ridge(b,a,1.3,10+i),c,'#F6B89A',h);mist(b+20,30,'#F2A7C3',.1*(1-i/5));});vig(.55);},
+ Alpine:()=>{sky([[0,'#060B2A'],[.35,'#14257A'],[.55,'#4C5BC9'],[.62,'#B7B5FF'],[1,'#B7B5FF']]);sun(420,520,220,'#DCDBFF',.35);
+  const pk=ridge(480,85,1.35,21);layer(pk,'#2A3470','#B7B5FF',.5);const sn=hx('#DCE2FF');for(let x=0;x<W;x++)if(pk[x]<450*S)for(let y=Math.ceil(pk[x]);y<pk[x]+22*S&&y<H;y++)blend(px(x,y),sn,.5);
+  layer(ridge(565,35,1.6,22,true),'#141B45','#4C5BC9',.3);const r0=Math.round(600*S);
+  {const tl=ridge(560,18,1.2,9);for(let x=0;x<W;x++){const u=x/(W-1),w=Math.max(cl((.34-u)/.12),cl((u-.72)/.12));tl[x]=w>0?L(r0+1,tl[x]-w*14*S,w):H;}layer(tl,'#070B22');}
+  const dk=hx('#0A1030');for(let j=0;j<H-r0;j++){const src=r0-1-j;if(src<0)break;for(let x=0;x<W;x++){const s=px(x,src),d=px(x,r0+j);for(let k=0;k<3;k++)img[d+k]=L(img[s+k]*.55,dk[k],.35);}}mist(600,18,'#B7B5FF',.18);vig(.5);},
+ Desert:()=>{sky([[0,'#160D2E'],[.4,'#4A2A5E'],[.6,'#C86A4A'],[.68,'#F0A060'],[1,'#F0A060']]);sun(560,600,180,'#FFC98A',.75);
+  [[600,40,'#9A5A5A',.5,true],[650,60,'#6A3A48',.35,true],[730,35,'#3A2235',.2,false],[820,30,'#160E18',0,false]].forEach(([b,a,c,h,m],i)=>layer(ridge(b,a,1.5,30+i,!m,m),c,'#F0A060',h));vig(.55);},
+ Hills:()=>{sky([[0,'#0E1626'],[.35,'#2E3E58'],[.55,'#6E7F86'],[.63,'#C9C69A'],[1,'#C9C69A']]);sun(1100,560,200,'#EDE3B0',.55);
+  [[580,30,'#5E7A62',.45],[640,45,'#3E5A48',.3],[720,55,'#22382C',.15],[820,45,'#0C1610',0]].forEach(([b,a,c,h],i)=>layer(ridge(b,a,2,40+i,true),c,'#B9E4A3',h));vig(.55);},
+ Coast:()=>{sky([[0,'#2B2A33'],[.4,'#8C8A93'],[.6,'#E6DCD6'],[1,'#EDE8DF']]);sun(1000,500,240,'#FBE6DA',.5);
+  {const sea=hx('#8E9AA0');for(let y=Math.round(640*S);y<H;y++)for(let x=0;x<W;x++)blend(px(x,y),sea,.6);}
+  [[560,70,'#A9ADA6',.55],[620,90,'#6E756F',.35],[720,110,'#2E332F',.1]].forEach(([b,a,c,h],i)=>{const l=ridge(b,a,1.4,50+i),cut=Math.floor(W*(.35+.2*i));for(let x=0;x<W;x++){if(x<cut)l[x]=H;else l[x]=L(H,l[x],cl((x-cut)/(W*.08)));}layer(l,c,'#EDE8DF',h);mist(b+10,40,'#EDE8DF',.25);});vig(.62);}
+};
+const cache={};
+function render(name){if(cache[name])return cache[name];SCENES[name]();const id=new ImageData(W,H);for(let i=0,j=0;i<W*H*3;i+=3,j+=4){id.data[j]=img[i];id.data[j+1]=img[i+1];id.data[j+2]=img[i+2];id.data[j+3]=255;}return cache[name]=id;}
+const cv=document.getElementById('bg'),ctx=cv.getContext('2d');
+function show(name){ctx.putImageData(render(name),0,0);cv.classList.add('on');
+  document.querySelectorAll('.land').forEach(b=>b.setAttribute('aria-pressed',b.dataset.n===name));
+  try{localStorage.setItem('orch-land',name)}catch(e){}}
+const lands=document.querySelector('.lands');const tmp=document.createElement('canvas');tmp.width=W;tmp.height=H;const tctx=tmp.getContext('2d');
+Object.keys(SCENES).forEach(n=>{const b=document.createElement('button');b.type='button';b.className='land';b.dataset.n=n;b.title=n;b.setAttribute('aria-label',n);
+  tctx.putImageData(render(n),0,0);b.style.backgroundImage=`url(${tmp.toDataURL('image/jpeg',.6)})`;b.onclick=()=>show(n);lands.appendChild(b);});
+let start='Alpine';try{const s=localStorage.getItem('orch-land');if(s&&SCENES[s])start=s;}catch(e){}
+show(start);
+})();
+</script>

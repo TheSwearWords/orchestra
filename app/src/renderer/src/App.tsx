@@ -82,7 +82,10 @@ function App(): React.JSX.Element {
   // shortcut: one remembered list shared by every window; upgrade when windows need their own
   const [tabs, setTabs] = useState<string[]>(() => {
     const v = startingView()
-    return v.at === 'book' ? [v.id] : rememberedJson('tabs', [])
+    if (v.at === 'book') return [v.id]
+    // the old tab strip kept a differently shaped value under 'tabs', so this list has its own key
+    const saved = rememberedJson<unknown>('open-tabs', [])
+    return Array.isArray(saved) ? saved.filter((t): t is string => typeof t === 'string') : []
   })
   const [opening, setOpening] = useState<{
     id: string
@@ -123,7 +126,7 @@ function App(): React.JSX.Element {
   }, [refresh])
 
   useEffect(() => remember('areas', areas), [areas])
-  useEffect(() => remember('tabs', tabs), [tabs])
+  useEffect(() => remember('open-tabs', tabs), [tabs])
 
   const current = view.at === 'book' ? projects?.find((p) => p.id === view.id) : undefined
   useEffect(() => {

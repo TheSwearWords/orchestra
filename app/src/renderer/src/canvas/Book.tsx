@@ -6,7 +6,8 @@ import { Canvas } from './Canvas'
 import { useCamera } from './useCamera'
 import { fit, type Rect } from './camera'
 import { AREAS, chip, typing, type Area } from './shared'
-import { AreaSwitch, Minimap, PageTurn, SIDE, Shell, ZoomChip, type Step } from './Chrome'
+import { AreaSwitch, Minimap, Shell, ZoomChip, type Step } from './Chrome'
+import { EdgeTab } from './EdgeTab'
 
 const GAP = 160 // between areas, in world px
 
@@ -95,12 +96,11 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
     { label: name, onClick: () => onArea(null) }
   ]
   const current = AREAS.find((a) => a.id === open)
+  const before = current && AREAS[AREAS.indexOf(current) - 1]
+  const after = current && AREAS[AREAS.indexOf(current) + 1]
   const pages = (on: Area | null): React.ReactNode => <AreaSwitch current={on} onGo={onArea} />
   return (
-    <div
-      className="relative h-full w-full"
-      style={open ? ({ '--side': `${SIDE}px` } as React.CSSProperties) : undefined}
-    >
+    <div className="relative h-full w-full">
       <div className="absolute inset-0" style={{ visibility: open ? 'hidden' : 'visible' }}>
         <Canvas
           cam={cam}
@@ -183,10 +183,16 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
           })}
         </div>
       )}
-      {open && (
+      {open && current && (
         <>
-          <PageTurn side="left" to={AREAS[AREAS.indexOf(current!) - 1]} onGo={onArea} />
-          <PageTurn side="right" to={AREAS[AREAS.indexOf(current!) + 1]} onGo={onArea} />
+          {/* the first area's left neighbour is the whole book; the last has nothing after it */}
+          <EdgeTab
+            side="left"
+            to={before?.id ?? null}
+            name={before?.name ?? 'Book'}
+            onGo={onArea}
+          />
+          {after && <EdgeTab side="right" to={after.id} name={after.name} onGo={onArea} />}
         </>
       )}
     </div>

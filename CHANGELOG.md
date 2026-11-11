@@ -9,6 +9,7 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 - Nocturne, phase 1: the app is dark by default, with chalk type on near-black panels, set in Geist, Geist Mono and Instrument Serif Italic. The light look is still there: set `localStorage.theme = 'v2'` and reload.
 - Nocturne, phase 2: the Studio, Setup and the cover editor sit on a soft blurred landscape. Inside a book the board is flat grey with dots. The header, Back, Needs you, the area switch, the Orchestrator bar and the minimap are frosted glass.
 - Nocturne, phase 3: the breadcrumb is gone. The header has Home, a tab for each open project (its icon shows which area it is on) and + for a new project. Closing the tab you are on goes to the one on its left, or Home. Back shows only away from the Studio.
+- Nocturne, phases 4 and 5: the area switch is a notch under the header with an icon for the whole book and each area; the one you are on is a chalk pill with its name. The full-height page strips are replaced by small edge tabs at the sides, so boards use the full width.
 
 ## 2026-11-09
 

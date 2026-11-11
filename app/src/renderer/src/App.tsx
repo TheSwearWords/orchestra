@@ -9,7 +9,7 @@ import { Landscape } from './canvas/Landscape'
 import { Tabs } from './canvas/Tabs'
 import { DRAFT, closeTab, openTab } from './canvas/tabList'
 import { STUDIO, TOP_BAR, chip, coverInfo, requestFocus, type Area } from './canvas/shared'
-import { NeedsYou } from './canvas/NeedsYou'
+import { SessionDock } from './canvas/SessionDock'
 import { SIDE } from './canvas/Chrome'
 import { CoverEditor } from './canvas/CoverEditor'
 import { Opening } from './canvas/Opening'
@@ -358,17 +358,14 @@ function App(): React.JSX.Element {
           Back
         </button>
       )}
-      {current && (
-        <NeedsYou
-          key={current.id}
-          side={side}
-          project={current}
-          onOpen={(project, card) => {
-            requestFocus(project, card)
-            go({ at: 'book', id: project, area: 'create' })
-          }}
-        />
-      )}
+      <SessionDock
+        key={current?.id ?? 'studio'}
+        project={current}
+        onOpen={(project, card) => {
+          requestFocus(project, card)
+          go({ at: 'book', id: project, area: 'create' })
+        }}
+      />
       <OrchestratorBar
         to={to}
         projects={projects}

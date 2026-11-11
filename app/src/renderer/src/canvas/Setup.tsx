@@ -718,10 +718,6 @@ export function Setup({ onDone }: { onDone: () => void }): React.JSX.Element {
         project={STUDIO}
         board="setup"
         label="Setup"
-        crumbs={[
-          { label: 'Orchestra' },
-          { label: name.trim() && done.name ? `Hi, ${name.trim()}` : 'Setup' }
-        ]}
         right={
           <button onClick={skip} className={barButton}>
             Skip the tour

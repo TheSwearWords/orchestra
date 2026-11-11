@@ -4,7 +4,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Project } from '../../../preload'
 import { NeedsYou, useNeeds } from './NeedsYou'
-import { STATUS_WORDS, dockAgents, type DockAgent, type DockStatus } from './dock'
+import { OrchestratorFace } from './OrchestratorFace'
+import { signal, useFaceState } from './faceState'
+import { STATUS_WORDS, dockAgents, latestNotes, type DockAgent, type DockStatus } from './dock'
 
 const DOT: Record<DockStatus, string> = {
   'needs-you': 'bg-needs-you',
@@ -14,21 +16,33 @@ const DOT: Record<DockStatus, string> = {
   idle: 'bg-fg-disabled'
 }
 
-/** The project's deliverable agents, kept current as they change status. */
-function useAgents(project: string | undefined): DockAgent[] {
+/** The project's deliverable agents, kept current as they change status, and what each was
+ * last seen doing (from the agent log of the chats they were briefed in). */
+function useAgents(project: string | undefined): {
+  agents: DockAgent[]
+  notes: Record<string, string>
+} {
   const [agents, setAgents] = useState<DockAgent[]>([])
+  const [notes, setNotes] = useState<Record<string, string>>({})
   useEffect(() => {
     if (!project) return undefined
     let live = true
     const load = (): void =>
       void Promise.all([window.api.loadCreate(project), window.api.agentStates(project)])
-        .then(
-          ([plan, states]) => live && setAgents(dockAgents(plan.musicians, plan.selected, states))
-        )
+        .then(([plan, states]) => {
+          if (!live) return
+          setAgents(dockAgents(plan.musicians, plan.selected, states))
+          const chats = [...new Set(Object.values(states).map((s) => s.chat))]
+          void Promise.all(
+            chats.map((c) => window.api.loadChat(project, c).catch(() => null))
+          ).then((all) => live && setNotes(latestNotes(all.flatMap((c) => c?.log ?? []))))
+        })
         .catch(() => live && setAgents([]))
     load()
     const off = window.api.onChatEvent((e) => {
-      if (e.project === project && e.kind === 'agents') load()
+      if (e.project !== project) return
+      if (e.kind === 'agents') load()
+      if (e.kind === 'log') setNotes((n) => ({ ...n, ...latestNotes([e.entry]) }))
     })
     // deliverables chosen or dropped on the Create board
     addEventListener('orchestra:agents-changed', load)
@@ -40,7 +54,7 @@ function useAgents(project: string | undefined): DockAgent[] {
       removeEventListener('focus', load)
     }
   }, [project])
-  return project ? agents : []
+  return project ? { agents, notes } : { agents: [], notes: {} }
 }
 
 export function SessionDock({
@@ -50,7 +64,10 @@ export function SessionDock({
   project?: Project // none on the Studio: the Orchestrator's dot alone
   onOpen: (project: string, card: string) => void
 }): React.JSX.Element {
-  const agents = useAgents(project?.id)
+  const { agents, notes } = useAgents(project?.id)
+  // a working agent says what it is doing; the rest say their status
+  const line = (a: DockAgent): string =>
+    (a.status === 'working' && notes[a.id]) || STATUS_WORDS[a.status]
   const here = useMemo(() => (project ? [project] : []), [project])
   const needs = useNeeds(here)
   const [open, setOpen] = useState(false)
@@ -75,6 +92,15 @@ export function SessionDock({
   }, [open])
 
   const playing = agents.filter((a) => a.status === 'working').length
+  // the Orchestrator's face hears about the agents from here
+  const face = useFaceState()
+  const finished = agents.filter((a) => a.status === 'done').length
+  const lastFinished = useRef(finished)
+  useEffect(() => {
+    const more = finished > lastFinished.current
+    lastFinished.current = finished
+    signal({ working: playing, needs: needs.length, ...(more ? { doneAt: Date.now() } : {}) })
+  }, [playing, needs.length, finished])
   const conducting = playing ? `Conducting · ${playing} playing` : 'Nothing playing'
   return (
     <div ref={root} className="absolute right-0 z-30" style={{ top: 104 }}>
@@ -89,14 +115,7 @@ export function SessionDock({
           aria-label={`Agents in this session. ${conducting}`}
           className="flex w-full items-center gap-2.5 px-[7px] pt-2.5 pb-2 text-left"
         >
-          <span
-            aria-hidden
-            className={`size-[22px] shrink-0 rounded-full transition-[background,box-shadow] duration-1000 ease-(--ease-calm) ${
-              needs.length
-                ? 'bg-[radial-gradient(circle_at_35%_30%,var(--color-status-signal-text),var(--color-needs-you-default))] shadow-[0_0_14px_var(--color-status-signal-subtle)]'
-                : 'bg-[radial-gradient(circle_at_35%_30%,var(--color-agent-text),var(--color-brand))]'
-            }`}
-          />
+          <OrchestratorFace size={22} state={face} />
           {open && (
             <span className="min-w-0">
               <span className="block truncate type-body-s font-medium text-fg">Orchestrator</span>
@@ -129,9 +148,7 @@ export function SessionDock({
                 {open && (
                   <span className="min-w-0">
                     <span className="block truncate type-body-s font-medium text-fg">{a.name}</span>
-                    <span className="block truncate type-caption text-dim">
-                      {STATUS_WORDS[a.status]}
-                    </span>
+                    <span className="block truncate type-caption text-dim">{line(a)}</span>
                   </span>
                 )}
               </li>
@@ -146,7 +163,7 @@ export function SessionDock({
           style={{ top: hover.y }}
         >
           <span className="type-body-s font-medium text-fg">{hover.agent.name}</span>
-          <span className="type-caption text-dim">{STATUS_WORDS[hover.agent.status]}</span>
+          <span className="type-caption text-dim">{line(hover.agent)}</span>
         </span>
       )}
       {project && !open && (

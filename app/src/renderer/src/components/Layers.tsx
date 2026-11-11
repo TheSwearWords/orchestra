@@ -44,7 +44,7 @@ export function Layers({
       className="absolute z-20 flex w-60 flex-col border border-chip-line bg-card text-link shadow-float"
       style={{
         top,
-        left: 'calc(14px + var(--side, 0px))',
+        left: 14,
         maxHeight: `calc(100% - ${top + 120}px)`
       }}
     >

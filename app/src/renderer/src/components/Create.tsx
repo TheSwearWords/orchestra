@@ -564,7 +564,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               on
                 ? 'seat-on'
                 : 'border border-card-line bg-card text-link shadow-card hover:bg-selected'
-            } ${locked ? 'cursor-default outline-[3px] outline-offset-4 outline-brand' : ''}`}
+            } ${locked ? 'cursor-default outline-2 outline-offset-4 outline-agent/45' : ''}`}
             style={{
               left: s.x - SEAT.w / 2,
               top: s.y - SEAT.h / 2,
@@ -973,7 +973,6 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       project={project}
       board="create"
       label="II · Create"
-      crumbs={frame.crumbs}
       pages={frame.pages}
       preview={frame.preview}
       world={world}

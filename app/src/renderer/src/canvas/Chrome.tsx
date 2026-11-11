@@ -1,13 +1,11 @@
-// Floating chrome (brand spec §5.2): sharp white chips that sit above the board.
+// Floating chrome: the frosted pieces that sit above the board.
 import { Icon } from '../components/Icon'
 import { AREAS, TOP_BAR, chip, type Area } from './shared'
 import { clampZoom, type Camera, type Rect } from './camera'
 import { MODE_ICON } from './tabList'
 
-export type Step = { label: string; onClick?: () => void }
-
-/** Every screen's frame: the breadcrumb across the top (with the screen's own controls on its
- * right), the pages centred under it and the minimap bottom right. The Orchestrator bar and the
+/** Every screen's frame: the header (with the screen's own controls on its right), the area
+ * switch hanging under it and the minimap bottom right. The Orchestrator bar and the
  * back button belong to the whole window, so App draws them. */
 export function Shell({
   right,
@@ -16,7 +14,6 @@ export function Shell({
   minimap,
   children
 }: {
-  crumbs?: Step[]
   right?: React.ReactNode
   pages?: React.ReactNode
   corner?: React.ReactNode // bottom left: the Studio's title
@@ -29,7 +26,7 @@ export function Shell({
         className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 border-b border-chip-line bg-chip pr-2 pl-2 shadow-float glass"
         style={{ height: TOP_BAR }}
       >
-        {/* App draws the tabs here (Tabs.tsx); crumbs is ignored until its callers drop it */}
+        {/* App draws Home and the tabs over this side (Tabs.tsx) */}
         <span />
         <div className="flex items-center gap-2">{right}</div>
       </header>
@@ -40,10 +37,7 @@ export function Shell({
       )}
       {corner && <div className="absolute bottom-3.5 left-3.5 z-20">{corner}</div>}
       {minimap && (
-        <div
-          className="absolute bottom-3.5 z-20"
-          style={{ right: 'calc(14px + var(--side, 0px))' }}
-        >
+        <div className="absolute bottom-3.5 z-20" style={{ right: 14 }}>
           {minimap}
         </div>
       )}
@@ -55,70 +49,6 @@ export function Shell({
 /** A control inside the top bar: a hairline box, not a floating chip. */
 export const barButton =
   'serif-on flex h-9 items-center border border-chip-line px-3.5 type-label-s text-link hover:bg-selected'
-
-/** The little wire between two breadcrumb steps: a port on each, joined like the board's nodes. */
-function NodeLink(): React.JSX.Element {
-  return (
-    <svg aria-hidden width="28" height="10" viewBox="0 0 28 10" className="shrink-0 text-brand">
-      <line
-        x1="5"
-        y1="5"
-        x2="23"
-        y2="5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeDasharray="3 3"
-      />
-      <circle
-        cx="4"
-        cy="5"
-        r="3"
-        fill="var(--color-chip)"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <circle cx="24" cy="5" r="3" fill="currentColor" />
-    </svg>
-  )
-}
-
-/** Where you are, as a row of equal boxes: the same type in every one, the current step
- * filled blue. Clicking an earlier step goes back out to it. */
-export function Breadcrumb({ steps }: { steps: Step[] }): React.JSX.Element {
-  const box = 'flex h-9 items-center border border-chip-line px-3.5 type-label-s whitespace-nowrap'
-  return (
-    <nav aria-label="Where you are" className="flex min-w-0 items-center gap-2 text-link">
-      <span className="mr-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand">
-        <Icon name="logo-mark" size={20} />
-      </span>
-      <ol className="flex min-w-0 items-center">
-        {steps.map((s, i) => {
-          const last = i === steps.length - 1
-          return (
-            <li key={i} className="flex items-center">
-              {i > 0 && <NodeLink />}
-              {last ? (
-                <span
-                  aria-current="location"
-                  className={`${box} border-brand bg-brand text-on-brand`}
-                >
-                  {s.label}
-                </span>
-              ) : (
-                <button
-                  onClick={s.onClick}
-                  className={`${box} transition-colors duration-200 ease-(--ease) hover:bg-selected`}
-                >
-                  {s.label}
-                </button>
-              )}
-            </li>
-          )
-        })}
-      </ol>
-    </nav>
-  )
-}
 
 /** The area switch: a notch hanging from the header's bottom edge, with the book and its three
  * areas as icons. The one you are on is a chalk pill that also names it. */
@@ -190,43 +120,6 @@ export function NewCard({
     >
       <Icon name="add-line" size={16} />
       {title}
-    </button>
-  )
-}
-
-// The page-turn strips are gone (EdgeTab.tsx), so the corners no longer move in.
-// shortcut: kept at 0 for its callers; remove with PageTurn in the clean-up phase
-export const SIDE = 0
-
-/** A full-height strip at the window's edge that goes to the neighbouring area. At the first
- * and last area it stays as an empty strip, so the frame doesn't change as you go. */
-export function PageTurn({
-  side,
-  to,
-  onGo
-}: {
-  side: 'left' | 'right'
-  to?: (typeof AREAS)[number]
-  onGo: (a: Area) => void
-}): React.JSX.Element {
-  return (
-    <button
-      disabled={!to}
-      aria-hidden={!to}
-      aria-label={to && `Go to ${to.numeral} ${to.name}`}
-      title={to && `${to.numeral} · ${to.name}`}
-      onClick={() => to && onGo(to.id)}
-      className={`absolute bottom-0 z-10 flex flex-col items-center justify-center gap-3 border-chip-line bg-chip text-link transition-colors duration-200 ease-(--ease) enabled:hover:bg-brand enabled:hover:text-on-brand ${side === 'left' ? 'left-0 border-r' : 'right-0 border-l'}`}
-      style={{ top: TOP_BAR, width: SIDE }}
-    >
-      {to && (
-        <>
-          <span className="font-mono text-[18px]">{side === 'left' ? '←' : '→'}</span>
-          <span className="type-label-serif-l [writing-mode:vertical-rl]">
-            {to.numeral} · {to.name}
-          </span>
-        </>
-      )}
     </button>
   )
 }

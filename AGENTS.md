@@ -2,7 +2,7 @@
 
 Orchestra is an Electron design app. A user works through three areas (I Research, II Create, III Refine) with a team of AI agents. This file is for agents and people adding to the code. It covers how the app is built, which pieces depend on each other, and how to land a change without colliding with other contributors.
 
-Last checked against commit `d2d501f` on branch `canvas` (2026-11-08). If you change something described here, update this file in the same pull request.
+Last checked against `main` after the Nocturne reskin (2026-11-11). If you change something described here, update this file in the same pull request.
 
 ## The ten rules
 
@@ -137,9 +137,10 @@ Bracket prefixes such as `[Brief from the Orchestrator]` and `[Report from the â
 - `Canvas.tsx` is the surface (pan, zoom, dot grid). `camera.ts` holds the maths, and `useCamera.ts` holds the state and flights.
 - `Board.tsx` puts `CardSpec` objects on a `Canvas`, handles drag, resize, collapse and selection, and saves positions to `<project>/boards/<board>.json`.
 - `place.ts` (`settle`, `freeSpot`) moves cards so nothing overlaps.
-- `Chrome.tsx` draws the viewport-anchored frame: breadcrumb, pages, minimap and zoom.
+- `Chrome.tsx` draws the viewport-anchored frame: the header, the area switch, the minimap and zoom. `Tabs.tsx` draws Home and the project tabs in the header, `EdgeTab.tsx` the side tabs to the neighbouring areas, and `SessionDock.tsx` the agents' status dots with Needs you inside it.
 - `Book.tsx` plays the camera between the three areas and calls `render(area, frame)`. `App.tsx` chooses what each area renders.
-- `App.tsx` also owns Back, `NeedsYou` and `OrchestratorBar`, because they belong to the whole window.
+- `App.tsx` also owns the tabs, Back, `SessionDock` and `OrchestratorBar`, because they belong to the whole window.
+- The Orchestrator's face (`OrchestratorFace.tsx`, drawn by `liquid.ts`) shows one state everywhere. The bar and the dock report what they know through `signal()` in `faceState.ts`.
 
 Screens that don't share React state coordinate through window events: `orchestra:desk`, `orchestra:needs`, `orchestra:focus` and `orchestra:agents-changed`.
 
@@ -168,7 +169,7 @@ Orchestra/
 - The folder name is a project's permanent id. Renaming changes only `concept.md`.
 - `_studio` is a reserved pseudo-project for the chat above every project. Handlers that use `chatHome()` accept it. Handlers that use `projectDir()` reject it, and that's why `ChatPanel` skips proposals, outputs and agent states in the Studio.
 - `asks.json`, `proposals.json` and `agents.json` are read, changed and rewritten whole with no lock. Keep each one to a single writer path through the Conductor.
-- Per-viewer UI memory is in `localStorage` (`areas`, `needs-seen`, `confirmed:<project>`). Guard every access, as the existing code does.
+- Per-viewer UI memory is in `localStorage` (`areas`, `open-tabs`, `theme`, `needs-seen`, `confirmed:<project>`). Guard every access, as the existing code does.
 
 ## Changes that must travel together
 
@@ -299,22 +300,24 @@ Put logic that needs testing in a pure file, as `place.ts`, `camera.ts` and `sta
 
 ## UI rules
 
-The full reference is `ideation/brand-spec.md`, and the layouts are in `ideation/canvas-spec.md`. These rules apply to every screen:
+The look is Nocturne: dark, frosted, soft. Its values and decisions are in `Project Files/alt-nocturne.md`, the build plan in `Project Files/nocturne-handoff.md`, and the styles in `assets/themes/nocturne.css`. `ideation/brand-spec.md` describes the earlier v2 look and is kept for history; the layouts in `ideation/canvas-spec.md` still hold. These rules apply to every screen:
 
-- **Two kinds of UI.** Artboard-bound: cards, covers, the desk, everything inside a project. Viewport-anchored and the same everywhere: breadcrumb, Back, pages (bottom left), Orchestrator bar (bottom centre), minimap (bottom right).
+- **Two kinds of UI.** Artboard-bound: cards, covers, the desk, everything inside a project. Viewport-anchored and the same everywhere: the header with Home and the project tabs, the area switch notch under it, Back, the side tabs, the session dock (right edge), the Orchestrator bar (bottom centre), the New pill and the minimap (bottom right). Only viewport chrome gets the `glass` backdrop blur; artboard cards never do.
 - **Artboard windows never scroll.** A card grows to fit, and resizing changes only its width. Viewport chrome may scroll.
 - **Nothing on an artboard overlaps.** Use `settle` and `freeSpot`, which keep 72px clear around every window.
 - **A window opens with what it's connected to.** Give a card `link` and `auto`: `tree.ts` puts it under its parent, or beside it with `'left'` or `'right'`, in a column of its own. Moving a window by hand takes it out, and Tidy puts it back.
 - **Inside a project, nothing navigates to a sub-board.** Clicking something opens a window beside it.
 - **The user talks only to the Orchestrator.** Deliverable windows have no text input and are wired to the Orchestrator's window. Choices go in the Action box.
-- **Waiting items** get an orange mark on their window and appear in Needs you. Orange means this and nothing else.
+- **Waiting items** get an amber mark on their window and appear in Needs you, a pill beside the session dock. Amber means this and nothing else.
 - **Wires curve** and go bold on hover.
-- **A window shows what it is.** Give a card a `kind` (`canvas/kinds.tsx`). Agents share one blue header with a rank tab on the left, files are paper with a page mark, finished work is ink, decisions have a diamond.
+- **A window shows what it is.** Give a card a `kind` (`canvas/kinds.tsx`). Agents share one blue-tinted header with a rank tab on the left, files are chalk paper (the `paper` class flips text colours inside it), finished work is raised with a chalk border, decisions have an amber frame.
 - **Labels explain themselves.** Use plain words with a one-line description. No in-joke names.
-- **Hover never moves layout.** Add `serif-on` to labels, and `serifHold.ts` holds their width.
-- **Selected, hovered or current** means Bodoni Moda italic 800, through `serif-on` or the `type-current-*` utilities.
-- **Motion** uses one curve, `var(--ease)`. Screen entrances use `stagger`. With reduced motion, keep fades only.
-- **Corners are sharp** (radius 0), except pills, avatars and the orb.
+- **Hover never moves layout.** Hover and current are a colour or fill change, never a font change. (`serif-on` and `serifHold.ts` remain from v2 and do nothing under Nocturne.)
+- **Type.** Geist for the interface, Geist Mono caps for small labels, Instrument Serif Italic for a few titles only (`type-accent`, the display styles). Labels are sentence case.
+- **Buttons.** A primary action is a chalk pill, a secondary one a glass pill. The styles key off `bg-brand` and the `border-chip-line` / `border-line` classes on a `button`.
+- **Notches.** Chrome that grows out of an edge uses the `notch-up`, `notch-down`, `notch-left` or `notch-right` class (`main.css`): one element, with the outline carried round its flares. Do not build one from separate pieces.
+- **Motion** is soft and the same everywhere: every control eases colour, shadow and scale over about 220ms on `var(--ease)`, set once in `nocturne.css`. The face and status changes use `var(--ease-calm)`. Areas slide in from their side (`page-in`). Screen entrances use `stagger`. With reduced motion, keep fades and colour changes only.
+- **Corners** follow the radius scale: 4, 6, 10, 14, 18, and pills. Windows are 10; controls are 6 or pills.
 
 Tokens come from `Orchestra/projects/orchestra-brand/prereqs/tokens.json`, and `npm run tokens` generates `tokens.css`. Never edit `tokens.css`. Hand-written utilities go in `main.css`. Icons are SVGs in `assets/icons/`, drawn through `Icon`.
 
@@ -338,7 +341,8 @@ Also not built or only partly built:
 - **A packaged build can't find its vault** or ship a starter library. `paths.ts` depends on the working directory.
 - **The `tools` front-matter field** is parsed but not applied. Tool access is set in `conductor.ts`.
 - **The Studio's Orchestrator** is told not to use project tools, but is still given them.
-- **Tab-drag IPC** (`drag:*`, `tabs:adopt`) has no remaining callers.
+- **Tab-drag IPC** (`drag:*`, `tabs:adopt`) has no remaining callers; the header tabs reorder by drag but do not tear off into windows.
+- **The v2 light theme** still loads with `localStorage.theme = 'v2'` but is no longer kept faithful. Removing it, with the Bodoni, Archivo and Plex fonts, is the owner's call.
 
 `Project Files/extensibility-plan.md` predates the canvas, so its file list and line counts are out of date. Its phases and open decisions still apply.
 

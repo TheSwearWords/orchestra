@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import type { BoardLayout } from '../../../preload'
 import { snap, fit, type Rect } from './camera'
 import { Canvas } from './Canvas'
-import { Minimap, Shell, ZoomChip, barButton, type Step } from './Chrome'
+import { Minimap, Shell, ZoomChip, barButton } from './Chrome'
 import { DOCK_GAP, DOCK_TOP, TOP_BAR, barInput, fitBelow, popMenu, type MenuItem } from './shared'
 import { freeSpot, separate, settle, touches } from './place'
 import { treeLayout } from './tree'
@@ -55,7 +55,6 @@ interface Props {
   project: string
   board: string // file name, e.g. "research" or "create"
   label: string // the minimap's page label
-  crumbs: Step[]
   pages?: React.ReactNode // bottom left: the area switch
   cards: CardSpec[]
   // more on the board under the cards (the stage); in world px, with its extent for fitting
@@ -101,7 +100,6 @@ export function Board({
   project,
   board,
   label,
-  crumbs,
   pages,
   cards,
   world,
@@ -489,7 +487,6 @@ export function Board({
       chrome={
         !preview && (
           <Shell
-            crumbs={crumbs}
             right={
               <>
                 {right}
@@ -551,7 +548,7 @@ export function Board({
       >
         {worldGroup && (
           <div
-            className="pointer-events-none absolute border border-brand/40 bg-brand/5"
+            className="pointer-events-none absolute rounded-xl border border-dashed border-line-strong"
             style={{
               left: worldGroup.rect.x,
               top: worldGroup.rect.y,
@@ -681,7 +678,7 @@ export function Board({
             return (
               <div
                 key={f.id}
-                className="pointer-events-none absolute border border-brand/40 bg-brand/5"
+                className="pointer-events-none absolute rounded-xl border border-dashed border-line-strong"
                 style={{
                   left: x,
                   top: y,

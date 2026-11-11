@@ -299,7 +299,6 @@ export function Studio({
       }}
       chrome={
         <Shell
-          crumbs={[{ label: 'Studio' }]}
           right={
             <>
               {Object.keys(layout.covers).length > 0 && (

@@ -118,13 +118,7 @@ export function CoverEditor({
 
   return (
     <div className="board bg-dots relative flex h-full w-full items-center justify-center gap-[clamp(32px,6vw,120px)] px-10 animate-[area-in_550ms_var(--ease)_both]">
-      <Shell
-        crumbs={[
-          { label: 'Studio', onClick: onDone },
-          ...(project ? [{ label: project.name, onClick: () => onEnter(project.id) }] : []),
-          { label: project ? 'Edit' : 'New project' }
-        ]}
-      />
+      <Shell />
 
       {/* the cover, at about 500×680 */}
       <div

@@ -853,10 +853,10 @@ export function Card({
         e.stopPropagation()
         void popMenu(items)
       }}
-      className={`absolute flex flex-col ${
+      className={`absolute flex flex-col rounded-lg ${
         look?.frame ??
         (blue
-          ? 'bg-poster-dots'
+          ? 'indigo bg-poster-dots'
           : card.tone === 'paper'
             ? 'border-2 border-brand bg-card'
             : 'border border-card-line bg-card')
@@ -881,7 +881,7 @@ export function Card({
       {card.kind && look?.rank && (
         <span
           aria-hidden
-          className="absolute top-0 right-full flex w-7 items-center justify-center bg-brand text-on-brand"
+          className="absolute top-0 right-full flex w-7 items-center justify-center rounded-l-md bg-agent text-inverse"
           style={{ height: HEADER }}
         >
           <KindMark kind={card.kind} />
@@ -905,13 +905,13 @@ export function Card({
             }
           )
         }
-        className={`flex shrink-0 cursor-grab items-center gap-3 px-4 active:cursor-grabbing ${
+        className={`flex shrink-0 cursor-grab items-center gap-3 rounded-t-[inherit] px-4 active:cursor-grabbing ${
           look?.header ?? (blue ? 'text-on-brand' : 'border-b border-hair text-link')
         }`}
         style={{ height: HEADER }}
       >
         {card.needsYou && (
-          <span className="absolute -top-[22px] right-2 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
+          <span className="absolute -top-[26px] right-2 rounded-full bg-needs-you px-2.5 py-0.5 type-label-s text-on-needs-you">
             Needs you
           </span>
         )}
@@ -931,7 +931,7 @@ export function Card({
         ) : (
           <h2
             title={card.onRename ? 'Double-click to rename' : undefined}
-            className={`min-w-0 flex-1 truncate ${look?.title ?? 'type-label-serif-l'}`}
+            className={`min-w-0 flex-1 truncate ${look?.title ?? 'type-heading-m'}`}
           >
             {card.title}
           </h2>

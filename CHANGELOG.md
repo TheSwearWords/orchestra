@@ -6,6 +6,9 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 
 ### Changed
 
+- Nocturne look, matched to the Figma screens: labels are sentence case in Geist, small labels stay mono caps, and Instrument Serif Italic is kept for a few titles. Buttons are chalk or glass pills, windows and cards have rounded corners, files are chalk paper, agents and desk tools get soft gradient orbs, and every control eases the same way on hover and press.
+- Create: prerequisite rows that are ready are green with a green outline, deliverables that are on are a soft blue card, and Lock in is a card like them. Research: the Interpret box is a muted indigo panel.
+- The active header tab is drawn as one shape, so its corners line up.
 - Nocturne, phase 1: the app is dark by default, with chalk type on near-black panels, set in Geist, Geist Mono and Instrument Serif Italic. The light look is still there: set `localStorage.theme = 'v2'` and reload.
 - Nocturne, phase 2: the Studio, Setup and the cover editor sit on a soft blurred landscape. Inside a book the board is flat grey with dots. The header, Back, Needs you, the area switch, the Orchestrator bar and the minimap are frosted glass.
 - Nocturne, phase 3: the breadcrumb is gone. The header has Home, a tab for each open project (its icon shows which area it is on) and + for a new project. Closing the tab you are on goes to the one on its left, or Home. Back shows only away from the Studio.

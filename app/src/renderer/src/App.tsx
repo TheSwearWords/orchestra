@@ -354,7 +354,7 @@ function App(): React.JSX.Element {
           disabled={history.back.length === 0}
           aria-label="Back"
           title="Back (mouse back button, Alt+←)"
-          className={`${chip} glass serif-on absolute z-30 h-9 gap-2 px-3 type-label-s disabled:opacity-40`}
+          className={`${chip} glass absolute z-30 h-9 gap-2 rounded-full! px-4 type-label-m disabled:opacity-40`}
           style={{ top: TOP_BAR + 10, left: 14 + side }}
         >
           <Icon name="arrow-left-line" size={14} />

@@ -463,13 +463,15 @@ export function Studio({
           key={d.id}
           onClick={() => openWindow(d.id)}
           aria-pressed={windows.some((w) => w.id === d.id) || (d.id === 'graph' && graphExpanded)}
-          className={`absolute flex flex-col items-start gap-1 border border-card-line bg-card p-4 text-left text-link shadow-card transition-colors duration-200 ease-(--ease) hover:bg-selected ${
+          className={`absolute flex flex-col items-start gap-1 rounded-lg border border-card-line bg-card p-4 text-left text-link shadow-card transition-colors duration-200 ease-(--ease) hover:bg-selected ${
             windows.some((w) => w.id === d.id) ? 'outline-2 outline-offset-4 outline-brand' : ''
           }`}
           style={{ left: d.x, top: d.y, width: DESK_W, height: DESK_H }}
         >
-          <span className="flex size-10 items-center justify-center rounded-full bg-brand text-on-brand">
-            <Icon name={d.icon} size={20} />
+          <span
+            className={`orb ${DESK_ORB[d.id]} flex size-7 items-center justify-center rounded-full bg-brand text-on-brand`}
+          >
+            <Icon name={d.icon} size={16} />
           </span>
           <span className="mt-2 type-heading-m">{d.name}</span>
           <span className="type-caption text-dim">{d.note}</span>
@@ -664,6 +666,13 @@ function ShelfCover({
 
 type Desk = 'agents' | 'mcps' | 'graph' | 'settings'
 const DESK_W = 216
+// each desk tool's light, from the Nocturne gradient set
+const DESK_ORB: Record<Desk, string> = {
+  agents: 'orb-pink',
+  mcps: 'orb-green',
+  graph: 'orb-blue',
+  settings: 'orb-peach'
+}
 const GRAPH_W = 656
 const GRAPH_WIDE = 1344 // the Knowledge window, expanded
 const DESK_H = 156

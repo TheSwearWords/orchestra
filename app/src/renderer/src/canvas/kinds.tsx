@@ -14,7 +14,11 @@ export type CardKind =
   | 'process'
 
 // every agent looks the same; the tab on the left says which rank it is
-const AGENT = { frame: 'border border-brand bg-card', header: 'bg-brand text-on-brand', rank: true }
+const AGENT = {
+  frame: 'border border-agent/50 bg-card',
+  header: 'border-b border-hair bg-agent-subtle text-fg',
+  rank: true
+}
 
 export const KIND: Record<
   CardKind,
@@ -25,19 +29,19 @@ export const KIND: Record<
   instrument: { tag: 'Instrument', ...AGENT },
   file: {
     tag: 'Markdown',
-    frame: 'border border-inverse/40 bg-card',
-    header: 'bg-dots border-b border-inverse/20 text-link',
+    frame: 'paper border border-transparent',
+    header: 'border-b border-hair text-link',
     title: 'font-mono text-[13px]'
   },
   deliverable: {
     tag: 'Deliverable',
-    frame: 'border-2 border-inverse bg-card',
-    header: 'bg-inverse text-on-brand'
+    frame: 'border border-inverse/55 bg-raised',
+    header: 'border-b border-hair text-fg'
   },
   decision: {
     tag: 'Decision',
-    frame: 'border-2 border-inverse bg-card',
-    header: 'border-b-2 border-inverse text-link'
+    frame: 'border border-needs-you/60 bg-card',
+    header: 'border-b border-hair text-fg'
   },
   reference: { tag: 'References' },
   process: { tag: 'Interpret' }

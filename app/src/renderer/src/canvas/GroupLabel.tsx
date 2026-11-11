@@ -66,7 +66,7 @@ export function GroupLabel({
           title={
             onRename ? 'Drag to move the group. Double-click to rename.' : 'Drag to move the group.'
           }
-          className={`block bg-brand px-2 py-0.5 type-label-s whitespace-nowrap text-on-brand ${onDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          className={`block rounded-full bg-inverse px-3 py-1 type-label-s whitespace-nowrap text-inverse ${onDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
         >
           {name}
         </span>

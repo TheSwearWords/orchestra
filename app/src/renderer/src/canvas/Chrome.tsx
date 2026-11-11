@@ -180,11 +180,11 @@ export function NewCard({
   return (
     <button
       onClick={onClick}
-      className="group absolute bottom-[176px] z-10 flex h-[220px] w-[168px] flex-col items-center justify-center gap-2 border border-dashed border-wire bg-card px-3 text-center text-link shadow-book transition-transform duration-200 ease-(--ease) hover:-translate-y-1 [border-dasharray:6]"
+      className="group absolute bottom-[176px] z-10 flex h-[220px] w-[168px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-wire bg-card px-3 text-center text-link shadow-book transition-transform duration-200 ease-(--ease) hover:-translate-y-1 [border-dasharray:6]"
       style={{ right: 'calc(14px + var(--side, 0px))' }}
     >
       <span className="font-mono text-2xl text-link/40">+</span>
-      <span className="serif-on type-heading-m">{title}</span>
+      <span className="type-accent">{title}</span>
       <span className="type-caption text-dim">{hint}</span>
     </button>
   )
@@ -247,7 +247,7 @@ export function ZoomChip({
   }
   const btn = 'flex h-full w-9 items-center justify-center hover:bg-selected'
   return (
-    <div className="flex h-9 items-stretch border border-chip-line type-caption text-link">
+    <div className="flex h-9 items-stretch overflow-hidden rounded-full border border-chip-line type-log-s text-dim">
       <button aria-label="Zoom out" className={btn} onClick={() => by(1 / 1.25)}>
         −
       </button>
@@ -329,7 +329,7 @@ export function Minimap({
           {blocks.map((b, i) => (
             <span
               key={i}
-              className={`absolute ${b.on ? 'bg-brand text-on-brand' : 'bg-brand/20 text-link'}`}
+              className={`absolute rounded-xs ${b.on ? 'bg-fg/45 text-inverse' : 'bg-fg/18 text-link'}`}
               style={box(b)}
             >
               {b.name && (
@@ -339,7 +339,7 @@ export function Minimap({
               )}
             </span>
           ))}
-          <span className="absolute border-[1.5px] border-brand" style={box(view)} />
+          <span className="absolute rounded-xs border-[1.5px] border-focus" style={box(view)} />
         </div>
       </div>
     </div>

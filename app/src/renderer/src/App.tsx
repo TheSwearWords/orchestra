@@ -6,6 +6,8 @@ import { Research } from './components/Research'
 import { Board } from './canvas/Board'
 import { Book, type Frame } from './canvas/Book'
 import { Landscape } from './canvas/Landscape'
+import { Tabs } from './canvas/Tabs'
+import { DRAFT, closeTab, openTab } from './canvas/tabList'
 import { STUDIO, TOP_BAR, chip, coverInfo, requestFocus, type Area } from './canvas/shared'
 import { NeedsYou } from './canvas/NeedsYou'
 import { SIDE } from './canvas/Chrome'
@@ -47,6 +49,24 @@ function startingView(): View {
 const shelfRect = (id: string): DOMRect | undefined =>
   document.querySelector(`[data-cover="${CSS.escape(id)}"]`)?.getBoundingClientRect()
 
+/** Setup has no projects yet: Home alone in the header, lit. */
+function SetupHome(): React.JSX.Element {
+  const none = (): void => {}
+  return (
+    <Tabs
+      projects={[]}
+      tabs={[]}
+      areas={{}}
+      active={null}
+      bare
+      onHome={none}
+      onTab={none}
+      onClose={none}
+      onNew={none}
+    />
+  )
+}
+
 function App(): React.JSX.Element {
   const [projects, setProjects] = useState<Project[] | null>(null)
   const [layout, setLayout] = useState<StudioLayout | null>(null)
@@ -58,6 +78,12 @@ function App(): React.JSX.Element {
   })
   // the area each book was last left on: its cover's ribbon, and where it opens next time
   const [areas, setAreas] = useState<Record<string, Area | null>>(() => rememberedJson('areas', {}))
+  // the header's tabs: the books open in this window, in the order they were opened
+  // shortcut: one remembered list shared by every window; upgrade when windows need their own
+  const [tabs, setTabs] = useState<string[]>(() => {
+    const v = startingView()
+    return v.at === 'book' ? [v.id] : rememberedJson('tabs', [])
+  })
   const [opening, setOpening] = useState<{
     id: string
     shelf: DOMRect
@@ -97,6 +123,7 @@ function App(): React.JSX.Element {
   }, [refresh])
 
   useEffect(() => remember('areas', areas), [areas])
+  useEffect(() => remember('tabs', tabs), [tabs])
 
   const current = view.at === 'book' ? projects?.find((p) => p.id === view.id) : undefined
   useEffect(() => {
@@ -106,6 +133,7 @@ function App(): React.JSX.Element {
   /** Shows a view. Between the Studio and a book it plays the opening (or the closing). */
   const show = useCallback((from: View, to: View): void => {
     if (to.at === 'book') setAreas((all) => ({ ...all, [to.id]: to.area }))
+    if (to.at === 'book') setTabs((t) => openTab(t, to.id))
     const enteringBook = from.at !== 'book' && to.at === 'book'
     const leavingBook = from.at === 'book' && to.at === 'studio'
     const id = enteringBook ? (to as { id: string }).id : leavingBook ? from.id : null
@@ -173,6 +201,7 @@ function App(): React.JSX.Element {
       <div className="on-landscape relative h-full">
         <Landscape name="sunset" />
         <Setup onDone={() => setSetUp(true)} />
+        <SetupHome />
       </div>
     )
 
@@ -293,18 +322,42 @@ function App(): React.JSX.Element {
         </div>
       )}
 
-      {/* the window's own chrome: Back under the breadcrumb, the Orchestrator at the foot */}
-      <button
-        onClick={() => step('back')}
-        disabled={history.back.length === 0}
-        aria-label="Back"
-        title="Back (mouse back button, Alt+←)"
-        className={`${chip} glass serif-on absolute z-30 h-9 gap-2 px-3 type-label-s disabled:opacity-40`}
-        style={{ top: TOP_BAR + 10, left: 14 + side }}
-      >
-        <Icon name="arrow-left-line" size={14} />
-        Back
-      </button>
+      {/* the window's own chrome: tabs in the header, Back under it, the Orchestrator at the foot */}
+      <Tabs
+        projects={projects}
+        tabs={tabs}
+        areas={view.at === 'book' ? { ...areas, [view.id]: view.area } : areas}
+        active={view.at === 'book' ? view.id : view.at === 'cover' ? DRAFT : null}
+        draft={view.at === 'cover' ? (project(view.id)?.name ?? 'Untitled') : undefined}
+        onHome={() => go({ at: 'studio' })}
+        onTab={(id) => (id === DRAFT ? undefined : enter(id))}
+        onClose={(id) => {
+          if (id === DRAFT) return go({ at: 'studio' })
+          const left = closeTab(tabs, id)
+          setTabs(left.tabs)
+          if (view.at === 'book' && view.id === id)
+            go(
+              left.next
+                ? { at: 'book', id: left.next, area: areas[left.next] ?? null }
+                : { at: 'studio' }
+            )
+        }}
+        onNew={() => go({ at: 'cover', id: null })}
+      />
+      {/* Home and the tabs get you out of the Studio; Back is for inside a book */}
+      {view.at !== 'studio' && (
+        <button
+          onClick={() => step('back')}
+          disabled={history.back.length === 0}
+          aria-label="Back"
+          title="Back (mouse back button, Alt+←)"
+          className={`${chip} glass serif-on absolute z-30 h-9 gap-2 px-3 type-label-s disabled:opacity-40`}
+          style={{ top: TOP_BAR + 10, left: 14 + side }}
+        >
+          <Icon name="arrow-left-line" size={14} />
+          Back
+        </button>
+      )}
       {current && (
         <NeedsYou
           key={current.id}

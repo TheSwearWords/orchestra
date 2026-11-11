@@ -9,14 +9,13 @@ export type Step = { label: string; onClick?: () => void }
  * right), the pages centred under it and the minimap bottom right. The Orchestrator bar and the
  * back button belong to the whole window, so App draws them. */
 export function Shell({
-  crumbs,
   right,
   pages,
   corner,
   minimap,
   children
 }: {
-  crumbs: Step[]
+  crumbs?: Step[]
   right?: React.ReactNode
   pages?: React.ReactNode
   corner?: React.ReactNode // bottom left: the Studio's title
@@ -29,7 +28,8 @@ export function Shell({
         className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 border-b border-chip-line bg-chip pr-2 pl-2 shadow-float glass"
         style={{ height: TOP_BAR }}
       >
-        <Breadcrumb steps={crumbs} />
+        {/* App draws the tabs here (Tabs.tsx); crumbs is ignored until its callers drop it */}
+        <span />
         <div className="flex items-center gap-2">{right}</div>
       </header>
       {pages && (

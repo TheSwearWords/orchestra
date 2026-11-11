@@ -4,6 +4,11 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 
 ## 2026-11-11
 
+### Removed
+
+- The edge tabs (page turners) at the sides of each area. The area switch under the header is the one way between areas, and the sides are free for the Layers panel and the session dock.
+- ASCII art from covers, the cover editor and the welcome card.
+
 ### Fixed
 
 - Switching areas, opening and closing windows, and panning were laggy. The frosted blur behind the chrome, the live blur on the landscape, the blur in the book-opening animation and the area slide are gone, and card shadows are smaller. The look is nearly the same: panels are slightly more solid.

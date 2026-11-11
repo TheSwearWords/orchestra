@@ -430,9 +430,9 @@ function Links({
               e.preventDefault()
               onMove(r)
             }}
-            className="group flex gap-3 border border-card-line p-3"
+            className="group flex gap-3 rounded-xl border border-hair bg-[var(--color-glass-fill)] p-3"
           >
-            <span className="flex size-[46px] shrink-0 items-center justify-center bg-brand font-display text-[24px] font-extrabold text-on-brand italic">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-glass-fill-strong)] font-display text-[20px] leading-none text-fg italic">
               {shown[0]?.toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
@@ -457,7 +457,7 @@ function Links({
                 target="_blank"
                 rel="noreferrer"
                 aria-label={`Open ${shown}`}
-                className="flex size-7 items-center justify-center bg-brand/15 text-link hover:bg-brand hover:text-on-brand"
+                className="flex size-7 items-center justify-center rounded-full bg-[var(--color-glass-fill)] text-link hover:bg-[var(--color-glass-fill-strong)]"
               >
                 <Icon name="arrow-right-up-line" size={14} />
               </a>
@@ -472,7 +472,7 @@ function Links({
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste a link, then Enter"
           aria-label="Add a reference link"
-          className="w-full border border-dashed border-wire bg-transparent px-3 py-2.5 font-mono text-[12px] text-link outline-none placeholder:text-dim focus:border-solid focus:border-brand"
+          className="w-full rounded-xl border border-dashed border-wire bg-transparent px-3 py-2.5 font-mono text-[12px] text-link outline-none placeholder:text-dim focus:border-solid focus:border-brand"
         />
       </form>
     </div>
@@ -620,6 +620,16 @@ function Sites({
   const [tagText, setTagText] = useState('')
   const allTags = [...new Set(sites.flatMap((s) => s.tags ?? []))].sort()
   const showTags = sites.length >= SHOW_TAGS_FROM && allTags.length > 0
+  // compact: one dense row per site, no screenshots; remembered between sessions
+  const [compact, setCompactState] = useState(() => localStorage.getItem('library-compact') === '1')
+  const setCompact = (on: boolean): void => {
+    setCompactState(on)
+    try {
+      localStorage.setItem('library-compact', on ? '1' : '0')
+    } catch {
+      // the library works the same without it
+    }
+  }
   const shown = showTags && tagFilter ? sites.filter((s) => s.tags?.includes(tagFilter)) : sites
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -642,10 +652,10 @@ function Sites({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 p-4">
-      {showTags && (
-        <div className="col-span-2 flex flex-wrap gap-1.5">
-          {[null, ...allTags].map((t) => (
+    <div className={`grid p-4 ${compact ? 'grid-cols-1 gap-1' : 'grid-cols-2 gap-3'}`}>
+      <div className="col-span-full flex flex-wrap items-center gap-1.5">
+        {showTags &&
+          [null, ...allTags].map((t) => (
             <button
               key={t ?? 'all'}
               aria-pressed={tagFilter === t}
@@ -659,47 +669,97 @@ function Sites({
               {t ?? 'All'}
             </button>
           ))}
-        </div>
-      )}
-      {shown.map((s) => (
-        <a
-          key={s.url}
-          data-port={`site-${host(s.url)}`}
-          href={s.url}
-          target="_blank"
-          rel="noreferrer"
-          title={s.url}
-          className="group flex flex-col gap-2 border border-card-line p-4 text-link transition-colors duration-150 hover:border-brand hover:bg-selected"
+        <button
+          onClick={() => setCompact(!compact)}
+          aria-pressed={compact}
+          title={compact ? 'Show screenshots' : 'Compact list'}
+          className="ml-auto flex h-7 items-center gap-1.5 rounded-full border border-hair bg-[var(--color-glass-fill)] px-3 type-label-s text-link hover:bg-[var(--color-glass-fill-strong)]"
         >
-          {s.shot && (
-            <img
-              alt=""
-              src={`orchestra://site/${host(s.url)}.png`}
-              className="-mx-4 -mt-4 mb-1 aspect-video w-[calc(100%+2rem)] max-w-none border-b border-card-line object-cover object-top"
-            />
-          )}
-          <span className="flex items-start justify-between">
-            <span className="flex size-11 items-center justify-center bg-brand font-display text-[22px] font-extrabold text-on-brand italic">
+          <Icon name="layout-grid-line" size={13} />
+          {compact ? 'Cards' : 'Compact'}
+        </button>
+      </div>
+      {shown.map((s) =>
+        compact ? (
+          <a
+            key={s.url}
+            data-port={`site-${host(s.url)}`}
+            href={s.url}
+            target="_blank"
+            rel="noreferrer"
+            title={s.about ? `${s.url}\n${s.about}` : s.url}
+            className="group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-link transition-colors duration-150 hover:bg-[var(--color-glass-fill-strong)]"
+          >
+            <span
+              aria-hidden
+              className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-glass-fill-strong)] font-display text-[12px] leading-none text-fg italic"
+            >
               {s.name[0]}
+            </span>
+            <span className="min-w-0 shrink-0 truncate type-body-s font-medium">{s.name}</span>
+            <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-dim">
+              {s.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
             </span>
             <Icon
               name="arrow-right-up-line"
-              size={16}
-              className="text-link/60 group-hover:text-link"
+              size={14}
+              className="shrink-0 text-link/40 group-hover:text-link"
             />
-          </span>
-          <span className="type-heading-m">{s.name}</span>
-          <span className="font-mono text-[11px] text-dim">
-            {s.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
-          </span>
-          {s.about && <span className="type-body-s text-fg">{s.about}</span>}
-          {s.tags && s.tags.length > 0 && (
-            <span className="font-mono text-[11px] text-dim">{s.tags.join(' · ')}</span>
-          )}
-        </a>
-      ))}
+          </a>
+        ) : (
+          <a
+            key={s.url}
+            data-port={`site-${host(s.url)}`}
+            href={s.url}
+            target="_blank"
+            rel="noreferrer"
+            title={s.url}
+            className="group flex flex-col gap-3 rounded-xl border border-hair bg-[var(--color-glass-fill)] p-2 text-link transition-colors duration-150 hover:border-line-strong hover:bg-[var(--color-glass-fill-strong)]"
+          >
+            {s.shot && (
+              <img
+                alt=""
+                src={`orchestra://site/${host(s.url)}.png`}
+                className="aspect-video w-full rounded-lg object-cover object-top"
+              />
+            )}
+            <span className="flex flex-col gap-1.5 px-2 pb-2">
+              <span className="flex items-center gap-2.5">
+                <span
+                  aria-hidden
+                  className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-glass-fill-strong)] font-display text-[14px] leading-none text-fg italic"
+                >
+                  {s.name[0]}
+                </span>
+                <span className="min-w-0 flex-1 truncate type-heading-m">{s.name}</span>
+                <Icon
+                  name="arrow-right-up-line"
+                  size={16}
+                  className="shrink-0 text-link/50 group-hover:text-link"
+                />
+              </span>
+              <span className="truncate font-mono text-[11px] text-dim">
+                {s.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+              </span>
+              {s.about && <span className="type-body-s text-fg">{s.about}</span>}
+              {s.tags && s.tags.length > 0 && (
+                <span className="flex flex-wrap gap-1 pt-0.5">
+                  {s.tags.map((t) => (
+                    <span
+                      key={t}
+                      className="rounded-full bg-[var(--color-glass-fill)] px-2 py-0.5 type-caption text-dim"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </span>
+          </a>
+        )
+      )}
       {adding ? (
-        <form onSubmit={submit} className="flex flex-col gap-2 border border-brand p-4">
+        <form onSubmit={submit} className="flex flex-col gap-2 rounded-xl border border-brand p-4">
           <input
             autoFocus
             required
@@ -747,7 +807,7 @@ function Sites({
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="flex min-h-40 flex-col items-center justify-center gap-1 border border-dashed border-wire text-link hover:bg-selected"
+          className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-wire text-link hover:bg-selected"
         >
           <span className="font-mono text-xl text-link/50">+</span>
           <span className="serif-on type-label-m">Add a site</span>
@@ -860,7 +920,7 @@ function NoteField({
       placeholder="What do you like about it?"
       aria-label="What I like about it"
       rows={Math.min(4, Math.max(1, Math.ceil(draft.length / 60)))}
-      className="w-full resize-none border border-transparent bg-transparent px-2 py-1.5 type-body-s outline-none transition-colors duration-150 placeholder:text-fg-2 hover:border-line focus:border-focus focus:bg-canvas"
+      className="w-full resize-none rounded-lg border border-transparent bg-transparent px-2 py-1.5 type-body-s outline-none transition-colors duration-150 placeholder:text-fg-2 hover:border-line focus:border-focus focus:bg-[var(--color-glass-fill)]"
     />
   )
 }

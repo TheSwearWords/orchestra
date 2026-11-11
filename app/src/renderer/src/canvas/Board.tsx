@@ -16,7 +16,8 @@ import { GroupLabel } from './GroupLabel'
 import { Port } from './Port'
 import { Rename } from './Rename'
 import { KIND, KindMark, type CardKind } from './kinds'
-import { Waveform } from './Waveform'
+import { OrchestratorFace } from './OrchestratorFace'
+import type { FaceState } from './faceState'
 import { Wire } from './Wire'
 import { useCamera } from './useCamera'
 
@@ -39,7 +40,8 @@ export interface CardSpec {
   bottom?: number // anchored: stays at x, its bottom edge here however tall it grows
   gate?: React.ReactNode // sits on its wire, just outside its group: what has to be ready first
   needsYou?: boolean // waiting on the user: an orange tab on its top edge
-  working?: boolean // an agent is working on it: a waveform over the frame
+  working?: boolean // an agent is working on it: its orb and header show it (see agentState)
+  agent?: FaceState // an agent's state when `working` and `needsYou` don't say enough
   kind?: CardKind // what this window is: its look and its tag (kinds.tsx)
   // the one exception to growing with its content: a chat, which could run forever. Its body
   // starts this tall and scrolls inside; dragging the corner makes it taller or shorter too.
@@ -49,13 +51,21 @@ export interface CardSpec {
 }
 
 const HEADER = 44
+const ORB = 24 // an agent's orb in its header
+/** The state an agent window shows: its orb, and the colour of its header. */
+function agentState(card: CardSpec): FaceState {
+  if (card.needsYou) return 'needs'
+  if (card.agent) return card.agent
+  if (card.working) return card.kind === 'orchestrator' ? 'thinking' : 'working'
+  return 'idle'
+}
 const GUESS = 360 // a card's height before it has rendered, for fitting the view
 
 interface Props {
   project: string
   board: string // file name, e.g. "research" or "create"
   label: string // the minimap's page label
-  pages?: React.ReactNode // bottom left: the area switch
+  pages?: boolean // the book's area switch hangs under the header, so content starts lower
   cards: CardSpec[]
   // more on the board under the cards (the stage); in world px, with its extent for fitting
   world?: React.ReactNode
@@ -77,7 +87,13 @@ interface Props {
   onPick?: (from: string, to: string) => void
   locked?: React.ReactNode // the board is shown greyed out and can't be used; this says why
   anchored?: React.ReactNode // held in place over the board, like the New card
-  worldGroup?: { name: string; rect: Rect } // a frame and tag around what's under the cards
+  // a frame and tag around what's under the cards; with onDrag and onDrop its label moves it
+  worldGroup?: {
+    name: string
+    rect: Rect
+    onDrag?: (dx: number, dy: number) => void
+    onDrop?: (dx: number, dy: number) => void
+  }
   worldWire?: { x: number; y: number; to: string } // a wire from the stage to a window
   worldFeeds?: { x: number; y: number; from: string[] } // wires from windows into the stage
   // named groups of windows: a blue frame around them, moved and renamed by its label
@@ -87,6 +103,9 @@ interface Props {
     members: string[]
     port?: string // a dot on its right edge that wires can be pulled from
     fixed?: boolean // its windows are pinned, so its label doesn't drag them
+    // pinned windows move themselves: the label reports the drag and the owner moves them
+    onDrag?: (dx: number, dy: number) => void
+    onDrop?: (dx: number, dy: number) => void
     onRename?: (name: string) => void
     onMenu?: () => void
   }[]
@@ -143,8 +162,9 @@ export function Board({
         id: c.id,
         parent: c.link,
         side: c.auto === true ? undefined : c.auto,
-        x: c.x,
-        y: c.y,
+        // a window you have moved is where its own tree hangs from
+        x: layout?.[c.id]?.x ?? c.x,
+        y: layout?.[c.id]?.y ?? c.y,
         w: layout?.[c.id]?.w ?? c.w,
         h: tall({ ...c, collapsed: layout?.[c.id]?.collapsed })
       }))
@@ -502,7 +522,6 @@ export function Board({
                 />
               </>
             }
-            pages={pages}
             minimap={
               <Minimap
                 label={label}
@@ -548,7 +567,7 @@ export function Board({
       >
         {worldGroup && (
           <div
-            className="pointer-events-none absolute rounded-xl border border-dashed border-line-strong"
+            className="group-frame pointer-events-none absolute"
             style={{
               left: worldGroup.rect.x,
               top: worldGroup.rect.y,
@@ -556,7 +575,12 @@ export function Board({
               height: worldGroup.rect.h
             }}
           >
-            <GroupLabel name={worldGroup.name} z={cam.camera.z} />
+            <GroupLabel
+              name={worldGroup.name}
+              z={cam.camera.z}
+              onDrag={worldGroup.onDrag}
+              onDrop={worldGroup.onDrop}
+            />
           </div>
         )}
         {world}
@@ -678,7 +702,7 @@ export function Board({
             return (
               <div
                 key={f.id}
-                className="pointer-events-none absolute rounded-xl border border-dashed border-line-strong"
+                className="group-frame pointer-events-none absolute"
                 style={{
                   left: x,
                   top: y,
@@ -692,15 +716,17 @@ export function Board({
                   onRename={f.onRename}
                   onMenu={f.onMenu}
                   onDrag={
-                    f.fixed ? undefined : (dx, dy) => setFrameDrag({ ids: f.members, dx, dy })
+                    f.onDrag ??
+                    (f.fixed ? undefined : (dx, dy) => setFrameDrag({ ids: f.members, dx, dy }))
                   }
                   onDrop={
-                    f.fixed
+                    f.onDrop ??
+                    (f.fixed
                       ? undefined
                       : (dx, dy) => {
                           setFrameDrag(null)
                           moveBy(f.members, dx, dy)
-                        }
+                        })
                   }
                 />
                 {f.port && (
@@ -865,6 +891,7 @@ export function Card({
               'shadow-card outline-2 outline-offset-8 outline-needs-you outline-dashed'
             : 'shadow-card'
       } ${selected && !dragging ? 'ring-[3px] ring-brand' : ''}`}
+      data-agent={card.kind && look?.rank ? agentState(card) : undefined}
       onPointerDownCapture={(e) => onSelect?.(e.shiftKey)}
       style={{
         left: 0,
@@ -874,16 +901,6 @@ export function Card({
         transition: tidying ? 'transform 450ms var(--ease), width 450ms var(--ease)' : undefined
       }}
     >
-      {card.working && <Waveform w={w} />}
-      {card.kind && look?.rank && (
-        <span
-          aria-hidden
-          className="absolute top-0 right-full flex w-7 items-center justify-center rounded-l-md bg-agent text-inverse"
-          style={{ height: HEADER }}
-        >
-          <KindMark kind={card.kind} />
-        </span>
-      )}
       <header
         // on the header, not the title: dragging captures the pointer here, so clicks land here
         onDoubleClick={(e) => {
@@ -912,10 +929,17 @@ export function Card({
             Needs you
           </span>
         )}
-        <span aria-hidden className="font-mono text-[11px] tracking-[-0.2em] opacity-50">
-          ⋮⋮
-        </span>
-        {card.kind && !look?.rank && <KindMark kind={card.kind} />}
+        {card.kind && look?.rank ? (
+          // an agent: its orb, tucked in the top left, says what it is doing
+          <OrchestratorFace size={ORB} state={agentState(card)} />
+        ) : (
+          <>
+            <span aria-hidden className="font-mono text-[11px] tracking-[-0.2em] opacity-50">
+              ⋮⋮
+            </span>
+            {card.kind && <KindMark kind={card.kind} />}
+          </>
+        )}
         {renaming ? (
           <Rename
             value={card.title}

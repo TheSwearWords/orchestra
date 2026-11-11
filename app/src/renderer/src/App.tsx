@@ -6,6 +6,7 @@ import { Research } from './components/Research'
 import { Board } from './canvas/Board'
 import { Book, type Frame } from './canvas/Book'
 import { Landscape } from './canvas/Landscape'
+import { AreaSwitch } from './canvas/Chrome'
 import { Tabs } from './canvas/Tabs'
 import { DRAFT, closeTab, moveTab, openTab } from './canvas/tabList'
 import { STUDIO, TOP_BAR, chip, coverInfo, requestFocus, type Area } from './canvas/shared'
@@ -370,6 +371,16 @@ function App(): React.JSX.Element {
         onMove={(id, onto) => setTabs((t) => moveTab(t, id, onto))}
         onNew={() => go({ at: 'cover', id: null })}
       />
+      {/* the area switch is drawn once for the whole window, so it stays put as you change
+          area and its pill can slide between them */}
+      {view.at === 'book' && (
+        <div className="absolute left-1/2 z-30 -translate-x-1/2" style={{ top: TOP_BAR }}>
+          <AreaSwitch
+            current={view.area}
+            onGo={(a) => go({ at: 'book', id: view.id, area: a })}
+          />
+        </div>
+      )}
       {/* Home and the tabs get you out of the Studio; Back is for inside a book */}
       {view.at !== 'studio' && (
         <button

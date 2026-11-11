@@ -34,7 +34,7 @@ export function Wire({
       </path>
       <path
         d={d}
-        className={`pointer-events-none fill-none [stroke-width:1.4] transition-[stroke-width] duration-150 group-hover:[stroke-width:3] ${
+        className={`pointer-events-none fill-none [stroke-width:2] transition-[stroke-width] duration-150 group-hover:[stroke-width:3] ${
           solid ? '' : '[stroke-dasharray:5_5]'
         } ${
           tone === 'needs-you'

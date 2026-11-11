@@ -4,18 +4,16 @@ import { AREAS, TOP_BAR, chip, type Area } from './shared'
 import { clampZoom, type Camera, type Rect } from './camera'
 import { MODE_ICON } from './tabList'
 
-/** Every screen's frame: the header (with the screen's own controls on its right), the area
- * switch hanging under it and the minimap bottom right. The Orchestrator bar and the
+/** Every screen's frame: the header (with the screen's own controls on its right) and the
+ * minimap bottom right. The area switch is the window's, so App draws it. The Orchestrator bar and the
  * back button belong to the whole window, so App draws them. */
 export function Shell({
   right,
-  pages,
   corner,
   minimap,
   children
 }: {
   right?: React.ReactNode
-  pages?: React.ReactNode
   corner?: React.ReactNode // bottom left: the Studio's title
   minimap?: React.ReactNode
   children?: React.ReactNode
@@ -23,18 +21,13 @@ export function Shell({
   return (
     <>
       <header
-        className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 border-b border-chip-line bg-chip pr-2 pl-2 shadow-float glass"
+        className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-4 bg-chip pr-2 pl-2 shadow-float glass"
         style={{ height: TOP_BAR }}
       >
         {/* App draws Home and the tabs over this side (Tabs.tsx) */}
         <span />
         <div className="flex items-center gap-2">{right}</div>
       </header>
-      {pages && (
-        <div className="absolute left-1/2 z-20 -translate-x-1/2" style={{ top: TOP_BAR }}>
-          {pages}
-        </div>
-      )}
       {corner && <div className="absolute bottom-3.5 left-3.5 z-20">{corner}</div>}
       {minimap && (
         <div className="absolute bottom-3.5 z-20" style={{ right: 14 }}>

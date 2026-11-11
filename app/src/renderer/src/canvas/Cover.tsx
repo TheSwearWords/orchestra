@@ -1,7 +1,14 @@
 // A project's cover, generated from its name, client and art, like a concert programme
 // (brand spec §5.4 Book/Cover, canvas spec §2.3).
-import { Ascii, type AsciiName } from '../components/Ascii'
-import { AREAS, coverArt, coverColor, type Area, type CoverColor, type CoverInfo } from './shared'
+import { PLATES } from './Landscape'
+import {
+  AREAS,
+  coverColor,
+  coverLandscape,
+  type Area,
+  type CoverColor,
+  type CoverInfo
+} from './shared'
 
 const LOOK: Record<CoverColor, { face: string; spine: string; plate: string; dim: string }> = {
   blue: {
@@ -41,8 +48,12 @@ export function CoverFace({
   const m = AREAS.find((a) => a.id === movement)
   return (
     <div
-      className={`cover-face cover-${color} relative flex h-full w-full flex-col overflow-hidden py-6 pr-6 pl-[42px] ${look.face} ${className}`}
+      className={`cover-face cover-${color} relative isolate flex h-full w-full flex-col overflow-hidden py-6 pr-6 pl-[42px] ${look.face} ${className}`}
     >
+      {/* Nocturne only: the same soft plates as the home screens, hidden under the v2 theme */}
+      <span aria-hidden className="cover-landscape">
+        <img src={PLATES[coverLandscape(info.id)]} alt="" />
+      </span>
       <span
         aria-hidden
         className={`cover-spine absolute inset-y-0 left-0 w-[18px] ${look.spine}`}
@@ -51,23 +62,18 @@ export function CoverFace({
         <span>Orchestra presents</span>
         <span>No. {String(info.no).padStart(2, '0')}</span>
       </div>
-      <div
-        className={`cover-plate absolute top-[64px] right-6 size-[150px] text-white ${look.plate}`}
-      >
-        {info.cover?.image ? (
+      {/* only an uploaded picture goes on the cover; the light does the rest */}
+      {info.cover?.image && (
+        <div
+          className={`cover-plate absolute top-[64px] right-6 size-[150px] text-white ${look.plate}`}
+        >
           <img
             alt=""
             src={`orchestra://file/${info.id}/${encodeURIComponent(info.cover.image)}`}
             className="size-full object-cover"
           />
-        ) : (
-          <Ascii
-            name={(info.cover?.art as AsciiName) ?? coverArt(info.id)}
-            fit="contain"
-            className="absolute inset-2"
-          />
-        )}
-      </div>
+        </div>
+      )}
       <div className="mt-auto">
         <h3 className="type-heading-l [overflow-wrap:anywhere]">{info.name || 'Untitled'}</h3>
         {info.client && <p className={`mt-2 type-label-s ${look.dim}`}>{info.client}</p>}

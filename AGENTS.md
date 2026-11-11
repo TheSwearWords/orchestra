@@ -137,7 +137,7 @@ Bracket prefixes such as `[Brief from the Orchestrator]` and `[Report from the â
 - `Canvas.tsx` is the surface (pan, zoom, dot grid). `camera.ts` holds the maths, and `useCamera.ts` holds the state and flights.
 - `Board.tsx` puts `CardSpec` objects on a `Canvas`, handles drag, resize, collapse and selection, and saves positions to `<project>/boards/<board>.json`.
 - `place.ts` (`settle`, `freeSpot`) moves cards so nothing overlaps.
-- `Chrome.tsx` draws the viewport-anchored frame: the header, the area switch, the minimap and zoom. `Tabs.tsx` draws Home and the project tabs in the header, `EdgeTab.tsx` the side tabs to the neighbouring areas, and `SessionDock.tsx` the agents' status dots with Needs you inside it.
+- `Chrome.tsx` draws the viewport-anchored frame: the header, the area switch, the minimap and zoom. `Tabs.tsx` draws Home and the project tabs in the header, and `SessionDock.tsx` the agents' status dots with Needs you inside it.
 - `Book.tsx` plays the camera between the three areas and calls `render(area, frame)`. `App.tsx` chooses what each area renders.
 - `App.tsx` also owns the tabs, Back, `SessionDock` and `OrchestratorBar`, because they belong to the whole window.
 - The Orchestrator's face (`OrchestratorFace.tsx`, a CSS glowing sphere) shows one state everywhere, as its colour. The bar and the dock report what they know through `signal()` in `faceState.ts`.

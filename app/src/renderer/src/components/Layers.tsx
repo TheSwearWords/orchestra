@@ -1,6 +1,6 @@
 // The layers panel on Create: every deliverable and what belongs to it, like Figma's layers.
 // Double-click flies to it; the eye hides or shows it; Only hides the others so you can focus.
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { KindMark, type CardKind } from '../canvas/kinds'
 import { Icon } from './Icon'
 
@@ -35,24 +35,57 @@ export function Layers({
 }): React.JSX.Element {
   const [closed, setClosed] = useState(false)
   const [open, setOpen] = useState<string[]>([])
+  // Closed, the panel is exactly as wide as its title and chevron. The width is measured and
+  // written straight to the element (not through React state) so it can ease between the two.
+  const panel = useRef<HTMLElement>(null)
+  const title = useRef<HTMLSpanElement>(null)
+  const controls = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const el = panel.current
+    if (!el) return
+    const hug =
+      (title.current?.offsetWidth ?? 0) + (controls.current?.offsetWidth ?? 0) + 28 + 10 + 2
+    el.style.width = `${closed ? hug : 240}px`
+  }, [closed, hidden.length])
   const row = 'flex h-8 items-center gap-1.5 pr-1 hover:bg-selected'
   const small =
     'flex h-6 shrink-0 items-center justify-center px-1 type-caption text-link hover:bg-card'
   return (
     <section
+      ref={panel}
       aria-label="Layers"
-      className="absolute z-20 flex w-60 flex-col border border-chip-line bg-card text-link shadow-float"
+      // closed, the whole panel is the button that opens it
+      onClick={() => closed && setClosed(false)}
+      className={`absolute z-20 flex flex-col overflow-hidden border border-chip-line bg-card text-link shadow-float transition-[width] duration-300 ease-(--ease) ${
+        closed ? 'cursor-pointer' : ''
+      }`}
       style={{
         top,
         left: 14,
         maxHeight: `calc(100% - ${top + 120}px)`
       }}
     >
-      <header className="flex h-9 shrink-0 items-center justify-between border-b border-hair pr-1 pl-3">
-        <span className="type-label-s">Layers</span>
-        <span className="flex items-center gap-1">
+      <header
+        // open, anywhere on the header minimises the panel (closed, the whole panel opens it)
+        onClick={() => !closed && setClosed(true)}
+        className={`flex h-9 shrink-0 items-center justify-between border-b transition-colors duration-300 ${
+          closed
+            ? 'gap-2.5 border-transparent px-3.5'
+            : 'cursor-pointer gap-3 border-hair pr-1 pl-3'
+        }`}
+      >
+        <span ref={title} className="type-label-s">
+          Layers
+        </span>
+        <span ref={controls} className="flex items-center gap-1">
           {hidden.length > 0 && (
-            <button onClick={() => onHidden([])} className={small}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation() // don't open the panel
+                onHidden([])
+              }}
+              className={small}
+            >
               Show all
             </button>
           )}
@@ -60,7 +93,7 @@ export function Layers({
             onClick={() => setClosed(!closed)}
             aria-expanded={!closed}
             aria-label={closed ? 'Show layers' : 'Collapse layers'}
-            className={`${small} w-6`}
+            className={`${small} ${closed ? 'w-3.5 px-0' : 'w-6'}`}
           >
             <Icon
               name="arrow-down-s-line"
@@ -70,7 +103,12 @@ export function Layers({
           </button>
         </span>
       </header>
-      {!closed && (
+      {/* the list stays mounted so it can ease shut: its row height runs from 0 to 1 */}
+      <div
+        inert={closed}
+        className="grid min-h-0 w-0 min-w-full transition-[grid-template-rows,opacity] duration-300 ease-(--ease)" // w-0 + min-w-full: the list does not widen the closed panel
+        style={{ gridTemplateRows: closed ? '0fr' : '1fr', opacity: closed ? 0 : 1 }}
+      >
         <ul className="min-h-0 overflow-y-auto py-1">
           <li>
             <div className={`${row} pl-7`} onDoubleClick={() => onFly('orchestrator')}>
@@ -152,7 +190,7 @@ export function Layers({
             )
           })}
         </ul>
-      )}
+      </div>
     </section>
   )
 }

@@ -43,7 +43,8 @@
   --color-bg-muted: #1d1d22;
   --color-bg-inverse: #f4f2ee;
   --color-surface-default: rgba(8, 8, 10, 0.92);
-  --color-chip-bg: rgba(8, 8, 10, 0.92);
+  /* the chrome (header, notches, bar, minimap, Back) is a solid, deep black, not frost */
+  --color-chip-bg: #050506;
   --color-card-bg: rgba(8, 8, 10, 0.92);
   --color-surface-raised: #141418;
   --color-surface-sunken: #060607;
@@ -69,7 +70,7 @@
   --color-rule-default: rgba(255, 255, 255, 0.22);
   --color-border-focus: #5b7cff;
   --color-wire-live: #5b7cff;
-  --color-wire-default: rgba(244, 242, 238, 0.3);
+  --color-wire-default: rgba(244, 242, 238, 0.55);
 
   --color-brand-default: #0538ff;
   --color-bg-brand: #0538ff;
@@ -99,7 +100,9 @@
   --color-status-danger-subtle: rgba(255, 90, 95, 0.14);
   --color-status-danger-text: #ff9a9d;
 
-  --color-canvas-dot: rgba(255, 255, 255, 0.14);
+  --color-canvas-dot: rgba(255, 255, 255, 0.07);
+  --color-group-fill: rgba(255, 255, 255, 0.07);
+  --color-group-line: rgba(255, 255, 255, 0.24);
 
   --effect-float: 0 10px 28px rgba(0, 0, 0, 0.45);
   --effect-card: 0 6px 16px rgba(0, 0, 0, 0.35);
@@ -127,6 +130,10 @@
   box-shadow:
     0 10px 28px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+/* the notch hangs from the header, so the top-edge highlight would draw a rule across the join */
+.nocturne .notch-down.glass {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
 }
 
 /* Home screens sit on a landscape (canvas/Landscape.tsx): the plate blurred until you can just
@@ -545,4 +552,136 @@
 .nocturne .face-orb[data-state='error'] {
   --face: #6a6a76;
   --face-glow: rgba(255, 90, 95, 0.5);
+}
+
+/* ---- Blue on dark. The saturated brand blue (#0538ff) is a fill colour. Strokes, outlines,
+   rings, wires and the focus ring take the brighter accent (#5b7cff) so they read on dark.
+   shortcut: matches the utility classes v2 components carry (border-brand and friends);
+   upgrade when those components get their own Nocturne styling. ---- */
+.nocturne
+  :is(
+    .border-brand,
+    .hover\:border-brand:hover,
+    .focus\:border-brand:focus,
+    .focus-within\:border-brand:focus-within
+  ) {
+  border-color: var(--color-accent);
+}
+.nocturne .border-brand\/40 {
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+.nocturne :is(.outline-brand, .focus-visible\:outline-brand:focus-visible) {
+  outline-color: var(--color-accent);
+}
+.nocturne .stroke-brand,
+.nocturne .group:hover .group-hover\:stroke-brand {
+  stroke: var(--color-accent);
+}
+.nocturne .ring-brand {
+  --tw-ring-color: var(--color-accent);
+}
+.nocturne :focus-visible {
+  outline-color: var(--color-accent);
+}
+
+/* ---- Covers borrow a landscape plate (already blurred at build time, so no runtime filter),
+   darkened toward the foot so the title and rule stay legible. ---- */
+.cover-landscape {
+  display: none;
+}
+.nocturne .cover-landscape {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.nocturne .cover-landscape img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 1;
+}
+.nocturne .cover-landscape::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 45%, rgba(10, 10, 12, 0.55) 100%);
+}
+
+/* ---- The Working tag (above the Orchestrator bar and above a window an agent is on): blue is
+   for "working", so it is the 13% tint with bright-blue type and a soft stroke, not a solid
+   block of brand blue. ---- */
+.nocturne .working-tag {
+  border: 1px solid rgba(124, 149, 255, 0.4);
+  border-radius: var(--radius-md);
+  background-color: var(--color-brand-subtle);
+  color: var(--color-agent-text);
+}
+.nocturne .working-tag .bg-on-brand {
+  background-color: var(--color-accent);
+}
+
+/* ---- Notch outline. The notch's own border is a translucent line drawn over its dark fill,
+   but the tapers' stroke is drawn straight over the lighter board, so the same translucent
+   colour reads brighter there. One opaque colour, matched to the border as it renders over the
+   fill, makes the stroke continuous round the whole shape. ---- */
+.nocturne :is(.notch-up, .notch-down, .notch-left, .notch-right) {
+  --notch-line: #222224;
+}
+
+
+
+/* ---- Agent status. An agent window's orb says what it is doing, and its header takes the same
+   colour, as a tint. Idle and working are blue, thinking lilac, needs you amber, done green,
+   an error red. A thinking orb breathes. ---- */
+.nocturne [data-agent] > header {
+  background-color: rgba(46, 85, 255, 0.13);
+  transition: background-color 1s var(--ease-calm);
+}
+.nocturne [data-agent='working'] > header {
+  background-color: rgba(46, 85, 255, 0.24);
+}
+.nocturne [data-agent='thinking'] > header {
+  background-color: rgba(183, 181, 255, 0.16);
+}
+.nocturne [data-agent='needs'] > header {
+  background-color: rgba(255, 162, 74, 0.16);
+}
+.nocturne [data-agent='done'] > header {
+  background-color: rgba(111, 220, 140, 0.16);
+}
+.nocturne [data-agent='error'] > header {
+  background-color: rgba(255, 90, 95, 0.14);
+}
+@keyframes orb-think {
+  0%,
+  100% {
+    scale: 1;
+    box-shadow:
+      0 0 10px 0 var(--face-glow),
+      inset 0 0 6px rgba(255, 255, 255, 0.35);
+  }
+  50% {
+    scale: 1.12;
+    box-shadow:
+      0 0 20px 3px var(--face-glow),
+      inset 0 0 8px rgba(255, 255, 255, 0.5);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .nocturne .face-orb[data-state='thinking'] {
+    animation: orb-think 1.8s var(--ease-calm) infinite;
+  }
+}
+
+/* A window you have clicked into scrolls its own contents, and its stroke goes bold to say so:
+   the 1px border plus an accent line inside it and one outside it. :focus-within covers a click
+   into a text field even if the board hasn't marked the window yet. */
+.nocturne [data-card]:is([data-active], :focus-within) {
+  box-shadow:
+    var(--effect-card),
+    0 0 0 1.5px var(--color-accent),
+    inset 0 0 0 1.5px var(--color-accent);
 }

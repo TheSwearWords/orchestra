@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { Cover, Project } from '../../../preload'
 import { Shell } from './Chrome'
 import { CoverFace } from './Cover'
-import { Ascii } from '../components/Ascii'
-import { ART } from './shared'
 
 type Field = 'name' | 'client' | 'concept'
 const QUESTIONS: { field: Field; ask: string; label: string; optional?: boolean }[] = [
@@ -190,30 +188,14 @@ export function CoverEditor({
               <span className="mt-3 type-label-s text-dim">Artwork</span>
               <div className="flex flex-wrap gap-2">
                 <button
-                  aria-pressed={!cover.art && !cover.image}
+                  aria-pressed={!cover.image}
                   onClick={() => void changeCover({ color: cover.color })}
                   className={`flex size-16 items-center justify-center border type-label-s text-link ${
-                    !cover.art && !cover.image ? 'border-brand bg-selected' : 'border-chip-line'
+                    !cover.image ? 'border-brand bg-selected' : 'border-chip-line'
                   }`}
                 >
-                  Auto
+                  None
                 </button>
-                {ART.map((a) => (
-                  <button
-                    key={a}
-                    aria-label={a}
-                    title={a}
-                    aria-pressed={cover.art === a && !cover.image}
-                    onClick={() => void changeCover({ color: cover.color, art: a })}
-                    className={`relative size-16 bg-brand text-white ${
-                      cover.art === a && !cover.image
-                        ? 'outline-2 outline-offset-2 outline-brand'
-                        : ''
-                    }`}
-                  >
-                    <Ascii name={a} fit="contain" className="absolute inset-1" />
-                  </button>
-                ))}
                 <button
                   onClick={() => void upload()}
                   className={`flex size-16 items-center justify-center border border-dashed text-center type-label-s text-link hover:bg-selected ${

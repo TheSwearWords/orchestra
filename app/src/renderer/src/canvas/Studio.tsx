@@ -112,32 +112,36 @@ export function Studio({
   }
 
   const rects: Rect[] = ids.map((id) => ({ x: at(id)[0], y: at(id)[1], w: COVER.w, h: COVER.h }))
-  // the desk, under the shelf: what every project shares
-  const deskY = ROW_Y + COVER.h + 120
-  // each button sits over the window it opens, with room for that window. Agents is too wide for
-  // that to stay a tight row, so its window opens leftward from under its button instead.
-  const slot: Record<Desk, number> = {
-    agents: DESK_W,
-    mcps: WINDOW.mcps.w,
-    graph: GRAPH_W,
-    settings: WINDOW.settings.w
+  // the desk: what every project shares. Its four buttons are a column just left of the shelf,
+  // and each tool's window opens to the left of them, in its own bay, laid out so no two bays
+  // overlap (the buttons are on the right, the shelf is further right again):
+  //   Agents (wide, tall)  |  Knowledge graph  |  buttons  |  shelf
+  //   MCPs                 |  Settings
+  // Agent files opened from the Agents window go in a column left of the Agents bay.
+  const deskX = 96 - 72 - DESK_W
+  const desk = DESK.map((d, i) => ({ ...d, x: deskX, y: ROW_Y + i * (DESK_H + 24) }))
+  const bayTop = ROW_Y
+  const graphX = snap(deskX - BAY_GAP - GRAPH_W) // the column nearest the buttons
+  const agentsX = snap(graphX - BAY_GAP - WINDOW.agents.w) // and the one beyond it
+  const bays: Record<Desk, { x: number; y: number }> = {
+    agents: { x: agentsX, y: bayTop },
+    graph: { x: graphX, y: bayTop },
+    settings: { x: graphX, y: snap(bayTop + GRAPH_H + BAY_GAP) },
+    mcps: { x: agentsX, y: snap(bayTop + WINDOW.agents.guess + BAY_GAP) }
   }
-  const desk = DESK.map((d, i) => ({
-    ...d,
-    x: 96 + DESK.slice(0, i).reduce((sum, o) => sum + slot[o.id] + 72, 0),
-    y: deskY
-  }))
-  // the knowledge graph, always open, under its button
+  // the knowledge graph, always open, in its bay
   const [graphWindow, setGraphWindow] = useState({
-    x: desk.find((d) => d.id === 'graph')!.x,
-    y: snap(deskY + DESK_H + 48),
+    x: bays.graph.x,
+    y: bays.graph.y,
     w: GRAPH_W,
     collapsed: false
   })
   const [graphExpanded, setGraphExpanded] = useState(false)
-  const [graphH, setGraphH] = useState(528)
+  const [graphH, setGraphH] = useState(GRAPH_H)
+  // expanded, the Knowledge window grows to the left, away from the buttons and the shelf
+  const graphGrow = GRAPH_WIDE - graphWindow.w
   const graphRect = {
-    x: graphWindow.x,
+    x: graphExpanded ? graphWindow.x - graphGrow : graphWindow.x,
     y: graphWindow.y,
     w: graphExpanded ? GRAPH_WIDE : graphWindow.w,
     h: graphWindow.collapsed ? 44 : graphH
@@ -151,12 +155,11 @@ export function Studio({
     w.file ? { title: `${w.file.name} · file`, w: 760, guess: 900 } : WINDOW[w.id as Desk]
   function openFile(f: AgentFileRef): void {
     const id = `file-${f.role}-${f.id}`
-    const agents = windows.find((o) => o.id === 'agents')
     const spot = windows.find((o) => o.id === id) ?? {
       id,
       file: f,
-      x: agents ? agents.x + (agents.w ?? WINDOW.agents.w) + 48 : 96,
-      y: agents ? agents.y : deskY + DESK_H + 48
+      x: snap(agentsX - BAY_GAP - 760),
+      y: bayTop
     }
     if (!windows.some((o) => o.id === id)) setWindows([...windows, spot])
     setFlyTo(id)
@@ -183,17 +186,16 @@ export function Studio({
   function expandGraph(on: boolean): void {
     setGraphExpanded(on)
     setGraphWindow((g) => ({ ...g, collapsed: false }))
-    if (on) void cam.fly(fitBelow({ ...graphRect, w: GRAPH_WIDE, h: 1100 }, 1), 450)
+    if (on)
+      void cam.fly(
+        fitBelow({ ...graphRect, x: graphWindow.x - graphGrow, w: GRAPH_WIDE, h: 1100 }, 1),
+        450
+      )
   }
   function openWindow(id: Desk): void {
     // the graph already has its window on the board: this opens it up
     if (id === 'graph') return expandGraph(true)
-    const d = desk.find((x) => x.id === id)!
-    const spot = windows.find((w) => w.id === id) ?? {
-      id,
-      x: id === 'agents' ? d.x + DESK_W - WINDOW.agents.w : d.x,
-      y: d.y + DESK_H + 48
-    }
+    const spot = windows.find((w) => w.id === id) ?? { id, ...bays[id] }
     if (!windows.some((w) => w.id === id)) setWindows([...windows, spot])
     setFlyTo(id)
   }
@@ -347,7 +349,7 @@ export function Studio({
           return (
             <div
               key={g.name}
-              className="pointer-events-none absolute border border-brand/40 bg-brand/5"
+              className="group-frame pointer-events-none absolute"
               style={{
                 left: x,
                 top: y,
@@ -481,6 +483,7 @@ export function Studio({
           id: 'live-graph',
           title: 'Knowledge graph',
           ...graphWindow,
+          x: graphRect.x,
           w: graphRect.w,
           body: (
             <Knowledge
@@ -494,7 +497,9 @@ export function Studio({
         onHeight={setGraphH}
         z={cam.camera.z}
         tidying={tidying}
-        onMove={(x, y) => setGraphWindow((g) => ({ ...g, x, y }))}
+        onMove={(x, y) =>
+          setGraphWindow((g) => ({ ...g, x: graphExpanded ? x + (GRAPH_WIDE - g.w) : x, y }))
+        }
         onResize={(w) => !graphExpanded && setGraphWindow((g) => ({ ...g, w }))}
         onCollapse={() => setGraphWindow((g) => ({ ...g, collapsed: !g.collapsed }))}
       />
@@ -673,6 +678,8 @@ const DESK_ORB: Record<Desk, string> = {
   settings: 'orb-peach'
 }
 const GRAPH_W = 656
+const GRAPH_H = 528 // the graph window's resting height
+const BAY_GAP = 48 // between bays, and between the buttons and the bays
 const GRAPH_WIDE = 1344 // the Knowledge window, expanded
 const DESK_H = 156
 const DESK: { id: Desk; name: string; note: string; icon: string }[] = [

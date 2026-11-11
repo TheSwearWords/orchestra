@@ -65,6 +65,8 @@ const time = (iso: string): string =>
 
 const solidButton =
   'h-9 shrink-0 bg-brand px-4 type-label-m text-on-brand transition-[background-color,scale] duration-150 hover:bg-brand-hover active:scale-[0.97] active:bg-brand-pressed disabled:bg-muted disabled:text-fg-disabled'
+// a seat's light, from the Nocturne gradient set; picked by category so a family shares one
+const SEAT_ORB = ['orb-peach', 'orb-pink', 'orb-green', 'orb-lilac', 'orb-blue']
 const outlineButton =
   'flex h-9 shrink-0 items-center gap-2 border border-line-strong bg-canvas px-4 type-label-m transition-[background-color,scale] duration-150 hover:bg-muted active:scale-[0.97]'
 
@@ -492,10 +494,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             title={`${f.job}\n→ ${f.output}`}
             className={`absolute flex items-center justify-between gap-2 px-3 type-label-s whitespace-nowrap transition-colors duration-200 ${
               !on
-                ? 'border border-dashed border-wire/40 bg-card text-placeholder'
+                ? 'bg-card/50 text-placeholder'
                 : state === 'Ready'
-                  ? 'bg-success-subtle text-success-fg'
-                  : 'border border-brand bg-card text-link shadow-float'
+                  ? 'border border-success/75 bg-success-subtle text-fg'
+                  : 'border border-card-line bg-card text-fg'
             }`}
             style={{
               left: spots[i].x - PREREQ.w / 2,
@@ -504,8 +506,20 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               height: PREREQ.h
             }}
           >
-            <span className="truncate">{f.name}</span>
-            {on && <span className="type-caption normal-case">{state}</span>}
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span
+                aria-hidden
+                className={`size-1.5 shrink-0 rounded-full ${
+                  !on ? 'bg-fg-disabled' : state === 'Ready' ? 'bg-success' : 'bg-agent'
+                }`}
+              />
+              <span className="truncate">{f.name}</span>
+            </span>
+            {on && (
+              <span className={`type-log-s ${state === 'Ready' ? 'text-success-fg' : 'text-dim'}`}>
+                {state}
+              </span>
+            )}
           </button>
         )
       })}
@@ -548,7 +562,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             }
             className={`absolute flex flex-col items-center px-4 pt-5 pb-4 text-center transition-[background-color,color] duration-200 ease-(--ease) ${
               on
-                ? 'bg-poster-dots shadow-card'
+                ? 'seat-on'
                 : 'border border-card-line bg-card text-link shadow-card hover:bg-selected'
             } ${locked ? 'cursor-default outline-[3px] outline-offset-4 outline-brand' : ''}`}
             style={{
@@ -559,17 +573,17 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
             }}
           >
             {needsYou && confirmed && (
-              <span className="absolute -top-3 right-4 bg-needs-you px-2 py-0.5 type-label-s text-on-needs-you">
+              <span className="absolute -top-3 right-4 rounded-full bg-needs-you px-2.5 py-0.5 type-label-s text-on-needs-you">
                 Needs you
               </span>
             )}
             <span
-              className={`flex size-14 shrink-0 items-center justify-center rounded-full ${on ? 'bg-white text-link' : 'bg-brand text-on-brand'}`}
+              className={`orb ${SEAT_ORB[m.category.length % SEAT_ORB.length]} flex size-9 shrink-0 items-center justify-center rounded-full ${on ? 'bg-white text-link' : 'bg-brand text-on-brand'}`}
             >
-              <Icon name={m.icon} size={26} />
+              <Icon name={m.icon} size={18} />
             </span>
             <span className="mt-3 type-heading-m leading-none">{m.name}</span>
-            <span className={`mt-1.5 type-label-s ${on ? 'text-poster-dim' : 'text-dim'}`}>
+            <span className={`mt-1.5 type-label-mono ${on ? 'text-poster-dim' : 'text-dim'}`}>
               {m.category}
             </span>
             <span
@@ -602,10 +616,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               ? 'Lock in the deliverables that are on'
               : 'Turn on another deliverable to add it'
         }
-        className={`group absolute flex flex-col items-center justify-center gap-1 rounded-full px-6 text-center shadow-card transition-colors duration-200 ease-(--ease) ${
-          ready
-            ? `bg-poster-dots ${waitingToLock.length ? 'hover:bg-inverse' : ''}`
-            : 'border border-card-line bg-card text-link'
+        className={`group absolute flex flex-col items-center justify-center gap-1 rounded-md px-4 text-center transition-colors duration-200 ease-(--ease) ${
+          ready ? 'seat-on' : 'border border-card-line bg-card text-link shadow-card'
         }`}
         style={{
           left: lockX - LOCK_R,
@@ -614,7 +626,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           height: LOCK_R * 2
         }}
       >
-        <span className="type-heading-m">
+        <span className="type-accent">
           {waitingToLock.length
             ? confirmed
               ? `Add ${waitingToLock.length}`
@@ -623,7 +635,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               ? 'Locked in'
               : 'Lock in'}
         </span>
-        <span className={`type-label-s ${ready ? 'text-poster-dim' : 'text-dim'}`}>
+        <span className={`type-label-mono ${ready ? 'text-poster-dim' : 'text-dim'}`}>
           {!ready ? 'Turn on your deliverables' : `${chosen.length} on`}
         </span>
       </button>

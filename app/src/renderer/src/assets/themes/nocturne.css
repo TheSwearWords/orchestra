@@ -152,3 +152,223 @@
 .nocturne .on-landscape .board {
   background-color: transparent;
 }
+
+/* ---- Type: Geist for the interface, Geist Mono caps for small labels, Instrument Serif Italic
+   as the one expressive face. The generated type-* utilities are v2's (Bodoni 800, caps
+   Archivo), so their Nocturne values are set here. ---- */
+.nocturne :is(.type-label-l, .type-label-m, .type-label-s) {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: -0.005em;
+}
+.nocturne .type-label-l {
+  font-size: 15px;
+}
+.nocturne .type-label-m {
+  font-size: 13.5px;
+}
+.nocturne .type-label-s {
+  font-size: 12.5px;
+  line-height: 18px;
+}
+.nocturne :is(.type-heading-m, .type-heading-s, .type-heading-xs) {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 500;
+  text-transform: none;
+  font-stretch: normal;
+}
+.nocturne .type-heading-m {
+  font-size: 17px;
+  line-height: 24px;
+  letter-spacing: -0.008em;
+}
+.nocturne .type-heading-s {
+  font-size: 20px;
+  line-height: 26px;
+  letter-spacing: -0.015em;
+}
+.nocturne .type-heading-xs {
+  font-size: 15px;
+  line-height: 22px;
+  letter-spacing: -0.005em;
+}
+.nocturne
+  :is(
+    .type-display-poster,
+    .type-display-xl,
+    .type-display-l,
+    .type-display-l-emphasis,
+    .type-heading-xl,
+    .type-heading-l,
+    .type-label-serif-l,
+    .type-label-serif-m,
+    .type-label-serif-s,
+    .type-accent
+  ) {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+/* Instrument Serif runs small beside Bodoni, so the serif labels step up */
+.nocturne .type-label-serif-l {
+  font-size: 23px;
+}
+.nocturne .type-label-serif-m {
+  font-size: 20px;
+}
+.nocturne .type-label-serif-s {
+  font-size: 18px;
+}
+.nocturne .type-heading-l {
+  font-size: 30px;
+}
+.nocturne .type-accent {
+  font-size: 28px;
+  line-height: 1.05;
+}
+.nocturne :is(.type-body-l, .type-body-m, .type-body-m-strong, .type-body-s, .type-lead) {
+  letter-spacing: -0.003em;
+}
+.nocturne .type-body-m-strong {
+  font-weight: 500;
+}
+.nocturne .type-body-m {
+  font-size: 15px;
+  line-height: 23px;
+}
+/* small print reads as Body S; logs, paths and caps labels stay mono */
+.nocturne .type-caption {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+}
+.nocturne .type-label-mono {
+  letter-spacing: 0.04em;
+}
+.nocturne .serif-on:is(:hover, :focus-visible, [aria-current]:not([aria-current='false'])) {
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* ---- Shape and motion defaults. In the base layer, so any utility on an element still
+   wins. Every control eases the same way: soft, about a fifth of a second. ---- */
+@layer base {
+  .nocturne :is(button, a, input, textarea, select, summary, [role='button'], [role='tab']) {
+    transition:
+      color 220ms var(--ease),
+      background-color 220ms var(--ease),
+      border-color 220ms var(--ease),
+      box-shadow 220ms var(--ease),
+      opacity 220ms var(--ease),
+      scale 220ms var(--ease),
+      translate 220ms var(--ease);
+  }
+  .nocturne :is(button, input, textarea, select) {
+    border-radius: var(--radius-md);
+  }
+  .nocturne button:not(:disabled, [data-cover]):active {
+    scale: 0.97;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nocturne button:active {
+    scale: none;
+  }
+}
+
+/* ---- Buttons. v2 marks a primary action with a blue fill and a secondary one with a
+   hairline box; here they are a chalk pill and a glass pill.
+   shortcut: matched by the classes v2 components carry; upgrade to a Button component when
+   the v2 theme is removed. ---- */
+.nocturne button.bg-brand,
+.nocturne button.bg-brand:hover {
+  border-radius: 999px;
+  border-color: transparent;
+  background-color: var(--color-light-chalk);
+  color: var(--color-text-inverse);
+}
+.nocturne button.bg-brand:hover:not(:disabled) {
+  background-color: var(--color-bg-inverse);
+}
+.nocturne button:is(.border-chip-line, .border-line, .border-line-strong):not(.bg-brand) {
+  border-radius: 999px;
+  background-color: var(--color-glass-fill);
+}
+.nocturne
+  button:is(.border-chip-line, .border-line, .border-line-strong):not(.bg-brand):hover:not(
+    :disabled
+  ) {
+  background-color: var(--color-glass-fill-strong);
+}
+.nocturne :is(input, textarea):is(.border-line, .border-chip-line, .border) {
+  background-color: var(--color-glass-fill);
+}
+.nocturne ::selection {
+  background: rgba(91, 124, 255, 0.35);
+}
+
+/* ---- Paper: files and outputs are the one light surface. Inside it the text and line
+   variables flip, so whatever is drawn there reads dark on chalk without knowing. ---- */
+.nocturne .paper {
+  background-color: var(--color-light-chalk);
+  color: #0a0a0c;
+  --color-text-primary: #0a0a0c;
+  --color-text-link: #0a0a0c;
+  --color-text-secondary: rgba(10, 10, 12, 0.64);
+  --color-text-dim: rgba(10, 10, 12, 0.64);
+  --color-text-placeholder: rgba(10, 10, 12, 0.4);
+  --color-border-default: rgba(10, 10, 12, 0.14);
+  --color-rule-hair: rgba(10, 10, 12, 0.14);
+  --color-card-selected: rgba(10, 10, 12, 0.06);
+  --color-glass-fill: rgba(10, 10, 12, 0.05);
+  --color-glass-fill-strong: rgba(10, 10, 12, 0.09);
+}
+
+/* ---- The soft gradient orbs that stand for agents and desk tools. ---- */
+.nocturne .orb {
+  border-radius: 999px;
+  background: radial-gradient(circle at 38% 32%, #fff 0%, var(--orb, #5b7cff) 42%, #0538ff 130%);
+  color: transparent;
+}
+.orb-peach {
+  --orb: #f6b89a;
+}
+.orb-pink {
+  --orb: #f2a7c3;
+}
+.orb-green {
+  --orb: #b9e4a3;
+}
+.orb-lilac {
+  --orb: #b7b5ff;
+}
+.orb-blue {
+  --orb: #5b7cff;
+}
+.nocturne .orb:is(.orb-peach, .orb-pink, .orb-green, .orb-lilac) {
+  background: radial-gradient(circle at 38% 32%, #fff 0%, var(--orb) 55%, var(--orb) 100%);
+}
+
+/* ---- Create and Research pieces ---- */
+/* selected seat and Lock in: a blue tint over frost, a soft blue stroke and glow */
+.nocturne .seat-on {
+  border: 1px solid rgba(124, 149, 255, 0.5);
+  background: linear-gradient(rgba(46, 85, 255, 0.13), rgba(46, 85, 255, 0.13)), var(--color-frost);
+  color: var(--color-text-primary);
+  box-shadow: 0 0 32px rgba(5, 56, 255, 0.2);
+}
+.nocturne button.seat-on:hover:not(:disabled) {
+  border-color: rgba(124, 149, 255, 0.8);
+  box-shadow: 0 0 40px rgba(5, 56, 255, 0.3);
+}
+/* the Interpret box: muted deep indigo, not a bright blue */
+.nocturne .indigo {
+  border: 1px solid rgba(183, 181, 255, 0.32);
+  background: radial-gradient(120% 140% at 15% 0%, #24306f, #12142b);
+  color: var(--color-text-primary);
+}
+
+.nocturne button.bg-brand:disabled {
+  opacity: 0.45;
+}

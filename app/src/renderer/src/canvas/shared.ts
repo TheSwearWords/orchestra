@@ -7,7 +7,7 @@ import { fit, type Camera, type Rect } from './camera'
 export const reducedMotion = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export const chip =
-  'flex h-[46px] items-center border border-chip-line bg-chip shadow-float text-link'
+  'flex h-[46px] items-center rounded-lg border border-chip-line bg-chip shadow-float text-link'
 
 export type Area = 'research' | 'create' | 'refine'
 export const AREAS: { id: Area; numeral: string; name: string }[] = [

@@ -2,7 +2,6 @@
 // replaces the breadcrumb. App owns which tabs are open (list logic in tabList.ts).
 import type { Project } from '../../../preload'
 import { Icon } from '../components/Icon'
-import { Taper } from './Taper'
 import { TOP_BAR, type Area } from './shared'
 import { DRAFT, MODE_ICON } from './tabList'
 
@@ -60,19 +59,17 @@ export function Tabs({
       {/* with more tabs than fit they shrink to 120px, then the strip scrolls */}
       <div
         role="tablist"
-        className="flex h-full min-w-0 items-end overflow-x-auto px-2 [scrollbar-width:none]"
+        className="flex h-full min-w-0 items-end gap-1 overflow-x-auto px-3 [scrollbar-width:none]"
       >
         {list.map((t) => {
           const on = t.id === active
           return (
             <div
               key={t.id}
-              className={`relative flex h-10 max-w-56 min-w-[120px] shrink items-center rounded-t-lg border border-b-0 ${
-                on ? 'border-line bg-canvas text-fg' : 'border-transparent text-dim hover:text-fg'
+              className={`flex h-10 max-w-56 min-w-[120px] shrink items-center ${
+                on ? 'tab-on' : 'text-dim hover:text-fg'
               }`}
             >
-              {on && <Taper solid="br" size={8} className="bottom-0 -left-2 text-canvas" />}
-              {on && <Taper solid="bl" size={8} className="-right-2 bottom-0 text-canvas" />}
               <button
                 role="tab"
                 aria-selected={on}

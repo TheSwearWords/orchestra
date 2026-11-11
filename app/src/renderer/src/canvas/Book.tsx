@@ -133,8 +133,8 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
           {/* the spine, down the left of the spread */}
           <span
             aria-hidden
-            className="absolute bg-brand"
-            style={{ left: -GAP / 2 - 24, top: -GAP / 2, width: 24, height: h + GAP }}
+            className="absolute rounded-full bg-agent/70"
+            style={{ left: -GAP / 2 - 24, top: -GAP / 2, width: 8, height: h + GAP }}
           />
           {AREAS.map((a, i) => {
             const p = panels[i]
@@ -142,7 +142,7 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
               <section
                 key={a.id}
                 aria-label={`${a.numeral} ${a.name}`}
-                className="absolute overflow-hidden border border-card-line shadow-card"
+                className="absolute overflow-hidden rounded-xl border border-card-line bg-card shadow-card"
                 style={{ left: p.x, top: p.y, width: p.w, height: p.h }}
               >
                 {/* a live, low-detail copy of the area's board; only while no board is open */}
@@ -155,15 +155,13 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
                   className="group absolute inset-0 flex items-start p-16 transition-colors duration-200 ease-(--ease) hover:bg-selected"
                 >
                   <span
-                    className={`${chip} h-auto gap-4 px-8 py-4 ${a.id === 'create' ? 'bg-poster-dots' : ''}`}
+                    className={`${chip} h-auto gap-4 rounded-full! px-8 py-3`}
                     style={{
                       transform: `scale(${Math.min(1.5, 1 / Math.max(cam.camera.z, 0.25))})`,
                       transformOrigin: 'top left'
                     }}
                   >
-                    <span className="font-display text-[28px] font-extrabold italic">
-                      {a.numeral}
-                    </span>
+                    <span className="font-mono text-[22px] text-dim">{a.numeral}</span>
                     <span className="type-display-l">{a.name}</span>
                   </span>
                 </button>

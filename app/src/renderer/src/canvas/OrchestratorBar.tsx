@@ -525,10 +525,10 @@ export function OrchestratorBar({
 
         <form
           onSubmit={send}
-          className={`${chip} glass relative w-full gap-3 pr-3 pl-2.5 ${open ? 'shadow-none' : ''}`}
+          className={`${chip} glass relative w-full gap-3 rounded-b-none! pr-3 pl-2.5 ${open ? 'shadow-none' : ''}`}
           style={{ height: BAR_H }}
         >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand">
+          <span className="orb orb-blue flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand">
             <Icon name="logo-mark" size={20} />
           </span>
           <button
@@ -577,7 +577,7 @@ export function OrchestratorBar({
                 : 'Ask the Orchestrator anything, or type / to go somewhere'
             }
             aria-label={`Message the Orchestrator, ${to.label}`}
-            className="min-w-0 flex-1 border-0 border-b-2 border-brand bg-transparent py-1 type-body-m text-link outline-none placeholder:text-placeholder focus-visible:outline-none"
+            className="min-w-0 flex-1 border-0 bg-transparent py-1 type-body-m text-link outline-none placeholder:text-placeholder focus-visible:outline-none"
           />
           {busy ? (
             <button
@@ -590,7 +590,7 @@ export function OrchestratorBar({
           ) : null}
         </form>
         <div
-          className="relative flex items-center gap-5 border border-t-0 border-chip-line bg-chip px-3 type-caption text-link"
+          className="relative flex items-center gap-5 rounded-b-lg border border-t-0 border-chip-line bg-chip px-4 type-log-s text-dim"
           style={{ height: METER_H }}
         >
           {usage ? (
@@ -611,9 +611,9 @@ export function OrchestratorBar({
                   className="flex min-w-0 flex-1 items-center gap-2"
                 >
                   <span className="shrink-0">{name}</span>
-                  <span className="h-1.5 min-w-0 flex-1 bg-brand/15">
+                  <span className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-fg/10">
                     <span
-                      className={`block h-full ${pct >= 90 ? 'bg-signal' : 'bg-brand'}`}
+                      className={`block h-full rounded-full transition-[width] duration-700 ease-(--ease) ${pct >= 90 ? 'bg-signal' : 'bg-agent'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </span>

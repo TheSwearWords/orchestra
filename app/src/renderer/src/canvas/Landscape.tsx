@@ -6,8 +6,8 @@ import desert from '../assets/landscapes/desert.png'
 import hills from '../assets/landscapes/hills.png'
 import coast from '../assets/landscapes/coast.png'
 
-// shortcut: the plates are 720 × 450, half the design size, because they are only ever shown
-// under a 28px blur; upgrade when a landscape is shown sharp.
+// The plates are 720 × 450 with the blur baked in (a 28px CSS blur over the whole window was
+// costly), so they are soft at any size.
 const PLATES = { sunset, alpine, desert, hills, coast }
 
 /** Put it first inside a wrapper with the class `on-landscape`; the board above goes clear. */

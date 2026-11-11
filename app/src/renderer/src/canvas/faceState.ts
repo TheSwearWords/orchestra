@@ -2,7 +2,9 @@
 // story (typing, sending, answering; agents working, things waiting on you), so they report
 // what they know here and every face reads the same answer.
 import { useSyncExternalStore } from 'react'
-import type { FaceState } from './liquid'
+
+export type FaceState =
+  'idle' | 'listening' | 'sent' | 'thinking' | 'working' | 'needs' | 'done' | 'error'
 
 export interface Signals {
   typing: boolean // the bar has a message being written

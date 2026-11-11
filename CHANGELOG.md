@@ -4,9 +4,16 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 
 ## 2026-11-11
 
+### Fixed
+
+- Switching areas, opening and closing windows, and panning were laggy. The frosted blur behind the chrome, the live blur on the landscape, the blur in the book-opening animation and the area slide are gone, and card shadows are smaller. The look is nearly the same: panels are slightly more solid.
+
+### Changed
+
+- The Orchestrator is a glowing sphere again. Its colour still follows what is happening (blue at rest, lilac thinking, amber needs you, green done, grey on an error), blending over a second.
+
 ### Added
 
-- The Orchestrator has a live face: the integral in a bead of liquid glass, in the bar and the session dock. It leans in while you type, ripples on each key, turns when you send, swirls while it thinks, sends out droplets while agents work, glows amber when something needs you, fills green when work finishes and goes grey on an error. It rests while the window is in the background.
 - Drag a header tab onto another to reorder them.
 - In the session dock, a working agent shows what it is doing, from its latest log line.
 - The whole-book view says what you are looking at and how to move.
@@ -17,7 +24,7 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 - The breadcrumb and page-strip code is removed.
 
 - The header tab, the area switch, the side tabs and the session dock are each drawn as one shape, and their outline now follows the curve where they meet the edge. The dock has its rounded corners back.
-- Moving between areas slides the next board in from its side, and the pill in the area switch grows and shrinks as it moves.
+- Moving between areas fades the next board up, and the pill in the area switch grows and shrinks as it moves.
 - Opening a book: the cover lifts, grows and dissolves into the board in about half a second, in place of the swinging page.
 - Covers are dark with soft light blooming through them, in place of the flat blue poster.
 - "New asset" and "New project" are a small pill above the minimap, clear of the side tabs.

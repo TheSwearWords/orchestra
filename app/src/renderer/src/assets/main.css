@@ -227,12 +227,11 @@ body {
   }
 }
 
-/* Page or area change (brand spec §6): the next view zooms in from 1.045 with a fade.
-   Reduced motion keeps only the fade. */
+/* Page or area change: the next view fades up, quickly. Fade only: scaling a whole board
+   redraws every card and shadow on each frame, which made the switch stutter. */
 @keyframes area-in {
   from {
     opacity: 0;
-    scale: 1.012;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -343,22 +342,6 @@ body {
   top: 100%;
   right: 0;
   background: radial-gradient(circle at 0 100%, var(--notch-ring));
-}
-
-/* Moving between a book's areas: the next board slides in from the side it lives on
-   (--dir is -1, 0 or 1) while it fades. Reduced motion keeps the fade. */
-@keyframes page-in {
-  from {
-    opacity: 0;
-    translate: calc(var(--dir, 0) * 56px) 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  @keyframes page-in {
-    from {
-      opacity: 0;
-    }
-  }
 }
 
 /* A deliverable that is on, and Lock in beside it: the same selected card. v2 draws it as the

@@ -39,11 +39,10 @@ export function Opening({ info, shelf, dir, onSwap, onDone }: Props): React.JSX.
       {
         transform: place(shelf.x + shelf.width / 2, shelf.y + shelf.height / 2, s0),
         opacity: 1,
-        filter: 'blur(0px)',
         easing: ease
       },
-      { offset: 0.45, opacity: 0.9, filter: 'blur(2px)', easing: ease },
-      { transform: place(vw / 2, vh / 2, s1), opacity: 0, filter: 'blur(14px)' }
+      { offset: 0.45, opacity: 0.9, easing: ease },
+      { transform: place(vw / 2, vh / 2, s1), opacity: 0 }
     ]
     // a soft dark veil rises and falls with it, so the board swap underneath never flashes
     const dim: Keyframe[] = [{ opacity: 0 }, { offset: 0.4, opacity: 1 }, { opacity: 0 }]

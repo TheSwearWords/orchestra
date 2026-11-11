@@ -739,7 +739,7 @@ export function Setup({ onDone }: { onDone: () => void }): React.JSX.Element {
         top={<p className="bg-inverse px-3 py-2 type-label-s text-on-brand shadow-float">{hint}</p>}
       />
       {!started && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-inverse/40 p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-6">
           <div
             role="dialog"
             aria-modal="true"

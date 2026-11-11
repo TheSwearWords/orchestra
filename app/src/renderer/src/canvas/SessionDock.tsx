@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Project } from '../../../preload'
 import { NeedsYou, useNeeds } from './NeedsYou'
-import { Taper } from './Taper'
 import { STATUS_WORDS, dockAgents, type DockAgent, type DockStatus } from './dock'
 
 const DOT: Record<DockStatus, string> = {
@@ -80,12 +79,10 @@ export function SessionDock({
   return (
     <div ref={root} className="absolute right-0 z-30" style={{ top: 104 }}>
       <div
-        className={`glass relative rounded-l-2xl border border-r-0 border-chip-line bg-chip transition-[width] duration-200 ease-(--ease) ${
+        className={`notch-right glass relative transition-[width] duration-300 ease-(--ease) ${
           open ? 'w-[190px] shadow-float' : 'w-9'
         }`}
       >
-        <Taper solid="br" className="-top-2.5 right-0 text-chip" />
-        <Taper solid="tr" className="right-0 -bottom-2.5 text-chip" />
         <button
           onClick={() => setOpen(!open)}
           aria-expanded={open}

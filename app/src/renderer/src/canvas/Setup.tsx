@@ -736,7 +736,11 @@ export function Setup({ onDone }: { onDone: () => void }): React.JSX.Element {
         }}
         focus={focus}
         addMenu={menu}
-        top={<p className="bg-inverse px-3 py-2 type-label-s text-on-brand shadow-float">{hint}</p>}
+        top={
+          <p className="glass rounded-full border border-chip-line bg-chip px-4 py-2 type-label-s text-link shadow-float">
+            {hint}
+          </p>
+        }
       />
       {!started && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-6">

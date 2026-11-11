@@ -17,9 +17,12 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   /* brand v2: sharp everywhere; round only for pills, avatars and the orb */
   --radius-*: initial;
+  --radius-xs: 0;
   --radius-sm: 0;
   --radius-md: 0;
   --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
   --radius-full: 9999px;
 }
 
@@ -229,7 +232,7 @@ body {
 @keyframes area-in {
   from {
     opacity: 0;
-    scale: 1.045;
+    scale: 1.012;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -255,35 +258,107 @@ body {
   }
 }
 
-/* The header's active tab: one element. It is filled with the board's colour, sits over the
-   header's bottom line, and its two bottom flares are its own pseudo-elements, so nothing can
-   drift apart. The faint outline is an inset shadow, so it adds no size. */
-.tab-on {
-  position: relative;
-  border-radius: 10px 10px 0 0;
-  background-color: var(--color-bg-default);
-  color: var(--color-text-primary);
-  box-shadow:
-    inset 0 1px 0 var(--color-border-default),
-    inset 1px 0 0 var(--color-border-default),
-    inset -1px 0 0 var(--color-border-default);
+/* Notches: the pieces of chrome that grow out of an edge (the active header tab, the area
+   switch under the header, the side tabs, the session dock). Each is ONE element. Its two
+   concave flares are its own pseudo-elements, drawn as a radial gradient that carries the
+   outline round the curve, so the stroke follows the taper and nothing can drift apart.
+   notch-up rises from the edge below it, notch-down hangs from the edge above, notch-left and
+   notch-right grow out of the window's sides. */
+.notch-up,
+.notch-down,
+.notch-left,
+.notch-right {
+  --notch-fill: var(--color-chip-bg);
+  --notch-line: var(--color-chip-border);
+  --notch-ring:
+    transparent 8.75px, var(--notch-line) 9.25px, var(--notch-line) 9.75px,
+    var(--notch-fill) 10.25px;
+  border: 1px solid var(--notch-line);
+  background-color: var(--notch-fill);
 }
-.tab-on::before,
-.tab-on::after {
+:is(.notch-up, .notch-down, .notch-left, .notch-right)::before,
+:is(.notch-up, .notch-down, .notch-left, .notch-right)::after {
   content: '';
   position: absolute;
-  bottom: 0;
   width: 10px;
   height: 10px;
   pointer-events: none;
 }
-.tab-on::before {
-  right: 100%;
-  background: radial-gradient(circle at 0 0, transparent 9.5px, var(--color-bg-default) 10px);
+.notch-up {
+  --notch-fill: var(--color-bg-default);
+  --notch-line: var(--color-border-default);
+  position: relative;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  color: var(--color-text-primary);
 }
-.tab-on::after {
+.notch-up::before {
+  right: 100%;
+  bottom: 0;
+  background: radial-gradient(circle at 0 0, var(--notch-ring));
+}
+.notch-up::after {
   left: 100%;
-  background: radial-gradient(circle at 100% 0, transparent 9.5px, var(--color-bg-default) 10px);
+  bottom: 0;
+  background: radial-gradient(circle at 100% 0, var(--notch-ring));
+}
+.notch-down {
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+}
+.notch-down::before {
+  top: 0;
+  right: 100%;
+  background: radial-gradient(circle at 0 100%, var(--notch-ring));
+}
+.notch-down::after {
+  top: 0;
+  left: 100%;
+  background: radial-gradient(circle at 100% 100%, var(--notch-ring));
+}
+.notch-left {
+  border-left: 0;
+  border-radius: 0 14px 14px 0;
+}
+.notch-left::before {
+  bottom: 100%;
+  left: 0;
+  background: radial-gradient(circle at 100% 0, var(--notch-ring));
+}
+.notch-left::after {
+  top: 100%;
+  left: 0;
+  background: radial-gradient(circle at 100% 100%, var(--notch-ring));
+}
+.notch-right {
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
+}
+.notch-right::before {
+  right: 0;
+  bottom: 100%;
+  background: radial-gradient(circle at 0 0, var(--notch-ring));
+}
+.notch-right::after {
+  top: 100%;
+  right: 0;
+  background: radial-gradient(circle at 0 100%, var(--notch-ring));
+}
+
+/* Moving between a book's areas: the next board slides in from the side it lives on
+   (--dir is -1, 0 or 1) while it fades. Reduced motion keeps the fade. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    translate: calc(var(--dir, 0) * 56px) 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes page-in {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 /* A deliverable that is on, and Lock in beside it: the same selected card. v2 draws it as the

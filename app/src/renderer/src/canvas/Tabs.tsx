@@ -66,8 +66,10 @@ export function Tabs({
           return (
             <div
               key={t.id}
+              // middle-click closes, as in a browser
+              onAuxClick={(e) => e.button === 1 && onClose(t.id)}
               className={`flex h-10 max-w-56 min-w-[120px] shrink items-center ${
-                on ? 'tab-on' : 'text-dim hover:text-fg'
+                on ? 'notch-up' : 'text-dim hover:text-fg'
               }`}
             >
               <button

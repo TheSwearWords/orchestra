@@ -15,7 +15,7 @@ const QUESTIONS: { field: Field; ask: string; label: string; optional?: boolean 
 ]
 
 const underline =
-  'w-full border-0 border-b-2 border-brand bg-transparent pb-2 text-link outline-none placeholder:text-placeholder focus-visible:outline-none'
+  'w-full rounded-none border-0 border-b border-line-strong bg-transparent pb-2 text-link outline-none placeholder:text-placeholder focus:border-focus focus-visible:outline-none'
 
 function reason(err: unknown): string {
   return String(err).replace(/^.*Error: /, '') // Electron prefixes IPC errors with the channel
@@ -239,7 +239,7 @@ export function CoverEditor({
               </button>
               <button
                 onClick={onDone}
-                className="serif-on h-11 border-[1.5px] border-brand px-5 type-label-m text-link hover:bg-brand hover:text-on-brand"
+                className="h-11 border border-chip-line px-5 type-label-m text-link"
               >
                 Done
               </button>
@@ -284,7 +284,7 @@ export function CoverEditor({
                   <button
                     type="submit"
                     disabled={busy}
-                    className="serif-on h-11 border-[1.5px] border-brand px-5 type-label-m text-link hover:bg-brand hover:text-on-brand"
+                    className="h-11 border border-chip-line px-5 type-label-m text-link"
                   >
                     Create project
                   </button>

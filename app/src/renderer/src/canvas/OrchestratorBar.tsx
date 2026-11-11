@@ -346,7 +346,7 @@ export function OrchestratorBar({
           // the bar, opened up: same frame, no shadow of its own
           <section
             aria-label={`Conversation ${to.label}`}
-            className="absolute inset-x-0 flex origin-bottom flex-col border border-b-0 border-chip-line bg-card animate-[rise-in_240ms_var(--ease)_both]"
+            className="glass absolute inset-x-0 flex origin-bottom flex-col overflow-hidden rounded-t-lg border border-b-0 border-chip-line bg-card animate-[rise-in_240ms_var(--ease)_both]"
             style={{ bottom: STACK, height: CHAT_H }}
           >
             <header className="flex h-11 shrink-0 items-center gap-3 border-b border-hair px-4 text-link">
@@ -525,7 +525,7 @@ export function OrchestratorBar({
 
         <form
           onSubmit={send}
-          className={`${chip} glass relative w-full gap-3 rounded-b-none! pr-3 pl-2.5 ${open ? 'shadow-none' : ''}`}
+          className={`${chip} glass relative w-full gap-3 rounded-b-none! pr-3 pl-2.5 ${open ? 'rounded-t-none! shadow-none' : ''}`}
           style={{ height: BAR_H }}
         >
           <span className="orb orb-blue flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand">

@@ -41,14 +41,19 @@ export function CoverFace({
   const m = AREAS.find((a) => a.id === movement)
   return (
     <div
-      className={`relative flex h-full w-full flex-col overflow-hidden py-6 pr-6 pl-[42px] ${look.face} ${className}`}
+      className={`cover-face cover-${color} relative flex h-full w-full flex-col overflow-hidden py-6 pr-6 pl-[42px] ${look.face} ${className}`}
     >
-      <span aria-hidden className={`absolute inset-y-0 left-0 w-[18px] ${look.spine}`} />
-      <div className="flex justify-between type-label-s">
+      <span
+        aria-hidden
+        className={`cover-spine absolute inset-y-0 left-0 w-[18px] ${look.spine}`}
+      />
+      <div className="cover-meta flex justify-between type-label-s">
         <span>Orchestra presents</span>
         <span>No. {String(info.no).padStart(2, '0')}</span>
       </div>
-      <div className={`absolute top-[64px] right-6 size-[150px] text-white ${look.plate}`}>
+      <div
+        className={`cover-plate absolute top-[64px] right-6 size-[150px] text-white ${look.plate}`}
+      >
         {info.cover?.image ? (
           <img
             alt=""
@@ -77,7 +82,7 @@ export function CoverFace({
           </span>
         )}
         <div
-          className={`mt-4 flex justify-between border-t pt-3 type-label-s whitespace-nowrap [font-stretch:100%] ${
+          className={`cover-meta mt-4 flex justify-between border-t pt-3 type-label-s whitespace-nowrap [font-stretch:100%] ${
             color === 'white' ? 'border-rule' : 'border-white/70'
           }`}
         >

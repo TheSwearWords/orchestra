@@ -126,6 +126,31 @@ function App(): React.JSX.Element {
   }, [refresh])
 
   useEffect(() => remember('areas', areas), [areas])
+
+  // Ctrl+Tab and Ctrl+Shift+Tab walk the open tabs; Ctrl+1 to 9 jump straight to one
+  useEffect(() => {
+    const keys = (e: KeyboardEvent): void => {
+      if (!e.ctrlKey || e.altKey || e.metaKey) return
+      const open = tabs.filter((id) => projects?.some((p) => p.id === id))
+      const v = now.current.view
+      const i = v.at === 'book' ? open.indexOf(v.id) : -1
+      let n = -1
+      if (e.key === 'Tab' && open.length)
+        n =
+          i < 0
+            ? e.shiftKey
+              ? open.length - 1
+              : 0
+            : (i + (e.shiftKey ? -1 : 1) + open.length) % open.length
+      else if (/^[1-9]$/.test(e.key) && !e.shiftKey) n = Number(e.key) - 1
+      if (n < 0 || n >= open.length || n === i) return
+      e.preventDefault()
+      go({ at: 'book', id: open[n], area: areas[open[n]] ?? null })
+    }
+    addEventListener('keydown', keys)
+    return () => removeEventListener('keydown', keys)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- go is stable; it is declared below
+  }, [tabs, projects, areas])
   useEffect(() => remember('open-tabs', tabs), [tabs])
 
   const current = view.at === 'book' ? projects?.find((p) => p.id === view.id) : undefined

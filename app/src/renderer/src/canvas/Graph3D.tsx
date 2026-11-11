@@ -97,14 +97,27 @@ export function Graph3D({
     const mono = read('--font-mono', 'monospace')
     const sans = read('--font-sans', 'sans-serif')
     const onBrand = read('--color-on-brand', 'white')
-    // shades of the one brand colour, so clusters differ without bringing in new hues
-    const shades = [
-      brand,
-      ink,
-      `color-mix(in srgb, ${brand} 55%, white)`,
-      `color-mix(in srgb, ${brand} 60%, black)`,
-      `color-mix(in srgb, ${brand} 30%, white)`
-    ]
+    // Nocturne gives each cluster one of its soft lights; without them (the v2 theme) the
+    // clusters are shades of the one brand colour
+    const lights = [
+      '--color-accent',
+      '--color-light-peach',
+      '--color-light-pink',
+      '--color-light-green',
+      '--color-light-lilac'
+    ].map((v) => read(v, ''))
+    const soft = lights.every(Boolean)
+    const frost = read('--color-chip', paper)
+    const line = read('--color-line-strong', brand)
+    const shades = soft
+      ? lights
+      : [
+          brand,
+          ink,
+          `color-mix(in srgb, ${brand} 55%, white)`,
+          `color-mix(in srgb, ${brand} 60%, black)`,
+          `color-mix(in srgb, ${brand} 30%, white)`
+        ]
     const shade = (id: string): string => {
       const i = groups.of.get(id)
       return i === undefined ? brand : shades[i % shades.length]
@@ -127,7 +140,7 @@ export function Graph3D({
           radius * view.current.zoom
         )
       ctx.clearRect(0, 0, w, h)
-      ctx.strokeStyle = brand
+      ctx.strokeStyle = soft ? ink : brand
       ctx.lineWidth = 0.6
       const { focus: f, hover: over, highlight: lit } = live.current
       const near = over ? (linked.get(over) ?? new Set<string>()) : null
@@ -147,8 +160,8 @@ export function Graph3D({
         }
         ctx.stroke()
       }
-      strokeEdges(filtering ? 0.05 : 0.16, false)
-      if (filtering) strokeEdges(0.6, true)
+      strokeEdges(filtering ? 0.04 : soft ? 0.1 : 0.16, false)
+      if (filtering) strokeEdges(soft ? 0.45 : 0.6, true)
       // far points first, so near ones sit on top
       const order = points.map((p) => ({ p, s: at(p) })).sort((u, v) => v.s.depth - u.s.depth)
       for (const { p, s } of order) {
@@ -160,9 +173,16 @@ export function Graph3D({
           (2.5 + Math.min(p.degree, 16) * 0.45) *
           s.scale *
           (on || (filtering && active(p.id)) ? 1.5 : 1)
+        // only what you are pointing at glows: a blur on every point would cost too much
+        const glow = soft && (on || (filtering && active(p.id)))
+        if (glow) {
+          ctx.shadowColor = ctx.fillStyle as string
+          ctx.shadowBlur = 16
+        }
         ctx.beginPath()
         ctx.arc(s.sx, s.sy, r, 0, Math.PI * 2)
         ctx.fill()
+        if (glow) ctx.shadowBlur = 0
       }
 
       // words last, nearest and most important first, skipping any that would land on another
@@ -219,10 +239,10 @@ export function Graph3D({
         for (const c of groups.clusters.slice(0, TAGS)) {
           if (lit && !c.ids.some((id) => id.startsWith(lit))) continue
           const s = at(c)
-          const text = clip(c.name, 26).toUpperCase()
-          ctx.font = `600 10px ${sans}`
-          const width = ctx.measureText(text).width + 12
-          const b = { x: s.sx - width / 2, y: s.sy - 9, w: width, h: 18 }
+          const text = soft ? clip(c.name, 26) : clip(c.name, 26).toUpperCase()
+          ctx.font = soft ? `500 11px ${sans}` : `600 10px ${sans}`
+          const width = ctx.measureText(text).width + (soft ? 18 : 12)
+          const b = { x: s.sx - width / 2, y: s.sy - (soft ? 11 : 9), w: width, h: soft ? 22 : 18 }
           if (b.x < 0 || b.y < 0 || b.x + b.w > w || b.y + b.h > h) continue
           if (
             taken.some(
@@ -232,9 +252,20 @@ export function Graph3D({
             continue
           taken.push(b)
           ctx.globalAlpha = 1
-          ctx.fillStyle = brand
-          ctx.fillRect(b.x, b.y, b.w, b.h)
-          ctx.fillStyle = onBrand
+          if (soft) {
+            // a glass pill, like the app's other small labels
+            ctx.beginPath()
+            ctx.roundRect(b.x, b.y, b.w, b.h, b.h / 2)
+            ctx.fillStyle = frost
+            ctx.fill()
+            ctx.lineWidth = 1
+            ctx.strokeStyle = line
+            ctx.stroke()
+          } else {
+            ctx.fillStyle = brand
+            ctx.fillRect(b.x, b.y, b.w, b.h)
+          }
+          ctx.fillStyle = soft ? ink : onBrand
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.fillText(text, s.sx, s.sy + 0.5)

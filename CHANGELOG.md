@@ -2,6 +2,22 @@
 
 What changed in Orchestra, newest first. Add to the top section with each push.
 
+## 2026-11-11
+
+### Changed
+
+- The header tab, the area switch, the side tabs and the session dock are each drawn as one shape, and their outline now follows the curve where they meet the edge. The dock has its rounded corners back.
+- Moving between areas slides the next board in from its side, and the pill in the area switch grows and shrinks as it moves.
+- Opening a book: the cover lifts, grows and dissolves into the board in about half a second, in place of the swinging page.
+- Covers are dark with soft light blooming through them, in place of the flat blue poster.
+- "New asset" and "New project" are a small pill above the minimap, clear of the side tabs.
+- The knowledge graph uses the soft Nocturne lights, with glass labels.
+- Hover no longer swaps a label to the serif. Dialogs, menus and panels have rounded corners. The Orchestrator's conversation opens as one rounded panel with the bar.
+
+### Added
+
+- Ctrl+Tab and Ctrl+Shift+Tab walk the open tabs, Ctrl+1 to 9 jump to one, and a middle-click closes a tab.
+
 ## 2026-11-10
 
 ### Changed

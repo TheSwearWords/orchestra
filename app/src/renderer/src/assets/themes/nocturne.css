@@ -11,9 +11,12 @@
   --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
   --font-display: 'Instrument Serif', Georgia, serif;
 
+  --radius-xs: 2px;
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
   --radius-full: 9999px;
 
   /* the face and status changes move on a calmer curve than the chrome */
@@ -291,14 +294,19 @@
 .nocturne button.bg-brand:hover:not(:disabled) {
   background-color: var(--color-bg-inverse);
 }
-.nocturne button:is(.border-chip-line, .border-line, .border-line-strong):not(.bg-brand) {
+.nocturne
+  button:is(.border-chip-line, .border-line, .border-line-strong):not(
+    .bg-brand,
+    [class*='notch-']
+  ) {
   border-radius: 999px;
   background-color: var(--color-glass-fill);
 }
 .nocturne
-  button:is(.border-chip-line, .border-line, .border-line-strong):not(.bg-brand):hover:not(
-    :disabled
-  ) {
+  button:is(.border-chip-line, .border-line, .border-line-strong):not(
+    .bg-brand,
+    [class*='notch-']
+  ):hover:not(:disabled) {
   background-color: var(--color-glass-fill-strong);
 }
 .nocturne :is(input, textarea):is(.border-line, .border-chip-line, .border) {
@@ -371,4 +379,115 @@
 
 .nocturne button.bg-brand:disabled {
   opacity: 0.45;
+}
+
+/* ---- Audit pass, 2026-11-11 ---- */
+
+/* v2 swapped a label to the serif when hovered, focused or current. In pills and small type
+   that reads as a glitch here, so the swap is off: hover and current are colour and fill, and
+   the serif is kept for titles. */
+.nocturne .serif-on:is(:hover, :focus-visible, [aria-current]:not([aria-current='false'])),
+.nocturne .serif-on.serif-measure {
+  font-family: inherit;
+  font-style: inherit;
+  font-weight: inherit;
+  font-stretch: inherit;
+  letter-spacing: inherit;
+}
+.nocturne :is(.type-current-s, .type-current-m, .type-current-l) {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--color-text-primary);
+}
+.nocturne .type-current-s {
+  font-size: 12.5px;
+}
+.nocturne .type-current-m {
+  font-size: 13.5px;
+}
+.nocturne .type-current-l {
+  font-size: 15px;
+}
+
+/* every boxed panel (dialogs, menus, side panels, tiles) gets the window radius unless it says
+   otherwise or is joined to a neighbour along one edge */
+@layer base {
+  .nocturne
+    :is(div, section, form, dialog, ul, ol, aside, article, p, label, li).border:is(
+      .border-chip-line,
+      .border-card-line,
+      .border-line,
+      .border-line-strong
+    ):not(
+      [class*='border-t-0'],
+      [class*='border-b-0'],
+      [class*='border-l-0'],
+      [class*='border-r-0']
+    ) {
+    border-radius: var(--radius-lg);
+  }
+  .nocturne dialog {
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* ---- Covers: a dark programme with soft light blooming through it, in place of the flat
+   blue poster. Each colour choice keeps its own light. ---- */
+.nocturne .cover-face {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  background-color: #0b0b12;
+  background-size: auto;
+  color: var(--color-text-primary);
+}
+.nocturne .cover-blue {
+  background-image:
+    radial-gradient(55% 42% at 78% 30%, rgba(91, 124, 255, 0.85), transparent 72%),
+    radial-gradient(70% 50% at 18% 78%, rgba(5, 56, 255, 0.95), transparent 70%),
+    radial-gradient(48% 36% at 88% 92%, rgba(183, 181, 255, 0.7), transparent 72%);
+}
+.nocturne .cover-ink {
+  background-image:
+    radial-gradient(50% 38% at 72% 34%, rgba(237, 232, 223, 0.5), transparent 72%),
+    radial-gradient(60% 44% at 80% 90%, rgba(246, 184, 154, 0.75), transparent 72%),
+    radial-gradient(60% 40% at 12% 70%, rgba(91, 124, 255, 0.35), transparent 70%);
+}
+.nocturne .cover-white {
+  background-image:
+    radial-gradient(52% 40% at 74% 28%, rgba(242, 167, 195, 0.7), transparent 72%),
+    radial-gradient(64% 46% at 16% 82%, rgba(183, 181, 255, 0.8), transparent 70%),
+    radial-gradient(46% 34% at 90% 88%, rgba(185, 228, 163, 0.55), transparent 72%);
+}
+.nocturne .cover-spine {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.35), transparent);
+}
+/* the artwork floats in the light instead of sitting on a blue plate */
+.nocturne .cover-plate {
+  background-color: transparent;
+  opacity: 0.7;
+  mix-blend-mode: screen;
+}
+.nocturne .cover-plate img {
+  border-radius: var(--radius-md);
+  mix-blend-mode: normal;
+}
+.nocturne .cover-meta {
+  border-color: rgba(255, 255, 255, 0.22);
+  font-family: var(--font-mono);
+  gap: 10px;
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(244, 242, 238, 0.72);
+}
+.nocturne .cover-face h3 {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
 }

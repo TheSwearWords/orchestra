@@ -2,7 +2,6 @@
 import { Icon } from '../components/Icon'
 import { AREAS, TOP_BAR, chip, type Area } from './shared'
 import { clampZoom, type Camera, type Rect } from './camera'
-import { Taper } from './Taper'
 import { MODE_ICON } from './tabList'
 
 export type Step = { label: string; onClick?: () => void }
@@ -138,10 +137,8 @@ export function AreaSwitch({
     <div
       role="tablist"
       aria-label="Areas"
-      className="glass relative flex items-center gap-1 rounded-b-[14px] border border-t-0 border-chip-line bg-chip px-2 pt-1 pb-1.5"
+      className="notch-down glass relative flex items-center gap-1 px-2 pt-1 pb-1.5"
     >
-      <Taper solid="tr" className="top-0 -left-2.5 text-chip" />
-      <Taper solid="tl" className="top-0 -right-2.5 text-chip" />
       {slots.map((s) => {
         const on = s.id === current
         return (
@@ -152,14 +149,22 @@ export function AreaSwitch({
             aria-label={s.label}
             title={s.key ? `${s.label} (${s.key})` : s.label}
             onClick={() => onGo(s.id)}
-            className={`flex h-[30px] items-center justify-center gap-2 rounded-full transition-colors duration-200 ease-(--ease) ${
-              on
-                ? 'bg-inverse px-3 type-body-s font-medium whitespace-nowrap text-inverse'
-                : 'w-[30px] text-dim hover:bg-selected hover:text-fg'
+            className={`flex h-[30px] min-w-[30px] items-center justify-center rounded-full px-[7px] duration-300 ${
+              on ? 'bg-inverse text-inverse' : 'text-dim hover:bg-selected hover:text-fg'
             }`}
           >
             <Icon name={MODE_ICON[s.id ?? 'book']} size={16} />
-            {on && s.label}
+            {/* every slot carries its label; only the current one is open, so the pill grows
+                and shrinks as you move instead of jumping */}
+            <span
+              aria-hidden={!on}
+              className="grid transition-[grid-template-columns,opacity] duration-300 ease-(--ease)"
+              style={{ gridTemplateColumns: on ? '1fr' : '0fr', opacity: on ? 1 : 0 }}
+            >
+              <span className="overflow-hidden type-body-s font-medium whitespace-nowrap">
+                <span className="pr-1.5 pl-2">{s.label}</span>
+              </span>
+            </span>
           </button>
         )
       })}
@@ -167,7 +172,7 @@ export function AreaSwitch({
   )
 }
 
-/** The dashed card for making something new, pinned bottom right above the minimap. */
+/** The button for making something new, a pill standing just above the minimap. */
 export function NewCard({
   title,
   hint,
@@ -180,12 +185,11 @@ export function NewCard({
   return (
     <button
       onClick={onClick}
-      className="group absolute bottom-[176px] z-10 flex h-[220px] w-[168px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-wire bg-card px-3 text-center text-link shadow-book transition-transform duration-200 ease-(--ease) hover:-translate-y-1 [border-dasharray:6]"
-      style={{ right: 'calc(14px + var(--side, 0px))' }}
+      title={hint}
+      className="glass absolute right-3.5 bottom-[166px] z-10 flex h-10 items-center gap-2 rounded-full border border-chip-line bg-chip pr-4 pl-3 type-label-m text-link shadow-float"
     >
-      <span className="font-mono text-2xl text-link/40">+</span>
-      <span className="type-accent">{title}</span>
-      <span className="type-caption text-dim">{hint}</span>
+      <Icon name="add-line" size={16} />
+      {title}
     </button>
   )
 }

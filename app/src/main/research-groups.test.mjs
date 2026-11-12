@@ -9,6 +9,7 @@ import {
   ensureSite,
   listReferences,
   listSites,
+  removeSite,
   readGroups,
   removeGroup,
   renameGroup,
@@ -96,4 +97,16 @@ test('a window of one kind keeps it through a rename, and its text is one note',
   await saveText(p, 'Mood', 'again')
   await removeGroup(p, 'Mood')
   assert.equal((await listReferences(p)).length, 0)
+})
+
+test('removeSite deletes an added site and hides a built-in one, which a link then leaves out', async () => {
+  const home = temp()
+  const builtIn = (await listSites(home))[0]
+  await ensureSite(home, 'https://www.fontsinuse.com/uses/1')
+  let sites = await removeSite(home, 'https://fontsinuse.com')
+  assert.ok(!sites.some((s) => s.url.includes('fontsinuse')))
+  sites = await removeSite(home, builtIn.url)
+  assert.ok(!sites.some((s) => s.url === builtIn.url))
+  await ensureSite(home, builtIn.url + 'some/page')
+  assert.ok(!(await listSites(home)).some((s) => s.url === builtIn.url))
 })

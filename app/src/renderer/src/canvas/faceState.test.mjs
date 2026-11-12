@@ -9,6 +9,7 @@ const rest = {
   error: false,
   working: 0,
   needs: 0,
+  asking: false,
   doneAt: 0
 }
 const NOW = 1_000_000
@@ -35,4 +36,9 @@ test('needs you outranks everything but an error', () => {
   const s = { ...rest, needs: 1, working: 3, busy: true, typing: true }
   assert.equal(pickFace(s, NOW), 'needs')
   assert.equal(pickFace({ ...s, error: true }, NOW), 'error')
+})
+
+test('a question waiting in the conversation reads as needs you', () => {
+  assert.equal(pickFace({ ...rest, asking: true }, NOW), 'needs')
+  assert.equal(pickFace({ ...rest, asking: true, typing: true }, NOW), 'needs')
 })

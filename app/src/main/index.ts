@@ -7,7 +7,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { Conductor, GENERAL, STUDIO, readChat, readLog } from './conductor'
 import { agentPrompt, orchestratorPrompt, studioPrompt } from './prompts'
-import { readSelection, saveSelection } from './deliverables'
+import { lockDeliverables, readLocked, readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { providerStatus } from './connections'
 import { addCoverImage, COVER_TYPES, readCover, saveCover } from './covers'
@@ -48,6 +48,7 @@ import {
   addLink,
   addGroup,
   addSite,
+  removeSite,
   ensureSite,
   saveText,
   readGroups,
@@ -83,6 +84,7 @@ const conductor = new Conductor({
   projectDir: (id) => chatHome(id),
   library: () => loadLibrary(ORCHESTRA_HOME),
   selected: (dir) => readSelection(dir),
+  locked: (dir) => readLocked(dir),
   orchestratorModel: async () => {
     const o = (await loadLibrary(ORCHESTRA_HOME)).orchestrator
     if (o) runnableOrThrow(o)
@@ -527,6 +529,10 @@ app.whenReady().then(async () => {
     })
   })
   ipcMain.handle('sites:add', (_, site: Site) => addSite(ORCHESTRA_HOME, site))
+  ipcMain.handle('sites:remove', (_, url: unknown) => {
+    if (typeof url !== 'string') throw new Error('Pick a site to remove.')
+    return removeSite(ORCHESTRA_HOME, url)
+  })
   ipcMain.handle('research:addGroup', (_, project: string, name: unknown, kinds: unknown) =>
     addGroup(projectDir(project), name, kinds)
   )
@@ -563,8 +569,17 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('create:load', async (_, project: string) => {
     const dir = projectDir(project)
-    const [lib, selected] = await Promise.all([loadLibrary(ORCHESTRA_HOME), readSelection(dir)])
-    return { musicians: lib.musicians, instruments: lib.instruments, selected }
+    const [lib, selected, locked] = await Promise.all([
+      loadLibrary(ORCHESTRA_HOME),
+      readSelection(dir),
+      readLocked(dir)
+    ])
+    return { musicians: lib.musicians, instruments: lib.instruments, selected, locked }
+  })
+  ipcMain.handle('create:lock', async (_, project: string, ids: unknown) => {
+    if (!Array.isArray(ids) || !ids.every((id) => typeof id === 'string'))
+      throw new Error('Pick the deliverables to lock in.')
+    return lockDeliverables(projectDir(project), await loadLibrary(ORCHESTRA_HOME), ids)
   })
   ipcMain.handle('create:save', async (_, project: string, ids: string[]) => {
     const saved = await saveSelection(projectDir(project), await loadLibrary(ORCHESTRA_HOME), ids)

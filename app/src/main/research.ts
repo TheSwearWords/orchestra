@@ -355,11 +355,41 @@ export function referenceFilePath(project: string, file: string): string {
   return join(filesDir(project), file)
 }
 
-export async function listSites(home: string): Promise<Site[]> {
-  const own = await readFile(join(home, 'sites.json'), 'utf8')
+// Built-in sites the user removed, by host. Kept apart from sites.json so that file keeps its
+// shape: a plain list of the user's own sites.
+const hiddenFile = (home: string): string => join(home, 'sites-hidden.json')
+async function hiddenSites(home: string): Promise<string[]> {
+  return readFile(hiddenFile(home), 'utf8')
+    .then((t) => JSON.parse(t) as unknown)
+    .then((v) => (Array.isArray(v) ? v.filter((h): h is string => typeof h === 'string') : []))
+    .catch(() => [])
+}
+async function ownSites(home: string): Promise<Site[]> {
+  return readFile(join(home, 'sites.json'), 'utf8')
     .then((t) => JSON.parse(t) as Site[])
     .catch(() => [] as Site[])
-  return [...DEFAULT_SITES.map((s) => ({ ...s, tags: DEFAULT_TAGS[s.name] })), ...own]
+}
+
+export async function listSites(home: string): Promise<Site[]> {
+  const [own, hidden] = await Promise.all([ownSites(home), hiddenSites(home)])
+  const builtIn = DEFAULT_SITES.filter((s) => !hidden.includes(siteHost(s.url)))
+  return [...builtIn.map((s) => ({ ...s, tags: DEFAULT_TAGS[s.name] })), ...own]
+}
+
+/** Takes a site out of the library: one the user added is deleted, a built-in one is hidden. */
+export async function removeSite(home: string, url: string): Promise<Site[]> {
+  const host = siteHost(normalizeUrl(url))
+  const own = await ownSites(home)
+  const kept = own.filter((s) => siteHost(s.url) !== host)
+  await mkdir(home, { recursive: true })
+  if (kept.length !== own.length)
+    await writeFile(join(home, 'sites.json'), JSON.stringify(kept, null, 2))
+  if (DEFAULT_SITES.some((s) => siteHost(s.url) === host)) {
+    const hidden = await hiddenSites(home)
+    if (!hidden.includes(host))
+      await writeFile(hiddenFile(home), JSON.stringify([...hidden, host], null, 2))
+  }
+  return listSites(home)
 }
 
 export const siteHost = (url: string): string => new URL(url).hostname.replace(/^www\./, '')
@@ -368,6 +398,8 @@ export const siteHost = (url: string): string => new URL(url).hostname.replace(/
 export async function ensureSite(home: string, url: string): Promise<void> {
   const host = siteHost(url)
   if ((await listSites(home)).some((s) => siteHost(s.url) === host)) return
+  // removed on purpose: a new link from it doesn't bring it back
+  if ((await hiddenSites(home)).includes(host)) return
   const name = host.split('.')[0]
   await addSite(home, {
     name: name.charAt(0).toUpperCase() + name.slice(1),
@@ -390,8 +422,8 @@ export async function addSite(home: string, input: Site): Promise<Site[]> {
     ...(about ? { about } : {}),
     ...(tags.length ? { tags } : {})
   }
-  const own = (await listSites(home)).slice(DEFAULT_SITES.length)
+  const own = await ownSites(home)
   await mkdir(home, { recursive: true })
   await writeFile(join(home, 'sites.json'), JSON.stringify([...own, site], null, 2))
-  return [...DEFAULT_SITES, ...own, site]
+  return listSites(home)
 }

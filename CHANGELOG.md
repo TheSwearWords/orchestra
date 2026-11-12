@@ -2,6 +2,26 @@
 
 What changed in Orchestra, newest first. Add to the top section with each push.
 
+## 2026-11-12
+
+### Added
+
+- Research has a toolbar under the Orchestrator bar, as in Figma: one button each for a research group, reference links, inspiration, usable assets, a text window and an Interpret box. It replaces the New asset button.
+- Remove a site from the reference library with the × on its tile. Built-in sites are hidden, your own are deleted, and a new link from a removed site doesn't bring it back.
+
+### Changed
+
+- A new Research board opens with only the reference library, the Interpret box and research.md. The project's default group appears once something is filed in it.
+- In a reference link, Enter saves the note about why you like it (Shift+Enter starts a new line).
+- The text window has no Interpret button of its own: wire it to an Interpret box like any other window.
+- A question from the Orchestrator in Needs you opens the conversation it was asked in, and the sphere turns amber while the Orchestrator waits for your answer, in any conversation.
+- Locking in deliverables is saved with the project (in deliverables.md), not just in this window.
+
+### Fixed
+
+- A deliverable the Orchestrator added didn't appear on the Create board until you left and came back. The board now updates as agents change things.
+- The Orchestrator could brief a new deliverable, and it could start asking you questions, before you had locked it in. A deliverable now waits on the board until you lock it in.
+
 ## 2026-11-11
 
 ### Removed

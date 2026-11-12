@@ -13,6 +13,7 @@ export interface Signals {
   error: boolean // the bar is showing a failure
   working: number // Musicians working
   needs: number // things waiting on the user
+  asking: boolean // the Orchestrator asked something in the open conversation and waits
   doneAt: number // when a Musician last finished
 }
 
@@ -22,7 +23,7 @@ export const DONE_MS = 3000
 /** The one state to show, most pressing first. */
 export function pickFace(s: Signals, now: number): FaceState {
   if (s.error) return 'error'
-  if (s.needs > 0) return 'needs'
+  if (s.needs > 0 || s.asking) return 'needs'
   if (now - s.sentAt < SENT_MS) return 'sent'
   if (s.working > 0) return 'working'
   if (s.busy) return 'thinking'
@@ -38,6 +39,7 @@ let signals: Signals = {
   error: false,
   working: 0,
   needs: 0,
+  asking: false,
   doneAt: 0
 }
 const listeners = new Set<() => void>()

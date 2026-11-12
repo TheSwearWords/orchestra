@@ -93,9 +93,6 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const [files, setFiles] = useState<{ ref: AgentFileRef; from: string }[]>([])
   // where a card added by right-click first appears (until it's dragged and saved)
   const [dropped, setDropped] = useState<Record<string, { x: number; y: number }>>({})
-  // shortcut: confirmed is per viewer (localStorage); move it into deliverables.md if it
-  // should follow the project to other machines
-  const [lockedRaw, setLockedRaw] = useState(() => remembered(`confirmed:${project}`))
   // a card to bring into view: one just opened, or one the Needs you list points at
   const [focus, setFocus] = useState<string | undefined>(() => takeFocus(project))
   const [editing, setEditing] = useState<string | null>(null) // the deliverable being edited
@@ -157,10 +154,27 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   useEffect(() => {
     const load = (): void => void window.api.loadCreate(project).then(setPlan)
     load()
+    // a deliverable approved in the conversation, or a chat that changed the plan: catch up
+    const off = window.api.onChatEvent((e) => {
+      if (e.project === project && e.kind !== 'live' && e.kind !== 'log' && e.kind !== 'usage')
+        load()
+    })
     // an agent file saved: names, jobs and crews come from the library
     addEventListener('orchestra:agents-changed', load)
-    return () => removeEventListener('orchestra:agents-changed', load)
+    return () => {
+      off()
+      removeEventListener('orchestra:agents-changed', load)
+    }
   }, [project])
+
+  // lock-in used to be kept per viewer; carry what this viewer had locked into the project once
+  useEffect(() => {
+    if (!plan || plan.locked.length || !plan.selected.length) return
+    const old = remembered(`confirmed:${project}`)
+    const ids = old.includes('1') ? plan.selected : old.filter((id) => plan.selected.includes(id))
+    if (ids.length)
+      void window.api.lockDeliverables(project, ids).then((locked) => setPlan({ ...plan, locked }))
+  }, [plan, project])
   useEffect(() => {
     const load = (): void => {
       void window.api.listChats(project).then(setChats, () => {})
@@ -194,9 +208,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   function lockIn(): void {
     const fresh = plan!.selected.filter((id) => !lockedIn.includes(id))
     if (!fresh.length) return
-    const next = [...lockedIn, ...fresh]
-    setLockedRaw(next)
-    remember(`confirmed:${project}`, next)
+    setPlan({ ...plan!, locked: [...lockedIn, ...fresh] })
+    void window.api.lockDeliverables(project, fresh).catch((e) => setError(reason(e)))
     setFocus('orchestrator')
     // the Orchestrator takes it from here: it asks which deliverable to start with
     const names = fresh.map((id) => musician(id)?.name ?? id).join(', ')
@@ -283,8 +296,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const at = new Map(seats.map((s) => [s.id, s]))
   const musician = (id: string): Musician | undefined => plan.musicians.find((m) => m.id === id)
   const chosen = plan.selected.filter((id) => at.has(id))
-  // ['1'] is how projects locked in before this was per-deliverable were remembered
-  const lockedIn = lockedRaw.includes('1') ? plan.selected : lockedRaw
+  const lockedIn = plan.locked // kept in deliverables.md
   const confirmed = lockedIn.length > 0
   const spawned = chosen.filter((id) => lockedIn.includes(id))
   const waitingToLock = chosen.filter((id) => !lockedIn.includes(id))
@@ -1168,7 +1180,7 @@ function remember(key: string, value: string[]): void {
   }
 }
 
-const NO_PLAN: CreateState = { musicians: [], instruments: [], selected: [] }
+const NO_PLAN: CreateState = { musicians: [], instruments: [], selected: [], locked: [] }
 // the Orchestrator's chat can run forever, so it alone scrolls: capped at 1920×3240's shape
 const ASK_W = 432
 const INST_W = 288 // two Instrument windows sit under each deliverable's

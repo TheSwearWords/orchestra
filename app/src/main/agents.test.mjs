@@ -18,12 +18,13 @@ const lib = {
   ]
 }
 
-function conductor(dir) {
+function conductor(dir, locked) {
   return new Conductor({
     emit: () => {},
     projectDir: () => dir,
     library: async () => lib,
     selected: async () => ['website'],
+    ...(locked ? { locked: async () => locked } : {}),
     orchestratorModel: async () => 'opus',
     orchestratorPrompt: async () => '',
     agentPrompt: async () => '',
@@ -154,6 +155,16 @@ test('a proposed Musician waits as a card; bad or repeated drafts are refused', 
     assert.deepEqual([card.role, card.ref], ['proposal', 'musician:trailer'])
     await assert.rejects(c.proposeMusician('p', 'general', draft), /already waiting/)
     await assert.rejects(c.decide('p', 'general', 'musician:nope', true), /no longer exists/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a deliverable that is chosen but not locked in cannot be briefed', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'orchestra-lock-'))
+  try {
+    const c = conductor(dir, [])
+    await assert.rejects(c.briefMusician('p', 'general', 'website', 'Build it'), /isn't locked in/)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

@@ -66,7 +66,7 @@ export function useNeeds(projects: Project[]): Need[] {
                   {
                     key: `${p.id}/question/${asked.t}`,
                     project: p.id,
-                    card: 'actions',
+                    card: `chat:${GENERAL}`, // a conversation, not a window on the board
                     title: 'The Orchestrator asked',
                     what: asked.question,
                     t: asked.t

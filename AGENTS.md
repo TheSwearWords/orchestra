@@ -116,6 +116,7 @@ Every agent is its own `claude` process with its own saved session id, so it res
 - An agent's key is `<musician>` or `<musician>--<instrument>`.
 - All agents get `Read, Glob, Grep, WebFetch, WebSearch`, and file edits inside the project through `acceptEdits`. `Task`, `Agent` and `Bash` are disallowed.
 - Limits live in `conductor.ts`: 4 agents working at once per project, 40 messages between agents per project per hour.
+- A deliverable waits for the user: until it is locked in on the Create board (`locked:` in `deliverables.md`, `lockDeliverables`), `brief_musician` refuses it.
 - A deliverable's prerequisites gate it: until their files exist (`missingFoundations`), `brief_musician` needs `foundation` set to the next one, and the Musician can run only those. Create shows the same check as tags on the wire.
 - At 140,000 context tokens the Orchestrator writes a handoff note to `notes/`, and the next message starts a fresh session that reads it.
 - `open_window` kept its name from an earlier design. It now puts a choice in the Action box.
@@ -142,7 +143,7 @@ Bracket prefixes such as `[Brief from the Orchestrator]` and `[Report from the â
 - `App.tsx` also owns the tabs, Back, `SessionDock` and `OrchestratorBar`, because they belong to the whole window.
 - The Orchestrator's face (`OrchestratorFace.tsx`, a CSS glowing sphere) shows one state everywhere, as its colour. The bar and the dock report what they know through `signal()` in `faceState.ts`.
 
-Screens that don't share React state coordinate through window events: `orchestra:desk`, `orchestra:needs`, `orchestra:focus` and `orchestra:agents-changed`.
+Screens that don't share React state coordinate through window events: `orchestra:desk`, `orchestra:needs`, `orchestra:focus`, `orchestra:converse` (open the bar on a conversation) and `orchestra:agents-changed`. An area offers its tools for new windows through `useToolbar` (`canvas/toolbar.ts`); the bar draws them under its text box.
 
 ## Where data lives
 
@@ -153,10 +154,11 @@ Orchestra/
     musicians/<id>.md, instruments/<id>.md front matter = settings, body = prompt
     templates/                             what new agents are drafted from
   studio.json, setup.json, sites.json      Studio layout, first-launch state, user's sites
+  sites-hidden.json                        built-in library sites the user removed, by host
   studio/                                  the _studio chat's home, and boards/setup.json
   projects/<id>/
     concept.md                             name and client in front matter, "## Concept" section
-    research.md, deliverables.md           interpretation; chosen ids in front matter
+    research.md, deliverables.md           interpretation; chosen and locked-in ids in front matter
     references/ (+ files/), prereqs/, exports/, audits/, notes/
     boards/<board>.json                    card positions
     graphify-out/                          the project's knowledge graph
@@ -169,7 +171,7 @@ Orchestra/
 - The folder name is a project's permanent id. Renaming changes only `concept.md`.
 - `_studio` is a reserved pseudo-project for the chat above every project. Handlers that use `chatHome()` accept it. Handlers that use `projectDir()` reject it, and that's why `ChatPanel` skips proposals, outputs and agent states in the Studio.
 - `asks.json`, `proposals.json` and `agents.json` are read, changed and rewritten whole with no lock. Keep each one to a single writer path through the Conductor.
-- Per-viewer UI memory is in `localStorage` (`areas`, `open-tabs`, `theme`, `needs-seen`, `confirmed:<project>`). Guard every access, as the existing code does.
+- Per-viewer UI memory is in `localStorage` (`areas`, `open-tabs`, `theme`, `needs-seen`). `confirmed:<project>` is read once to carry old lock-ins into `deliverables.md`. Guard every access, as the existing code does.
 
 ## Changes that must travel together
 

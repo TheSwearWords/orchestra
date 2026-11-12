@@ -7,6 +7,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { OrchestratorFace } from './OrchestratorFace'
 import { signal, useFaceState } from './faceState'
+import { useTools } from './toolbar'
+import { waitingOnUser } from '../decide'
 import type { CreateState, Thread, Usage } from '../../../preload'
 import { ChatPanel } from '../components/Create'
 import { Icon } from '../components/Icon'
@@ -43,7 +45,7 @@ const MODES = [
 
 const BAR_H = 58
 const METER_H = 24 // the usage meter under the field
-const STACK = BAR_H + METER_H
+const TOOLS_H = 52 // the row of tools under the bar, when the open area offers some
 const CHAT_H = 'min(76vh, 840px)' // the opened conversation
 const METERS = [
   ['five_hour', '5-hour'],
@@ -124,6 +126,9 @@ export function OrchestratorBar({
     return () => clearInterval(timer)
   }, [])
   const [error, setError] = useState('')
+  // the open area's tools sit under the meter, so everything above them rises by their height
+  const tools = useTools()
+  const STACK = BAR_H + METER_H + (tools.length ? TOOLS_H : 0)
   // the face follows what the bar is doing; the session dock reports the agents' side
   const face = useFaceState()
   useEffect(
@@ -137,6 +142,45 @@ export function OrchestratorBar({
   const chat = threadOf[to.project] ?? GENERAL
   const input = useRef<HTMLInputElement>(null)
   const here = useRef<HTMLDivElement>(null)
+
+  // is the Orchestrator waiting on an answer in the conversation shown? the face turns amber
+  const [asking, setAsking] = useState(false)
+  useEffect(() => {
+    let live = true
+    const check = (): void =>
+      void window.api.loadChat(to.project, chat).then(
+        (c) =>
+          live &&
+          setAsking(
+            !!waitingOnUser(
+              c.messages,
+              new Set(plan?.musicians.map((m) => m.id) ?? []),
+              plan?.selected ?? []
+            )
+          ),
+        () => {}
+      )
+    check()
+    const off = window.api.onChatEvent((e) => {
+      if (e.project === to.project && e.chat === chat && e.kind === 'message') check()
+    })
+    return () => {
+      live = false
+      off()
+    }
+  }, [to.project, chat, plan])
+  useEffect(() => signal({ asking }), [asking])
+
+  // a question picked in Needs you opens the conversation it was asked in
+  useEffect(() => {
+    const converse = (e: Event): void => {
+      const { project, chat: c } = (e as CustomEvent<{ project: string; chat: string }>).detail
+      setThreadOf((t) => ({ ...t, [project]: c }))
+      setOpen(true)
+    }
+    addEventListener('orchestra:converse', converse)
+    return () => removeEventListener('orchestra:converse', converse)
+  }, [])
 
   useEffect(() => {
     let live = true
@@ -632,6 +676,35 @@ export function OrchestratorBar({
             <span className="text-dim">Your Claude plan usage shows after your next message</span>
           )}
         </div>
+        {tools.length > 0 && (
+          // what this area can add, as in Figma's toolbar: one button per kind of window
+          <div
+            role="toolbar"
+            aria-label="Add to the board"
+            className="flex justify-center"
+            style={{ height: TOOLS_H }}
+          >
+            <div className="glass mt-2 flex items-center gap-0.5 rounded-full border border-chip-line bg-chip p-1">
+              {tools.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={t.run}
+                  aria-label={`New ${t.label.toLowerCase()}`}
+                  className="group/tool relative flex size-9 items-center justify-center rounded-full text-dim hover:bg-selected hover:text-fg"
+                >
+                  <Icon name={t.icon} size={17} />
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute bottom-full mb-2 rounded-md border border-chip-line bg-chip px-2 py-1 type-label-s whitespace-nowrap text-link opacity-0 shadow-float transition-opacity duration-150 group-hover/tool:opacity-100 group-focus-visible/tool:opacity-100"
+                  >
+                    {t.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {error && (
           <p
             role="alert"

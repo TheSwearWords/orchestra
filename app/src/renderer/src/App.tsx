@@ -375,10 +375,7 @@ function App(): React.JSX.Element {
           area and its pill can slide between them */}
       {view.at === 'book' && (
         <div className="absolute left-1/2 z-30 -translate-x-1/2" style={{ top: TOP_BAR }}>
-          <AreaSwitch
-            current={view.area}
-            onGo={(a) => go({ at: 'book', id: view.id, area: a })}
-          />
+          <AreaSwitch current={view.area} onGo={(a) => go({ at: 'book', id: view.id, area: a })} />
         </div>
       )}
       {/* Home and the tabs get you out of the Studio; Back is for inside a book */}
@@ -399,6 +396,17 @@ function App(): React.JSX.Element {
         key={current?.id ?? 'studio'}
         project={current}
         onOpen={(project, card) => {
+          // a question from the Orchestrator: its conversation opens, wherever you are in the book
+          if (card.startsWith('chat:')) {
+            const v = now.current.view
+            if (!(v.at === 'book' && v.id === project))
+              go({ at: 'book', id: project, area: areas[project] ?? null })
+            const detail = { project, chat: card.slice(5) }
+            requestAnimationFrame(() =>
+              dispatchEvent(new CustomEvent('orchestra:converse', { detail }))
+            )
+            return
+          }
           requestFocus(project, card)
           go({ at: 'book', id: project, area: 'create' })
         }}

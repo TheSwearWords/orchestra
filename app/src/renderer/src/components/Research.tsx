@@ -3,7 +3,7 @@ import type { Kind, Reference, ResearchState, Tag } from '../../../preload'
 import { Board, type CardSpec } from '../canvas/Board'
 import type { Frame } from '../canvas/Book'
 import { popMenu, type MenuItem } from '../canvas/shared'
-import { NewCard } from '../canvas/Chrome'
+import { useToolbar } from '../canvas/toolbar'
 import { DOC_BODY } from '../canvas/stage'
 import { Port } from '../canvas/Port'
 import { Icon } from './Icon'
@@ -34,6 +34,16 @@ const SLOT: Record<Kind, { x: number; w: number }> = {
   inspiration: { x: 504, w: 576 },
   assets: { x: 1152, w: 432 },
   text: { x: 0, w: 480 }
+}
+// the tools under the Orchestrator bar; their actions come from the board
+const TOOL_IDS = ['group', 'links', 'inspiration', 'assets', 'text', 'interpret'] as const
+const TOOL_META: Record<(typeof TOOL_IDS)[number], { label: string; icon: string }> = {
+  group: { label: 'Research group', icon: 'layout-grid-line' },
+  links: { label: 'Reference links window', icon: 'global-line' },
+  inspiration: { label: 'Inspiration window', icon: 'image-line' },
+  assets: { label: 'Usable assets window', icon: 'box-3-line' },
+  text: { label: 'Text window', icon: 'file-text-line' },
+  interpret: { label: 'Interpret box', icon: 'pen-nib-line' }
 }
 const SHOW_TAGS_FROM = 8 // sites in the library before the tag filter earns its place
 
@@ -84,12 +94,6 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
     setInterpreting(null)
   }
 
-  if (!data) return <div className="bg-dots h-full" />
-  const links = data.references.filter((r) => r.kind === 'link')
-  const groups: Group[] = [null, ...data.groups.others]
-  const defaultName = data.groups.default ?? `${frame.name} research`
-  const nameOf = (g: Group): string => g ?? defaultName
-  const kindsOf = (g: Group): Kind[] => (g && data.groups.kinds[g]) || FULL
   const windowId = (g: Group, k: Kind): string => `w-${g ?? ''}-${k}`
   type At = { x: number; y: number } | undefined
   /** A new full group, or with `kind` a single window, where you right-clicked. */
@@ -118,6 +122,33 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
         ]
       })
     })
+  // the same choices as the right-click menu, as tools under the Orchestrator bar, offered while
+  // this board is open (not in the book's small previews); none of them needs the loaded data
+  useToolbar(
+    TOOL_IDS.map((id) => ({
+      ...TOOL_META[id],
+      id,
+      run: () =>
+        id === 'group'
+          ? create('New research group', undefined)
+          : id === 'interpret'
+            ? newBox(undefined)
+            : create(LABEL[id], undefined, id)
+    })),
+    !frame.preview
+  )
+
+  if (!data) return <div className="bg-dots h-full" />
+  const links = data.references.filter((r) => r.kind === 'link')
+  // the project's own group stays off the board until something is filed in it, so a new
+  // board opens with just the library, the Interpret box and research.md
+  const defaultUsed = data.references.some((r) => (r.group ?? null) === null)
+  const groups: Group[] = [...(defaultUsed ? [null] : []), ...data.groups.others]
+  // groups an Interpret box can read, the empty default one included
+  const readable: Group[] = [null, ...data.groups.others]
+  const defaultName = data.groups.default ?? `${frame.name} research`
+  const nameOf = (g: Group): string => g ?? defaultName
+  const kindsOf = (g: Group): Kind[] => (g && data.groups.kinds[g]) || FULL
   const addItems = (at?: At): MenuItem[] => [
     { label: 'New research group', run: () => create('New research group', at) },
     { label: '', separator: true },
@@ -128,22 +159,6 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
     { label: '', separator: true },
     { label: 'New Interpret box', run: () => newBox(at) }
   ]
-  /** A text window's button: its words, through an Interpret box of their own. */
-  const interpretText = async (group: string, text: string): Promise<void> => {
-    await run(async () => {
-      await window.api.saveText(project, group, text)
-      const fresh = await window.api.loadResearch(project)
-      let id = fresh.boxes.find((b) => b.groups.length === 1 && b.groups[0] === group)?.id
-      if (!id) {
-        const boxes = await window.api.addBox(project)
-        id = boxes[boxes.length - 1].id
-        await window.api.connectBox(project, id, group, true)
-      }
-      setInterpreting(id)
-      await window.api.interpret(project, id)
-    })
-    setInterpreting(null)
-  }
   const hosts = new Set(data.sites.map((s) => host(s.url)))
   /** Right-click or the "Group" button on a reference: where else it can be filed. */
   const moveMenu = (r: Reference): void => {
@@ -208,13 +223,6 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
                   ])
         }))}
       addMenu={(at) => addItems(at)}
-      anchored={
-        <NewCard
-          title="New asset"
-          hint="A group, a window or an Interpret box."
-          onClick={() => void popMenu(addItems())}
-        />
-      }
       top={
         error && (
           <p
@@ -243,9 +251,7 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
               ) : k === 'text' ? (
                 <TextWindow
                   value={refs.text[0]?.note ?? ''}
-                  busy={interpreting !== null}
                   onSave={(text) => run(() => window.api.saveText(project, g!, text))}
-                  onInterpret={(text) => void interpretText(g!, text)}
                 />
               ) : (
                 <Tiles
@@ -317,7 +323,7 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
             body: (
               <InterpretBoxBody
                 port={`box-${b.id}`}
-                groups={groups.map((g) => ({
+                groups={readable.map((g) => ({
                   key: g ?? '',
                   name: nameOf(g),
                   count: data.references.filter((r) => (r.group ?? null) === g).length
@@ -351,43 +357,39 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
           x: -1640,
           y: 0,
           w: 1490, // two columns of 720px pictures, the size they're captured at
-          body: <Sites sites={data.sites} onAdd={(site) => run(() => window.api.addSite(site))} />
+          body: (
+            <Sites
+              sites={data.sites}
+              onAdd={(site) => run(() => window.api.addSite(site))}
+              onRemove={(url) => run(() => window.api.removeSite(url))}
+            />
+          )
         }
       ]}
     />
   )
 }
 
-/** A window of the user's own words, read by Interpret like any other reference. */
+/** A window of the user's own words, read by Interpret like any other reference: wire it to an
+ * Interpret box from the dot on its right. */
 function TextWindow({
   value,
-  busy,
-  onSave,
-  onInterpret
+  onSave
 }: {
   value: string
-  busy: boolean
   onSave: (text: string) => Promise<boolean>
-  onInterpret: (text: string) => void
 }): React.JSX.Element {
   const [text, setText] = useState(value)
   return (
-    <div className="flex flex-col gap-3 p-4">
+    <div className="p-4">
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => text.trim() !== value.trim() && void onSave(text)}
         placeholder="Describe what you're after: a mood, a reference, how it should feel."
         aria-label="Your own words"
-        className="field-sizing-content min-h-40 w-full resize-none border border-card-line bg-transparent p-3 type-body-m text-link outline-none placeholder:text-placeholder focus:border-brand"
+        className="field-sizing-content min-h-40 w-full resize-none border border-card-line bg-transparent p-3 type-body-m text-link outline-none placeholder:text-placeholder focus:border-focus"
       />
-      <button
-        onClick={() => onInterpret(text)}
-        disabled={busy || !text.trim()}
-        className={`${solidButton} self-end`}
-      >
-        {busy ? 'Interpreting…' : 'Interpret'}
-      </button>
     </div>
   )
 }
@@ -611,11 +613,30 @@ function Remove({ onRemove }: { onRemove: () => void }): React.JSX.Element {
  * your own can be added. */
 function Sites({
   sites,
-  onAdd
+  onAdd,
+  onRemove
 }: {
   sites: ResearchState['sites']
   onAdd: (site: { name: string; url: string; about: string; tags: string[] }) => Promise<boolean>
+  onRemove: (url: string) => Promise<boolean>
 }): React.JSX.Element {
+  // the × on a site: kept inside the link's box, so it must not follow the link
+  const remove = (e: React.MouseEvent, s: { name: string; url: string }): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (confirm(`Remove ${s.name} from the reference library?`)) void onRemove(s.url)
+  }
+  const removeButton = (s: { name: string; url: string }, size: number): React.ReactNode => (
+    <button
+      type="button"
+      onClick={(e) => remove(e, s)}
+      aria-label={`Remove ${s.name} from the library`}
+      title="Remove from the library"
+      className="flex size-7 shrink-0 items-center justify-center rounded-full text-dim opacity-0 group-hover:opacity-100 hover:bg-[var(--color-glass-fill-strong)] hover:text-danger-fg focus-visible:opacity-100"
+    >
+      <Icon name="close-line" size={size} />
+    </button>
+  )
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [tagText, setTagText] = useState('')
   const allTags = [...new Set(sites.flatMap((s) => s.tags ?? []))].sort()
@@ -705,6 +726,7 @@ function Sites({
               size={14}
               className="shrink-0 text-link/40 group-hover:text-link"
             />
+            {removeButton(s, 13)}
           </a>
         ) : (
           <a
@@ -737,6 +759,7 @@ function Sites({
                   size={16}
                   className="shrink-0 text-link/50 group-hover:text-link"
                 />
+                {removeButton(s, 14)}
               </span>
               <span className="truncate font-mono text-[11px] text-dim">
                 {s.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
@@ -916,6 +939,13 @@ function NoteField({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
         if (draft.trim() !== value) void onSave(draft)
+      }}
+      // Enter locks the note in; Shift+Enter starts a new line
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+          e.preventDefault()
+          e.currentTarget.blur()
+        }
       }}
       placeholder="What do you like about it?"
       aria-label="What I like about it"

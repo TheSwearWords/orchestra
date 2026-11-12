@@ -176,6 +176,8 @@ export interface ConductorOptions {
   projectDir: (project: string) => string
   library: () => Promise<{ musicians: Musician[]; instruments: Instrument[] }>
   selected: (projectDir: string) => Promise<string[]>
+  /** The chosen deliverables the user has locked in. Left out, every chosen one counts. */
+  locked?: (projectDir: string) => Promise<string[]>
   orchestratorModel: () => Promise<string>
   /** Instructions for a chat's Orchestrator: library prompt, house rules, project and chat. */
   orchestratorPrompt: (project: string, chat: string) => Promise<string>
@@ -449,6 +451,12 @@ export class Conductor implements Hub {
       throw new Error(
         `${musician} isn't one of this project's chosen deliverables. You can brief: ${allowed.map((x) => x.id).join(', ') || 'none yet'}. To add one, suggest it to the user.`
       )
+    // a deliverable waits for the user: added, it sits on the board until they lock it in
+    const locked = this.opts.locked && (await this.opts.locked(this.opts.projectDir(project)))
+    if (locked && !locked.includes(musician))
+      throw new Error(
+        `The ${m.name} deliverable isn't locked in yet. Tell the user it's on the Create board and wait for them to lock it in; don't brief it or ask its questions before then.`
+      )
     // its prerequisites have to exist first; making those is the one thing it can be briefed on
     const missing = await this.missingFoundations(project, musician)
     if (missing.length && foundation !== missing[0].id)
@@ -663,7 +671,7 @@ export class Conductor implements Hub {
         chat,
         o,
         approve
-          ? `[The user approved the ${p.draft.name} Musician (${p.draft.id}). It's saved to the library and added to this project's deliverables, so you can brief it now.]`
+          ? `[The user approved the ${p.draft.name} Musician (${p.draft.id}). It's saved to the library and added to this project's deliverables. It waits there until the user locks it in on the Create board: tell them it's ready to lock in, and don't brief it or ask its questions until they have.]`
           : `[The user declined the ${p.draft.name} Musician. Ask what they'd like instead if it isn't clear.]`
       )
       return

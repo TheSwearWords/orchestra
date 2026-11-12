@@ -87,6 +87,7 @@ export interface CreateState {
   musicians: Musician[]
   instruments: Instrument[]
   selected: string[] // deliverable (Musician) ids saved in deliverables.md
+  locked: string[] // the ones the user has locked in; only these can be briefed
 }
 
 const api = {
@@ -181,8 +182,11 @@ const api = {
     ipcRenderer.invoke('research:connectBox', project, id, group, on),
   readUsage: (): Promise<{ at: number; windows: Usage } | null> => ipcRenderer.invoke('usage:read'),
   addSite: (site: Site): Promise<Site[]> => ipcRenderer.invoke('sites:add', site),
+  removeSite: (url: string): Promise<Site[]> => ipcRenderer.invoke('sites:remove', url),
 
   loadCreate: (project: string): Promise<CreateState> => ipcRenderer.invoke('create:load', project),
+  lockDeliverables: (project: string, ids: string[]): Promise<string[]> =>
+    ipcRenderer.invoke('create:lock', project, ids),
   listAsks: (project: string): Promise<Record<string, Ask>> =>
     ipcRenderer.invoke('asks:list', project),
   answerAsk: (project: string, id: string, text: string, final: boolean): Promise<void> =>

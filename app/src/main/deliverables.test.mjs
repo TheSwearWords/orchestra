@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { readSelection, saveSelection } from './deliverables.ts'
+import { lockDeliverables, readLocked, readSelection, saveSelection } from './deliverables.ts'
 import { foundationOrder } from './plan.ts'
 
 const inst = (id, needs = []) => ({ id, name: id.toUpperCase(), needs, output: `prereqs/${id}.md` })
@@ -52,6 +52,22 @@ test('selection saves to deliverables.md and reads back', async () => {
     await assert.rejects(saveSelection(dir, lib, ['../escape']), /Unknown deliverable/)
     assert.deepEqual(await saveSelection(dir, lib, []), [])
     assert.deepEqual(await readSelection(dir), [])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('lock-in only adds, only chosen deliverables, and survives a new selection', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'orchestra-locked-'))
+  try {
+    await saveSelection(dir, lib, ['kit', 'site'])
+    assert.deepEqual(await readLocked(dir), [])
+    assert.deepEqual(await lockDeliverables(dir, lib, ['kit', 'nope']), ['kit'])
+    assert.deepEqual(await lockDeliverables(dir, lib, ['site']), ['kit', 'site'])
+    await saveSelection(dir, lib, ['site'])
+    assert.deepEqual(await readLocked(dir), ['site'])
+    await saveSelection(dir, lib, ['kit', 'site'])
+    assert.deepEqual(await readLocked(dir), ['site'])
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

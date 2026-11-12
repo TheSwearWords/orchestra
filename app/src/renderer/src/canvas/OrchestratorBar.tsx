@@ -45,7 +45,7 @@ const MODES = [
 
 const BAR_H = 58
 const METER_H = 24 // the usage meter under the field
-const TOOLS_H = 52 // the row of tools under the bar, when the open area offers some
+const TOOLS_H = 46 // the tools' notch on top of the bar
 const CHAT_H = 'min(76vh, 840px)' // the opened conversation
 const METERS = [
   ['five_hour', '5-hour'],
@@ -126,9 +126,11 @@ export function OrchestratorBar({
     return () => clearInterval(timer)
   }, [])
   const [error, setError] = useState('')
-  // the open area's tools sit under the meter, so everything above them rises by their height
+  // the open area's tools sit just above the text box; whatever opens above the bar clears them.
+  // An open conversation takes their place.
   const tools = useTools()
-  const STACK = BAR_H + METER_H + (tools.length ? TOOLS_H : 0)
+  const showTools = tools.length > 0 && !open
+  const STACK = BAR_H + METER_H + (showTools ? TOOLS_H : 0)
   // the face follows what the bar is doing; the session dock reports the agents' side
   const face = useFaceState()
   useEffect(
@@ -512,6 +514,46 @@ export function OrchestratorBar({
           </section>
         )}
 
+        {showTools && (
+          // what this area can add, as in Figma's toolbar: one button per kind of window, just
+          // above the text box
+          <div
+            role="toolbar"
+            aria-label="Add to the board"
+            className="absolute inset-x-0 z-10 flex justify-center"
+            // 1px down, so the notch covers the bar's top edge and the two read as one shape
+            style={{ bottom: BAR_H + METER_H - 1, height: TOOLS_H }}
+          >
+            <div
+              className="notch-up relative z-10 flex items-center gap-0.5 px-2 pt-1.5 pb-1"
+              // the bar's own fill and outline, so the notch grows out of it
+              style={
+                {
+                  '--notch-fill': 'var(--color-chip-bg)',
+                  '--notch-line': 'var(--color-chip-border)'
+                } as React.CSSProperties
+              }
+            >
+              {tools.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={t.run}
+                  aria-label={`New ${t.label.toLowerCase()}`}
+                  className="group/tool relative flex size-9 items-center justify-center rounded-full text-dim hover:bg-selected hover:text-fg"
+                >
+                  <Icon name={t.icon} size={17} />
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute bottom-full mb-2 rounded-md border border-chip-line bg-chip px-2 py-1 type-label-s whitespace-nowrap text-link opacity-0 shadow-float transition-opacity duration-150 group-hover/tool:opacity-100 group-focus-visible/tool:opacity-100"
+                  >
+                    {t.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {!open && working && (
           <div className="absolute inset-x-0" style={{ bottom: STACK }}>
             {working}
@@ -676,35 +718,6 @@ export function OrchestratorBar({
             <span className="text-dim">Your Claude plan usage shows after your next message</span>
           )}
         </div>
-        {tools.length > 0 && (
-          // what this area can add, as in Figma's toolbar: one button per kind of window
-          <div
-            role="toolbar"
-            aria-label="Add to the board"
-            className="flex justify-center"
-            style={{ height: TOOLS_H }}
-          >
-            <div className="glass mt-2 flex items-center gap-0.5 rounded-full border border-chip-line bg-chip p-1">
-              {tools.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={t.run}
-                  aria-label={`New ${t.label.toLowerCase()}`}
-                  className="group/tool relative flex size-9 items-center justify-center rounded-full text-dim hover:bg-selected hover:text-fg"
-                >
-                  <Icon name={t.icon} size={17} />
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none absolute bottom-full mb-2 rounded-md border border-chip-line bg-chip px-2 py-1 type-label-s whitespace-nowrap text-link opacity-0 shadow-float transition-opacity duration-150 group-hover/tool:opacity-100 group-focus-visible/tool:opacity-100"
-                  >
-                    {t.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         {error && (
           <p
             role="alert"

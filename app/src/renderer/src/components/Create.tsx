@@ -13,7 +13,7 @@ import type {
   MachineCheck
 } from '../../../preload'
 import { foundationOrder } from '../../../main/plan'
-import { NewCard } from '../canvas/Chrome'
+import { useToolbar } from '../canvas/toolbar'
 import { Board, type CardSpec } from '../canvas/Board'
 import { Wire } from '../canvas/Wire'
 import type { Frame } from '../canvas/Book'
@@ -202,6 +202,47 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     })
   }, [project, plan?.selected])
 
+  // what can be added, as tools above the Orchestrator bar. New deliverables and prerequisites
+  // are agents, so those tools start a request to the Orchestrator, which proposes them for
+  // approval. The tools re-register as deliverables are
+  // locked in, so the Instrument tool always offers the current ones
+  const lockedNow = plan ? plan.locked.filter((id) => plan.selected.includes(id)) : []
+  useToolbar(
+    [
+      {
+        id: 'deliverable',
+        label: 'Deliverable',
+        icon: 'box-3-line',
+        run: () =>
+          dispatchEvent(new CustomEvent('orchestra:ask', { detail: 'I need a new deliverable: ' }))
+      },
+      {
+        id: 'prerequisite',
+        label: 'Prerequisite',
+        icon: 'file-text-line',
+        run: () =>
+          dispatchEvent(new CustomEvent('orchestra:ask', { detail: 'I need a new prerequisite: ' }))
+      },
+      {
+        id: 'instrument',
+        label: 'Instrument',
+        icon: 'pencil-ruler-2-line',
+        run: () => {
+          void popMenu(
+            lockedNow.length
+              ? lockedNow.map((d) => ({
+                  label: `New Instrument for ${plan?.musicians.find((m) => m.id === d)?.name ?? d}`,
+                  run: () => void addInstrument(d)
+                }))
+              : [{ label: 'Lock in your deliverables to add Instruments' }]
+          )
+        }
+      }
+    ],
+    !!plan && !frame.preview,
+    lockedNow.join(',')
+  )
+
   if (!plan) return <div className="bg-dots h-full" />
 
   /** Locks in what's on and not yet locked. It only ever adds: nothing locked in comes back out. */
@@ -354,10 +395,6 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
 
   const needsResearch =
     !frame.preview && outputsRead && !outputs.some((o) => /^research(\.md$|\/.*\.md$)/.test(o.path))
-  // new deliverables and prerequisites are agents, so the Orchestrator proposes them for approval
-  const ask = (text: string) => (): void => {
-    dispatchEvent(new CustomEvent('orchestra:ask', { detail: text }))
-  }
   /** The end of an agent's right-click menu: which model it runs on. */
   function modelItems(
     role: 'musician' | 'instrument',
@@ -378,19 +415,6 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       }))
     ]
   }
-  const newItems: MenuItem[] = [
-    { label: 'New deliverable', run: ask('I need a new deliverable: ') },
-    { label: 'New prerequisite', run: ask('I need a new prerequisite: ') },
-    ...(confirmed && spawned.length
-      ? [
-          { label: '', separator: true },
-          ...spawned.map((d) => ({
-            label: `New Instrument for ${musician(d)!.name}`,
-            run: () => void addInstrument(d)
-          }))
-        ]
-      : [])
-  ]
 
   // the markdown files this project has made or is making, shown on the board to read
   const docs = [
@@ -442,6 +466,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     const file = f && outputs.find((o) => outputPaths(f.output).includes(o.path))
     if (file) void window.api.openOutput(project, file.path).catch(() => {})
   }
+  // the board's event listener above calls the latest of these; it is only read in that handler
+  // eslint-disable-next-line react-hooks/refs -- written here because the listener's effect sits above the early return
   openDoc.current = openPrereq
 
   // every chosen seat wires across to each foundation it needs, and those on to Lock in
@@ -1069,11 +1095,6 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       anchored={
         !needsResearch && (
           <>
-            <NewCard
-              title="New asset"
-              hint="A deliverable, a prerequisite or an Instrument."
-              onClick={() => void popMenu(newItems)}
-            />
             {layers.length > 0 && (
               <Layers
                 layers={layers}

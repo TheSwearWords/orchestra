@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { MachineCheck, Setup as SetupData } from '../../../preload'
 import { PROVIDERS, type ProviderId } from '../../../main/providers'
 import { ACCOUNTS, GITHUB, GRAPHIFY, RECIPES, type SetupStep } from '../../../main/recipes'
-import { Ascii } from '../components/Ascii'
 import { Board, type CardSpec } from './Board'
 import { Port } from './Port'
 import { barButton } from './Chrome'
@@ -746,7 +745,6 @@ export function Setup({ onDone }: { onDone: () => void }): React.JSX.Element {
             aria-labelledby="welcome-title"
             className="flex w-full max-w-[640px] flex-col gap-5 border border-chip-line bg-card p-10 text-link shadow-lift animate-[rise-in_240ms_var(--ease)_both]"
           >
-            <Ascii name="violin" fit="contain" className="relative h-52 w-full text-brand" />
             <h1 id="welcome-title" className="type-display-l">
               Welcome to Orchestra.
             </h1>

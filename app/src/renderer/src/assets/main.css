@@ -184,24 +184,6 @@ body {
   outline-offset: 4px;
 }
 
-/* a window an agent is working on: each column of the waveform rises and falls, in whole blocks
-   (these insets land in the gaps between the 4px blocks of the 22px-tall column) */
-@keyframes working-wave {
-  0%,
-  100% {
-    clip-path: inset(82% 0 0 0);
-  }
-  25% {
-    clip-path: inset(55% 0 0 0);
-  }
-  50% {
-    clip-path: inset(0 0 0 0);
-  }
-  75% {
-    clip-path: inset(27% 0 0 0);
-  }
-}
-
 /* the Orchestrator's working label: three squares lighting in turn */
 @keyframes working {
   0%,
@@ -349,4 +331,18 @@ body {
 .seat-on {
   background-color: var(--color-poster-bg);
   color: var(--color-text-on-brand);
+}
+
+/* A group on a board: a tinted box with its name on a label floating just above it. The label is
+   a rounded rectangle in the box's own colour, so the two read as a pair. */
+.group-frame {
+  border: 1px solid var(--color-group-line, rgba(5, 56, 255, 0.4));
+  border-radius: 12px;
+  background-color: var(--color-group-fill, rgba(5, 56, 255, 0.06));
+}
+.group-tab {
+  border: 1px solid var(--color-group-line, rgba(5, 56, 255, 0.4));
+  border-radius: 8px;
+  background-color: var(--color-group-fill, rgba(5, 56, 255, 0.06));
+  color: var(--color-text-primary);
 }

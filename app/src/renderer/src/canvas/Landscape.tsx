@@ -8,7 +8,7 @@ import coast from '../assets/landscapes/coast.png'
 
 // The plates are 720 × 450 with the blur baked in (a 28px CSS blur over the whole window was
 // costly), so they are soft at any size.
-const PLATES = { sunset, alpine, desert, hills, coast }
+export const PLATES = { sunset, alpine, desert, hills, coast }
 
 /** Put it first inside a wrapper with the class `on-landscape`; the board above goes clear. */
 export function Landscape({ name }: { name: keyof typeof PLATES }): React.JSX.Element {

@@ -101,21 +101,36 @@ export function SessionDock({
     lastFinished.current = finished
     signal({ working: playing, needs: needs.length, ...(more ? { doneAt: Date.now() } : {}) })
   }, [playing, needs.length, finished])
+  // The dock grows to fit every agent. When there are more than the screen has room for, the
+  // dots shrink (and, open, the rows drop their second line) before the list ever scrolls.
+  const [vh, setVh] = useState(innerHeight)
+  useEffect(() => {
+    const size = (): void => setVh(innerHeight)
+    addEventListener('resize', size)
+    return () => removeEventListener('resize', size)
+  }, [])
+  const room = (vh - 340 - 24) / Math.max(agents.length, 1) // pixels per agent
+  const pitch = Math.min(open ? 36 : 18, Math.max(open ? 16 : 8, room))
+  const compact = open && pitch < 30
+  const dot = open && !compact ? 8 : Math.min(8, Math.max(4, Math.round(pitch * 0.42)))
+  const gap = open ? (compact ? Math.max(2, pitch - 16) : 8) : Math.max(2, pitch - dot)
   const conducting = playing ? `Conducting · ${playing} playing` : 'Nothing playing'
   return (
     <div ref={root} className="absolute right-0 z-30" style={{ top: 104 }}>
       <div
-        className={`notch-right glass relative transition-[width] duration-300 ease-(--ease) ${
-          open ? 'w-[190px] shadow-float' : 'w-9'
+        // anywhere on the notch opens and closes it; the button inside carries the keyboard
+        // and screen-reader side, and its click bubbles up to here
+        onClick={(e) => e.detail < 2 && setOpen(!open)} // a double-click on an agent is not a toggle
+        className={`notch-right glass relative cursor-pointer transition-[width] duration-300 ease-(--ease) ${
+          open ? 'w-[190px] shadow-float' : 'w-10'
         }`}
       >
         <button
-          onClick={() => setOpen(!open)}
           aria-expanded={open}
           aria-label={`Agents in this session. ${conducting}`}
-          className="flex w-full items-center gap-2.5 px-[7px] pt-2.5 pb-2 text-left"
+          className={`flex w-full items-center gap-2.5 pt-3 pb-2 text-left ${open ? 'px-3.5' : 'justify-center'}`}
         >
-          <OrchestratorFace size={22} state={face} />
+          <OrchestratorFace size={15} state={face} />
           {open && (
             <span className="min-w-0">
               <span className="block truncate type-body-s font-medium text-fg">Orchestrator</span>
@@ -124,12 +139,12 @@ export function SessionDock({
           )}
         </button>
         {agents.length > 0 && (
-          // shortcut: a long list scrolls inside the dock so it never reaches the edge tab
-          // below it; upgrade to a "+N" row when projects carry more agents than fit
+          // shortcut: the dock grows to fit every agent and only scrolls when the list would reach the minimap; upgrade to a "+N" row when projects carry more agents than fit
           <ul
-            className={`flex max-h-[calc(50vh-230px)] flex-col overflow-y-auto pb-3 [scrollbar-width:none] ${
-              open ? 'gap-2.5 border-t border-hair px-3 pt-3' : 'items-center gap-3.5 pt-1'
+            className={`flex max-h-[calc(100vh-340px)] flex-col overflow-y-auto pb-3.5 [scrollbar-width:none] ${
+              open ? 'border-t border-hair px-3.5 pt-3' : 'items-center pt-1'
             }`}
+            style={{ gap }}
           >
             {agents.map((a) => (
               <li
@@ -141,14 +156,27 @@ export function SessionDock({
                   setHover({ agent: a, y: r.top + r.height / 2 - top })
                 }}
                 onMouseLeave={() => setHover(null)}
+                onDoubleClick={(e) => {
+                  // snap the board to this agent; the first click of the pair already toggled
+                  // the dock, so put it back
+                  e.stopPropagation()
+                  setOpen(open)
+                  if (project) onOpen(project.id, `chat-${a.id}`)
+                }}
               >
-                <span
-                  className={`size-3 shrink-0 rounded-full transition-colors duration-1000 ease-(--ease-calm) ${DOT[a.status]}`}
-                />
+                {/* the dot sits in a slot as wide as the Orchestrator's orb, so their centres line up */}
+                <span className="flex w-[15px] shrink-0 justify-center">
+                  <span
+                    className={`shrink-0 rounded-full transition-colors duration-1000 ease-(--ease-calm) ${DOT[a.status]}`}
+                    style={{ width: dot, height: dot }}
+                  />
+                </span>
                 {open && (
                   <span className="min-w-0">
                     <span className="block truncate type-body-s font-medium text-fg">{a.name}</span>
-                    <span className="block truncate type-caption text-dim">{line(a)}</span>
+                    {!compact && (
+                      <span className="block truncate type-caption text-dim">{line(a)}</span>
+                    )}
                   </span>
                 )}
               </li>

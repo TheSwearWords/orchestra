@@ -1,7 +1,6 @@
 // What the canvas components share: constants, types and small pure helpers.
 import { createContext } from 'react'
 import type { Cover, Project, Role, StudioLayout } from '../../../preload'
-import type { AsciiName } from '../components/Ascii'
 import { fit, type Camera, type Rect } from './camera'
 
 export const reducedMotion = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -19,18 +18,19 @@ export const AREAS: { id: Area; numeral: string; name: string }[] = [
 export const COVER = { w: 300, h: 400 }
 
 export type CoverColor = 'blue' | 'white' | 'ink'
-export const ART: AsciiName[] = ['apollo', 'violin', 'hand', 'concert']
 
 function hash(s: string): number {
   let h = 0
   for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0
   return Math.abs(h)
 }
-// shortcut: colour and art are picked from the id until project.json holds the Auto/manual
+// shortcut: colour is picked from the id until project.json holds the Auto/manual
 // cover settings (canvas spec §2.3); upgrade when the cover editor gets its Cover settings.
 export const coverColor = (id: string): CoverColor =>
   (['blue', 'ink', 'white'] as const)[hash(id) % 3]
-export const coverArt = (id: string): AsciiName => ART[hash(id + 'art') % ART.length]
+/** Which landscape plate a cover borrows its light from: the same one every time. */
+export const coverLandscape = (id: string): 'sunset' | 'alpine' | 'desert' | 'hills' | 'coast' =>
+  (['sunset', 'alpine', 'desert', 'hills', 'coast'] as const)[hash(id + 'land') % 5]
 /** A slight tilt, ±4°, the same every time for the same project. */
 export const coverTilt = (id: string): number => ((hash(id + 'tilt') % 81) - 40) / 10
 

@@ -41,7 +41,7 @@ export function GroupLabel({
   }
   return (
     <div
-      className="pointer-events-auto absolute bottom-full left-0 origin-bottom-left pb-1"
+      className="pointer-events-auto absolute bottom-full left-0 origin-bottom-left pb-2"
       style={{ transform: `scale(${1 / z})` }}
     >
       {editing ? (
@@ -66,7 +66,7 @@ export function GroupLabel({
           title={
             onRename ? 'Drag to move the group. Double-click to rename.' : 'Drag to move the group.'
           }
-          className={`block rounded-full bg-inverse px-3 py-1 type-label-s whitespace-nowrap text-inverse ${onDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          className={`group-tab block px-3 py-1 type-label-s whitespace-nowrap ${onDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
         >
           {name}
         </span>

@@ -48,6 +48,8 @@ import { splitDecision, waitingOnUser, type Decision } from '../decide'
 import { splitSuggestion } from '../suggest'
 import { OpenQuestion } from './OpenQuestion'
 import { splitGoTo, type Place } from '../goto'
+import { OrchestratorFace } from '../canvas/OrchestratorFace'
+import type { FaceState } from '../canvas/faceState'
 import { Icon } from './Icon'
 import { DeliverableEditor } from './DeliverableEditor'
 import { DocWindow } from './DocWindow'
@@ -122,6 +124,23 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, per screen
   }, [frame.preview])
   const [hiddenLayers, setHiddenLayers] = useState(() => remembered(`hidden:${project}`))
+  // Where you have moved the Deliverables stage and the Research group to, per project, and the
+  // move in progress while a label is being dragged
+  const [groupOff, setGroupOff] = useState(() => loadGroupOff(project))
+  const [groupDrag, setGroupDrag] = useState<{
+    g: 'stage' | 'research'
+    dx: number
+    dy: number
+  } | null>(null)
+  function dropGroup(g: 'stage' | 'research', dx: number, dy: number): void {
+    setGroupDrag(null)
+    const snapTo = (v: number): number => Math.round(v / 24) * 24
+    setGroupOff((all) => {
+      const next = { ...all, [g]: { x: snapTo(all[g].x + dx), y: snapTo(all[g].y + dy) } }
+      saveGroupOff(project, next)
+      return next
+    })
+  }
   function hideLayers(ids: string[]): void {
     setHiddenLayers(ids)
     remember(`hidden:${project}`, ids)
@@ -292,6 +311,22 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   const deliverablesRight = PREREQ.x + PREREQ.w / 2 + 56
   const deliverablesGroup = { ...stageGroup, w: deliverablesRight - stageLeft }
   const windowsY = stageGroup.y + stageGroup.h + 160
+  // the stage and the research can each be moved; everything that hangs off them moves with them
+  const moveOf = (g: 'stage' | 'research'): { x: number; y: number } => ({
+    x: groupOff[g].x + (groupDrag?.g === g ? groupDrag.dx : 0),
+    y: groupOff[g].y + (groupDrag?.g === g ? groupDrag.dy : 0)
+  })
+  const so = moveOf('stage')
+  const ro = moveOf('research')
+  const shifted = <T extends { x: number; y: number; bottom?: number }>(
+    c: T,
+    o: { x: number; y: number }
+  ): T => ({
+    ...c,
+    x: c.x + o.x,
+    y: c.y + o.y,
+    ...(c.bottom === undefined ? {} : { bottom: c.bottom + o.y })
+  })
   const spot = new Map(foundations.map((f, i) => [f.id, spots[i]]))
   // one that names no file can't be checked, so it never holds anything up (same in the conductor)
   const exists = (output: string): boolean => {
@@ -437,9 +472,9 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         ])
   ]
 
-  const extent = stageGroup
+  const extent = { ...stageGroup, x: stageGroup.x + so.x, y: stageGroup.y + so.y }
   // what the windows must keep clear of
-  const obstacles = [stageGroup]
+  const obstacles = [extent]
   const ready = chosen.length > 0
   /** What a deliverable's connections look like right now, for its seat. */
   const connection = (m: Musician): { text: string; bad: boolean } => {
@@ -462,7 +497,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   }
 
   const world = (
-    <>
+    <div className="absolute top-0 left-0" style={{ transform: `translate(${so.x}px, ${so.y}px)` }}>
       <svg
         aria-hidden
         className="pointer-events-none absolute overflow-visible"
@@ -649,7 +684,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           onSaved={() => setEditing(null)}
         />
       )}
-    </>
+    </div>
   )
 
   // once confirmed: the Orchestrator's window under the circle, every deliverable's window
@@ -703,7 +738,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           id: 'orchestrator',
           kind: 'orchestrator' as const,
           auto: true,
-          pin: true, // straight below Lock in
+          // starts straight below Lock in; you can move it, and its windows follow
           title: 'Orchestrator',
           count: chats.find((c) => c.id === GENERAL)?.busy ? 'thinking' : undefined,
           working: !!chats.find((c) => c.id === GENERAL)?.busy,
@@ -813,6 +848,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           title: musician(id)!.name,
           count: chats.find((c) => c.id === id)?.busy ? 'playing' : undefined,
           working: !!chats.find((c) => c.id === id)?.busy || agents[id]?.status === 'working',
+          agent:
+            agents[id]?.status === 'working'
+              ? ('working' as const)
+              : chats.find((c) => c.id === id)?.busy
+                ? ('thinking' as const)
+                : agents[id]?.status === 'error'
+                  ? ('error' as const)
+                  : undefined,
           x: windowX(i, spawned.length),
           y: windowsY + 960,
           w: WINDOW_W,
@@ -851,6 +894,12 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               title: inst?.name ?? iid,
               count: state ? STATUS[state.status].label : undefined,
               working: state?.status === 'working',
+              agent:
+                state?.status === 'done'
+                  ? ('done' as const)
+                  : state?.status === 'error'
+                    ? ('error' as const)
+                    : undefined,
               ...(dropped[card] ?? {
                 x: windowX(i, spawned.length) + (j % 2) * (INST_W + 24),
                 y: windowsY + 1800 + Math.floor(j / 2) * 300
@@ -949,7 +998,12 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       onClose: () => setOpenDocs((o) => o.filter((x) => x !== d.id)),
       body: <DocWindow project={project} path={d.path} stamp={d.stamp} />
     }))
-  const cards = [...researchCards, ...openedDocs, ...work]
+  const cards = [
+    // the research rides along with the stage, and its own move comes on top of that
+    ...researchCards.map((c) => shifted(c, { x: so.x + ro.x, y: so.y + ro.y })),
+    ...openedDocs.map((c) => shifted(c, so)),
+    ...work.map((c) => shifted(c, so))
+  ]
   const byId = new Map(cards.map((c) => [c.id, c]))
   const ownerOf = (id: string): string | undefined => {
     for (let c = byId.get(id); c; c = c.link ? byId.get(c.link) : undefined)
@@ -977,9 +1031,24 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       preview={frame.preview}
       world={world}
       worldRect={extent}
-      worldGroup={{ name: 'Deliverables', rect: deliverablesGroup }}
-      worldWire={confirmed ? { x: lockX, y: lockY + LOCK_R, to: 'orchestrator' } : undefined}
-      worldFeeds={{ x: lockX + LOCK_R, y: lockY, from: researchCards.map((c) => c.id) }}
+      worldGroup={{
+        name: 'Deliverables',
+        rect: {
+          ...deliverablesGroup,
+          x: deliverablesGroup.x + so.x,
+          y: deliverablesGroup.y + so.y
+        },
+        onDrag: (dx, dy) => setGroupDrag({ g: 'stage', dx, dy }),
+        onDrop: (dx, dy) => dropGroup('stage', dx, dy)
+      }}
+      worldWire={
+        confirmed ? { x: lockX + so.x, y: lockY + LOCK_R + so.y, to: 'orchestrator' } : undefined
+      }
+      worldFeeds={{
+        x: lockX + LOCK_R + so.x,
+        y: lockY + so.y,
+        from: researchCards.map((c) => c.id)
+      }}
       spawn={spawn}
       onSpawned={() => setSpawn(undefined)}
       obstacles={obstacles}
@@ -997,7 +1066,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               <Layers
                 layers={layers}
                 hidden={hiddenLayers}
-                top={TOP_BAR + 58}
+                top={TOP_BAR + 74}
                 onHidden={hideLayers}
                 onFly={setFocus}
               />
@@ -1050,7 +1119,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       }
       cards={cards}
       frames={[
-        { id: 'research', name: 'Research', fixed: true, members: researchCards.map((c) => c.id) },
+        {
+          id: 'research',
+          name: 'Research',
+          fixed: true,
+          members: researchCards.map((c) => c.id),
+          onDrag: (dx, dy) => setGroupDrag({ g: 'research', dx, dy }),
+          onDrop: (dx, dy) => dropGroup('research', dx, dy)
+        },
         ...layers.map((l) => ({
           id: `group:${l.id}`,
           name: l.name,
@@ -1062,6 +1138,16 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         .flatMap((l) => l.members.map((m) => m.id))}
     />
   )
+}
+
+type GroupOff = { stage: { x: number; y: number }; research: { x: number; y: number } }
+/** Where the Deliverables stage and the Research group were last left (stored as strings). */
+function loadGroupOff(project: string): GroupOff {
+  const n = remembered(`group-off:${project}`).map((v) => Number(v) || 0)
+  return { stage: { x: n[0] ?? 0, y: n[1] ?? 0 }, research: { x: n[2] ?? 0, y: n[3] ?? 0 } }
+}
+function saveGroupOff(project: string, o: GroupOff): void {
+  remember(`group-off:${project}`, [o.stage.x, o.stage.y, o.research.x, o.research.y].map(String))
 }
 
 // Per-viewer memory (whether the stage is confirmed); storage can be unavailable, so it is
@@ -1431,13 +1517,17 @@ export function ChatPanel({
 }
 
 /** The Orchestrator's mark, so its messages read as a person in the chat. */
-function Avatar({ size = 'md' }: { size?: 'sm' | 'md' }): React.JSX.Element {
+function Avatar({
+  size = 'md',
+  state = 'idle'
+}: {
+  size?: 'sm' | 'md'
+  state?: FaceState
+}): React.JSX.Element {
+  // the same glowing sphere as the bar and the window header
   return (
-    <span
-      aria-hidden
-      className={`flex shrink-0 items-center justify-center rounded-full bg-brand text-on-brand ${size === 'sm' ? 'size-5' : 'size-7'}`}
-    >
-      <Icon name="logo-mark" size={size === 'sm' ? 12 : 16} />
+    <span aria-hidden className="flex shrink-0 items-center justify-center">
+      <OrchestratorFace size={size === 'sm' ? 16 : 24} state={state} />
     </span>
   )
 }
@@ -1505,7 +1595,7 @@ function Conversation({
         if (m.role === 'user')
           return (
             <div key={i} className="flex flex-col items-end">
-              <p className="max-w-[80%] bg-subtle px-4 py-3 type-body-m whitespace-pre-wrap">
+              <p className="max-w-[80%] rounded-2xl rounded-br-md border border-hair bg-[var(--color-glass-fill-strong)] px-4 py-3 type-body-m whitespace-pre-wrap">
                 {m.text}
               </p>
               <span className="mt-1 type-caption text-fg-2">{time(m.t)}</span>
@@ -1583,7 +1673,7 @@ function Conversation({
         )
       })}
       {busy && (
-        <OrchestratorSays>
+        <OrchestratorSays live>
           {live ? (
             <Markdown
               text={splitDecision(splitSuggestion(live, known).body).body}
@@ -1600,10 +1690,18 @@ function Conversation({
 }
 
 /** The Orchestrator's turn: its mark on the left, the text flowing beside it, no bubble. */
-function OrchestratorSays({ t, children }: { t?: string; children: ReactNode }): React.JSX.Element {
+function OrchestratorSays({
+  t,
+  live,
+  children
+}: {
+  t?: string
+  live?: boolean // it is mid-reply: the sphere thinks
+  children: ReactNode
+}): React.JSX.Element {
   return (
     <div className="flex gap-3 pr-[10%]">
-      <Avatar />
+      <Avatar state={live ? 'thinking' : 'idle'} />
       <div className="min-w-0 flex-1">
         <div className="flex h-7 items-center gap-2">
           <span className="type-label-m">Orchestrator</span>
@@ -1849,8 +1947,8 @@ function Composer({
   }
 
   return (
-    <div className="shrink-0 bg-canvas pt-3 pb-6">
-      <div className="border border-fg-2/45 bg-canvas transition-colors duration-150 focus-within:border-fg-2">
+    <div className="shrink-0 pt-3 pb-5">
+      <div className="rounded-2xl border border-hair bg-[var(--color-glass-fill)] transition-colors duration-150 focus-within:border-[var(--color-accent)]">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -1878,7 +1976,7 @@ function Composer({
               onClick={onStop}
               aria-label="Stop"
               title="Stop what the agents are doing"
-              className="flex size-9 items-center justify-center bg-fg text-canvas transition-[background-color,scale] duration-150 hover:bg-fg-2 active:scale-[0.95]"
+              className="flex size-9 items-center justify-center rounded-full bg-inverse text-inverse transition-[background-color,scale] duration-150 hover:opacity-85 active:scale-[0.95]"
             >
               <Icon name="stop-fill" />
             </button>
@@ -1887,9 +1985,9 @@ function Composer({
               onClick={() => void submit()}
               disabled={!text.trim()}
               aria-label="Send"
-              className="flex size-9 items-center justify-center bg-brand text-on-brand transition-[background-color,scale] duration-150 hover:bg-brand-hover active:scale-[0.95] disabled:bg-muted disabled:text-fg-disabled"
+              className="flex size-9 items-center justify-center rounded-full bg-inverse text-inverse transition-[opacity,scale] duration-150 hover:opacity-85 active:scale-[0.95] disabled:bg-[var(--color-glass-fill-strong)] disabled:text-fg-disabled disabled:opacity-100"
             >
-              <Icon name="send-plane-2-fill" />
+              <Icon name="arrow-up-line" size={18} />
             </button>
           )}
         </div>

@@ -6,8 +6,7 @@ import { Canvas } from './Canvas'
 import { useCamera } from './useCamera'
 import { fit, type Rect } from './camera'
 import { AREAS, chip, typing, type Area } from './shared'
-import { AreaSwitch, Minimap, Shell, ZoomChip } from './Chrome'
-import { EdgeTab } from './EdgeTab'
+import { Minimap, Shell, ZoomChip } from './Chrome'
 
 const GAP = 160 // between areas, in world px
 
@@ -15,7 +14,7 @@ const GAP = 160 // between areas, in world px
  * is the small live copy on the book's page, with no chrome. */
 export interface Frame {
   name: string // the project's
-  pages: React.ReactNode
+  pages: boolean // the book's area switch hangs under the header (App draws it once)
   preview: boolean
   go?: (a: Area) => void // to another area of the book
 }
@@ -93,9 +92,6 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
   }, [area, onArea, onStudio])
 
   const current = AREAS.find((a) => a.id === open)
-  const before = current && AREAS[AREAS.indexOf(current) - 1]
-  const after = current && AREAS[AREAS.indexOf(current) + 1]
-  const pages = (on: Area | null): React.ReactNode => <AreaSwitch current={on} onGo={onArea} />
   return (
     <div className="relative h-full w-full">
       <div className="absolute inset-0" style={{ visibility: open ? 'hidden' : 'visible' }}>
@@ -113,7 +109,6 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
                   note="whole book"
                 />
               }
-              pages={pages(area)}
               minimap={
                 <Minimap
                   label="Book"
@@ -150,7 +145,7 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
               >
                 {/* a live, low-detail copy of the area's board; only while no board is open */}
                 <div inert className="pointer-events-none absolute inset-0">
-                  {!open && render(a.id, { name, pages: null, preview: true })}
+                  {!open && render(a.id, { name, pages: false, preview: true })}
                 </div>
                 <button
                   onClick={() => onArea(a.id)}
@@ -178,23 +173,11 @@ export function Book({ name, area, onArea, onStudio, render }: Props): React.JSX
         <div key={open} className="absolute inset-0">
           {render(open, {
             name,
-            pages: pages(open),
+            pages: true,
             preview: false,
             go: onArea
           })}
         </div>
-      )}
-      {open && current && (
-        <>
-          {/* the first area's left neighbour is the whole book; the last has nothing after it */}
-          <EdgeTab
-            side="left"
-            to={before?.id ?? null}
-            name={before?.name ?? 'Book'}
-            onGo={onArea}
-          />
-          {after && <EdgeTab side="right" to={after.id} name={after.name} onGo={onArea} />}
-        </>
       )}
     </div>
   )

@@ -3,11 +3,13 @@ import { MAX_ZOOM, wheelCamera, zoomAt, type Rect } from './camera'
 import { fitBelow, typing } from './shared'
 import type { useCamera } from './useCamera'
 
-/** Screen spacing of the dot grid: the 24px grid scaled, doubled or halved to stay readable. */
+/** Screen spacing of the dot grid: a dot every half grid step (12px), scaled, doubled or
+ * halved to stay readable. Snapping still uses the full 24px grid, so every cell has a dot at
+ * each corner and the middle of each edge. */
 function dotSpacing(z: number): number {
-  let s = 24 * z
-  while (s < 14) s *= 2
-  while (s > 48) s /= 2
+  let s = 12 * z
+  while (s < 8) s *= 2
+  while (s > 24) s /= 2
   return s
 }
 
@@ -94,19 +96,44 @@ export function Canvas({
     return () => removeEventListener('keydown', key)
   }, [content, fly, viewport])
 
+  // A window only scrolls its own contents once you have clicked into it. Until then the wheel
+  // moves the board, so passing the cursor over a chat while you pan never grabs the scroll.
+  const active = useRef<Element | null>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    const press = (e: PointerEvent): void => {
+      active.current?.removeAttribute('data-active')
+      active.current = (e.target as HTMLElement).closest('[data-card]')
+      active.current?.setAttribute('data-active', '')
+    }
+    el.addEventListener('pointerdown', press, true)
+    return () => el.removeEventListener('pointerdown', press, true)
+  }, [ref])
+
   // wheel is attached natively: React's listener is passive, so it can't stop the page zooming
   useEffect(() => {
     const el = ref.current
     if (!el) return
     const wheel = (e: WheelEvent): void => {
-      // over something that can still scroll that way, the wheel scrolls it; otherwise it moves
-      // the board
-      if (!e.ctrlKey && scrollable) {
+      // Over a window you have clicked into, the wheel scrolls its contents. At the end of
+      // them it stops there: it does not carry on and move the board. Anywhere else the wheel
+      // moves the board.
+      if (!e.ctrlKey && scrollable && Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
+        let held = false
         for (let n = e.target as HTMLElement | null; n && n !== el; n = n.parentElement) {
           if (!n.matches(scrollable)) continue
+          const card = n.closest('[data-card]')
+          if (card && card !== active.current) continue // not clicked into yet: pan the board
+          if (n.scrollHeight <= n.clientHeight) continue // nothing to scroll here
           const room =
             e.deltaY < 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1
-          if (n.scrollHeight > n.clientHeight && room) return
+          if (room) return
+          if (card) held = true
+        }
+        if (held) {
+          e.preventDefault()
+          return
         }
       }
       e.preventDefault()

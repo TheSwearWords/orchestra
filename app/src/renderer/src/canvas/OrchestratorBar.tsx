@@ -289,7 +289,7 @@ export function OrchestratorBar({
   const working = busy && (
     <p
       role="status"
-      className="flex w-fit max-w-full items-center gap-2 bg-brand px-2.5 py-1 type-label-mono text-on-brand"
+      className="working-tag flex w-fit max-w-full items-center gap-2 bg-brand px-2.5 py-1 type-label-mono text-on-brand"
     >
       <span aria-hidden className="flex shrink-0 gap-0.5">
         {[0, 1, 2].map((i) => (

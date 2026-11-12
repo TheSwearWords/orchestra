@@ -6,7 +6,7 @@ What changed in Orchestra, newest first. Add to the top section with each push.
 
 ### Added
 
-- Research has a toolbar under the Orchestrator bar, as in Figma: one button each for a research group, reference links, inspiration, usable assets, a text window and an Interpret box. It replaces the New asset button.
+- Research and Create have a toolbar in a notch on top of the Orchestrator bar, as in Figma. Research: a research group, reference links, inspiration, usable assets, a text window and an Interpret box. Create: a deliverable, a prerequisite and an Instrument. It replaces the New asset button, and gives way to the conversation when that is open.
 - Remove a site from the reference library with the × on its tile. Built-in sites are hidden, your own are deleted, and a new link from a removed site doesn't bring it back.
 
 ### Changed

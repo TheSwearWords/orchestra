@@ -143,7 +143,7 @@ Bracket prefixes such as `[Brief from the Orchestrator]` and `[Report from the â
 - `App.tsx` also owns the tabs, Back, `SessionDock` and `OrchestratorBar`, because they belong to the whole window.
 - The Orchestrator's face (`OrchestratorFace.tsx`, a CSS glowing sphere) shows one state everywhere, as its colour. The bar and the dock report what they know through `signal()` in `faceState.ts`.
 
-Screens that don't share React state coordinate through window events: `orchestra:desk`, `orchestra:needs`, `orchestra:focus`, `orchestra:converse` (open the bar on a conversation) and `orchestra:agents-changed`. An area offers its tools for new windows through `useToolbar` (`canvas/toolbar.ts`); the bar draws them under its text box.
+Screens that don't share React state coordinate through window events: `orchestra:desk`, `orchestra:needs`, `orchestra:focus`, `orchestra:converse` (open the bar on a conversation) and `orchestra:agents-changed`. An area offers its tools for new windows through `useToolbar` (`canvas/toolbar.ts`); the bar draws them in a notch on its top edge.
 
 ## Where data lives
 

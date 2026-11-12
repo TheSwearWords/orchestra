@@ -22,11 +22,11 @@ export function useTools(): Tool[] {
   return useSyncExternalStore(subscribe, () => tools)
 }
 
-/** Offers these tools while the calling screen is mounted (and `on`). */
-export function useToolbar(list: Tool[], on = true): void {
-  // the list is rebuilt on every render, so it is compared by what it offers; callers keep each
-  // tool's action current themselves (Research reads its actions through a ref)
-  const key = on ? list.map((t) => t.id).join('|') : ''
+/** Offers these tools while the calling screen is mounted (and `on`). They are registered again
+ * when `version` changes, so actions that read the screen's state can stay current. */
+export function useToolbar(list: Tool[], on = true, version = ''): void {
+  // the list is rebuilt on every render, so it is compared by what it offers and its version
+  const key = on ? `${list.map((t) => t.id).join('|')}#${version}` : ''
   const latest = list
   useEffect(() => {
     if (!key) return undefined

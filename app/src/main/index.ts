@@ -7,7 +7,14 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { Conductor, GENERAL, STUDIO, readChat, readLog } from './conductor'
 import { agentPrompt, orchestratorPrompt, studioPrompt } from './prompts'
-import { lockDeliverables, readLocked, readSelection, saveSelection } from './deliverables'
+import {
+  lockDeliverables,
+  readLocked,
+  readResearch,
+  readSelection,
+  saveResearch,
+  saveSelection
+} from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { providerStatus } from './connections'
 import { addCoverImage, COVER_TYPES, readCover, saveCover } from './covers'
@@ -569,12 +576,18 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('create:load', async (_, project: string) => {
     const dir = projectDir(project)
-    const [lib, selected, locked] = await Promise.all([
+    const [lib, selected, locked, research] = await Promise.all([
       loadLibrary(ORCHESTRA_HOME),
       readSelection(dir),
-      readLocked(dir)
+      readLocked(dir),
+      readResearch(dir)
     ])
-    return { musicians: lib.musicians, instruments: lib.instruments, selected, locked }
+    return { musicians: lib.musicians, instruments: lib.instruments, selected, locked, research }
+  })
+  ipcMain.handle('create:research', async (_, project: string, paths: unknown) => {
+    const saved = await saveResearch(projectDir(project), await loadLibrary(ORCHESTRA_HOME), paths)
+    knowledge.touch(project)
+    return saved
   })
   ipcMain.handle('create:lock', async (_, project: string, ids: unknown) => {
     if (!Array.isArray(ids) || !ids.every((id) => typeof id === 'string'))

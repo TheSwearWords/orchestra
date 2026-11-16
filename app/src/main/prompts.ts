@@ -59,7 +59,7 @@ This chat is only about the ${focus.name} deliverable (id ${focus.id}): ${focus.
     rules,
     thisChat,
     `## This project
-You are working in the project "${name}"; your current directory is its folder. Read concept.md, research.md, anything in research/ and deliverables.md before planning, and read deliverables.md again whenever the plan matters: the user can change it at any time. The agent library (Musicians and Instruments, as markdown) is at ${join(home, 'library')}.
+You are working in the project "${name}"; your current directory is its folder. Read concept.md, research.md, anything in research/ and deliverables.md before planning (if deliverables.md has a "research:" list, those are the notes the user picked for this work: lean on them and treat the rest of research/ as background), and read deliverables.md again whenever the plan matters: the user can change it at any time. The agent library (Musicians and Instruments, as markdown) is at ${join(home, 'library')}.
 
 Deliverables chosen so far: ${selected.length ? selected.join(', ') : 'none yet'}.
 

@@ -19,7 +19,7 @@ export const DOC_BODY = ORCH_CAP * 2 - 44
 const WINDOW_GAP = 48
 
 // Categories in the order a project usually needs them; unknown ones follow alphabetically.
-const CATEGORY_ORDER = ['Brand', 'Web', 'Product', 'Motion', '3D', 'Code']
+export const CATEGORY_ORDER = ['Brand', 'Web', 'Product', 'Motion', '3D', 'Code']
 const rank = (c: string): number => {
   const i = CATEGORY_ORDER.indexOf(c)
   return i < 0 ? CATEGORY_ORDER.length : i

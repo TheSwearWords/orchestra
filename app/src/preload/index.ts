@@ -88,6 +88,7 @@ export interface CreateState {
   instruments: Instrument[]
   selected: string[] // deliverable (Musician) ids saved in deliverables.md
   locked: string[] // the ones the user has locked in; only these can be briefed
+  research: string[] // research notes picked for Create to use, as paths in the project
 }
 
 const api = {
@@ -193,6 +194,8 @@ const api = {
     ipcRenderer.invoke('ask:answer', project, id, text, final),
   saveDeliverables: (project: string, ids: string[]): Promise<string[]> =>
     ipcRenderer.invoke('create:save', project, ids),
+  saveResearch: (project: string, paths: string[]): Promise<string[]> =>
+    ipcRenderer.invoke('create:research', project, paths),
   listChats: (project: string): Promise<ChatInfo[]> => ipcRenderer.invoke('chats:list', project),
   listThreads: (project: string): Promise<Thread[]> => ipcRenderer.invoke('chats:threads', project),
   graphBuiltAt: (project: string): Promise<number | null> =>

@@ -5,7 +5,8 @@ import { foundationOrder } from './plan.ts'
 
 // A project's chosen deliverables live in deliverables.md: the ids in front matter (what the
 // app reads), plus the build order written out for the user, Obsidian and the Orchestrator.
-// `locked` lists the ones the user has locked in; only those can be briefed.
+// `locked` lists the ones the user has locked in; only those can be briefed. `research` lists
+// the research notes the user picked for Create to use, as paths inside the project.
 
 export async function readSelection(project: string): Promise<string[]> {
   const md = await readFile(join(project, 'deliverables.md'), 'utf8').catch(() => '')
@@ -18,6 +19,33 @@ export async function readLocked(project: string): Promise<string[]> {
   const md = await readFile(join(project, 'deliverables.md'), 'utf8').catch(() => '')
   const list = parseDoc(md)?.fields.locked
   return Array.isArray(list) ? list : []
+}
+
+/** Keeps only well-formed research paths (`research.md` or `research/<name>.md`). The list is
+ * kept in front matter, where a comma or bracket would split it, so those are refused too. */
+export function cleanResearch(paths: unknown): string[] {
+  if (!Array.isArray(paths)) return []
+  const ok = paths.filter(
+    (p): p is string => typeof p === 'string' && /^research(\.md|\/[\w .-]+\.md)$/.test(p)
+  )
+  return [...new Set(ok)]
+}
+
+/** The research notes the user picked for Create to use. */
+export async function readResearch(project: string): Promise<string[]> {
+  const md = await readFile(join(project, 'deliverables.md'), 'utf8').catch(() => '')
+  return cleanResearch(parseDoc(md)?.fields.research)
+}
+
+/** Saves which research notes Create should use, leaving the deliverables as they are. */
+export async function saveResearch(
+  project: string,
+  lib: Library,
+  paths: unknown
+): Promise<string[]> {
+  const research = cleanResearch(paths)
+  await saveSelection(project, lib, await readSelection(project), undefined, research)
+  return research
 }
 
 /** Locks in more deliverables. It only ever adds, and only ones that are chosen. */
@@ -38,7 +66,8 @@ export async function saveSelection(
   project: string,
   lib: Library,
   ids: string[],
-  lockedIn?: string[] // left out: what was locked in stays locked, if it's still chosen
+  lockedIn?: string[], // left out: what was locked in stays locked, if it's still chosen
+  picked?: string[] // research notes picked for Create; left out: the picks stay as they were
 ): Promise<string[]> {
   const unknown = ids.filter((id) => !lib.musicians.some((m) => m.id === id))
   if (unknown.length) throw new Error(`Unknown deliverable: ${unknown.join(', ')}`)
@@ -49,10 +78,13 @@ export async function saveSelection(
     chosen.some((m) => m.id === id)
   )
 
+  const research = picked ?? (await readResearch(project))
+
   const md = [
     '---',
     `deliverables: [${chosen.map((m) => m.id).join(', ')}]`,
     ...(locked.length ? [`locked: [${locked.join(', ')}]`] : []),
+    ...(research.length ? [`research: [${research.join(', ')}]`] : []),
     '---',
     '',
     '# Deliverables',

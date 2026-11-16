@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Project } from '../main/projects'
+import type { RefineView } from '../main/refine'
+import type { Severity, FindingStatus } from '../main/audits'
 import type { AgentState, ChatEvent, ChatMessage, LogEntry } from '../main/conductor'
 import type { EditKey, Instrument, Library, Musician, Role } from '../main/library'
 import type { ProviderStatus } from '../main/providers'
@@ -265,6 +267,29 @@ const api = {
     ipcRenderer.invoke('previews:open', project, deliverable, label),
   readOutput: (project: string, path: string): Promise<string> =>
     ipcRenderer.invoke('create:readOutput', project, path),
+  refineLoad: (project: string): Promise<RefineView> => ipcRenderer.invoke('refine:load', project),
+  refineSetWork: (project: string, id: string, ref: string, note?: string): Promise<RefineView> =>
+    ipcRenderer.invoke('refine:setWork', project, id, { ref, note }),
+  refineApprove: (project: string, id: string): Promise<RefineView> =>
+    ipcRenderer.invoke('refine:approve', project, id),
+  refineReopen: (project: string, id: string): Promise<RefineView> =>
+    ipcRenderer.invoke('refine:reopen', project, id),
+  refineSignOff: (project: string, id: string): Promise<RefineView> =>
+    ipcRenderer.invoke('refine:signOff', project, id),
+  refineSetFinding: (
+    project: string,
+    id: string,
+    finding: string,
+    status: FindingStatus
+  ): Promise<RefineView> => ipcRenderer.invoke('refine:setFinding', project, id, finding, status),
+  refineAddFinding: (
+    project: string,
+    id: string,
+    note: string,
+    severity: Severity
+  ): Promise<RefineView> => ipcRenderer.invoke('refine:addFinding', project, id, note, severity),
+  refineOpenWork: (project: string, id: string): Promise<void> =>
+    ipcRenderer.invoke('refine:openWork', project, id),
   openOutput: (project: string, path: string): Promise<void> =>
     ipcRenderer.invoke('create:openOutput', project, path)
 }

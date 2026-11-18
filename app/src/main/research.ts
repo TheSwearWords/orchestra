@@ -35,6 +35,7 @@ export interface Site {
   about?: string // what the site is for, in a line; names alone don't say
   tags?: string[] // what kind of library it is
   shot?: boolean // has a picture of its landing page, worked out on load and never saved
+  tint?: string // a colour for its text panel, from that picture; also never saved
 }
 
 // The seven sources from the project notes; users add their own on top (sites.json).
@@ -408,22 +409,49 @@ export async function ensureSite(home: string, url: string): Promise<void> {
   })
 }
 
-export async function addSite(home: string, input: Site): Promise<Site[]> {
-  const name = oneLine(input.name)
+/** A site as the renderer sent it, checked and trimmed: a name, a real address, short text. */
+function cleanSite(input: Site): Site {
+  const name = oneLine(String(input?.name ?? ''))
   if (!name) throw new Error('Give the site a name.')
-  const about = oneLine(input.about ?? '').slice(0, 160)
-  const tags = (Array.isArray(input.tags) ? input.tags : [])
-    .map((t) => oneLine(String(t)).slice(0, 24))
-    .filter(Boolean)
-    .slice(0, 5)
-  const site = {
+  const about = oneLine(String(input.about ?? '')).slice(0, 160)
+  const tags = [
+    ...new Set(
+      (Array.isArray(input.tags) ? input.tags : [])
+        .map((t) => oneLine(String(t)).slice(0, 24))
+        .filter(Boolean)
+    )
+  ].slice(0, 8)
+  return {
     name,
-    url: normalizeUrl(input.url),
+    url: normalizeUrl(String(input.url ?? '')),
     ...(about ? { about } : {}),
     ...(tags.length ? { tags } : {})
   }
+}
+
+export async function addSite(home: string, input: Site): Promise<Site[]> {
+  const site = cleanSite(input)
   const own = await ownSites(home)
   await mkdir(home, { recursive: true })
   await writeFile(join(home, 'sites.json'), JSON.stringify([...own, site], null, 2))
+  return listSites(home)
+}
+
+/** Changes a site's name, description and tags; its address stays. A built-in site becomes
+ * the user's own copy, and the built-in one is hidden behind it. */
+export async function editSite(home: string, url: string, input: Site): Promise<Site[]> {
+  const host = siteHost(normalizeUrl(url))
+  const site = cleanSite({ ...input, url })
+  const own = await ownSites(home)
+  await mkdir(home, { recursive: true })
+  const i = own.findIndex((s) => siteHost(s.url) === host)
+  if (i >= 0) own[i] = site
+  else if (DEFAULT_SITES.some((s) => siteHost(s.url) === host)) {
+    own.push(site)
+    const hidden = await hiddenSites(home)
+    if (!hidden.includes(host))
+      await writeFile(hiddenFile(home), JSON.stringify([...hidden, host], null, 2))
+  } else throw new Error('That site is not in the library.')
+  await writeFile(join(home, 'sites.json'), JSON.stringify(own, null, 2))
   return listSites(home)
 }

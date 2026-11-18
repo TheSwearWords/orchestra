@@ -7,6 +7,7 @@ import {
   addFiles,
   addLink,
   addSite,
+  editSite,
   listReferences,
   listSites,
   normalizeUrl,
@@ -85,6 +86,38 @@ test('sites: defaults first, then the user’s own', async () => {
       about: 'Web design, curated'
     })
     await assert.rejects(addSite(dir, { name: ' ', url: 'x.com' }))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('sites: editing changes the text and tags, never the address', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'orchestra-sites-'))
+  try {
+    await addSite(dir, { name: 'Godly', url: 'godly.website' })
+    let sites = await editSite(dir, 'https://godly.website/', {
+      name: 'Godly ',
+      url: 'evil.example',
+      about: 'Web design',
+      tags: ['web', ' web ', 'motion']
+    })
+    assert.deepEqual(sites.at(-1), {
+      name: 'Godly',
+      url: 'https://godly.website/',
+      about: 'Web design',
+      tags: ['web', 'motion']
+    })
+    // a built-in site becomes the user's own copy, shown once
+    const builtIn = DEFAULT_SITES[0]
+    sites = await editSite(dir, builtIn.url, { ...builtIn, tags: ['mine'] })
+    const copies = sites.filter((s) => s.url === builtIn.url || s.name === builtIn.name)
+    assert.equal(copies.length, 1)
+    assert.deepEqual(copies[0].tags, ['mine'])
+    assert.equal(sites.length, DEFAULT_SITES.length + 1)
+    await assert.rejects(
+      editSite(dir, 'nowhere.example', { name: 'X', url: '' }),
+      /not in the library/
+    )
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

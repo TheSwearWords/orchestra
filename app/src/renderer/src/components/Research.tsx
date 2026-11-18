@@ -45,7 +45,6 @@ const TOOL_META: Record<(typeof TOOL_IDS)[number], { label: string; icon: string
   text: { label: 'Text window', icon: 'file-text-line' },
   interpret: { label: 'Interpret box', icon: 'pen-nib-line' }
 }
-const SHOW_TAGS_FROM = 8 // sites in the library before the tag filter earns its place
 
 /** I · Research as one artboard (C4): groups of references, each holding reference links,
  * inspiration and usable assets and named for the part of the project it's about; the sites
@@ -150,14 +149,19 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
   const nameOf = (g: Group): string => g ?? defaultName
   const kindsOf = (g: Group): Kind[] => (g && data.groups.kinds[g]) || FULL
   const addItems = (at?: At): MenuItem[] => [
-    { label: 'New research group', run: () => create('New research group', at) },
+    {
+      label: 'New research group',
+      icon: 'layout-grid-line',
+      run: () => create('New research group', at)
+    },
     { label: '', separator: true },
     ...KIND_LIST.map((k) => ({
       label: `New ${LABEL[k].toLowerCase()} window`,
+      icon: TOOL_META[k].icon,
       run: () => create(LABEL[k], at, k)
     })),
     { label: '', separator: true },
-    { label: 'New Interpret box', run: () => newBox(at) }
+    { label: 'New Interpret box', icon: 'pen-nib-line', run: () => newBox(at) }
   ]
   const hosts = new Set(data.sites.map((s) => host(s.url)))
   /** Right-click or the "Group" button on a reference: where else it can be filed. */
@@ -168,6 +172,7 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
       .filter((g) => g !== here && kindsOf(g).includes(kind))
       .map((g) => ({
         label: `Move to ${nameOf(g)}`,
+        icon: 'folder-line',
         run: () => void run(() => window.api.updateReference(project, r.id, { group: g }))
       }))
     void popMenu(items.length ? items : [{ label: 'Make another group to move this to' }])
@@ -215,6 +220,8 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
                   void popMenu([
                     {
                       label: 'Delete group',
+                      icon: 'close-line',
+                      danger: true,
                       run: () => {
                         if (confirm(`Delete "${g}"? Its references move to ${defaultName}.`))
                           void run(() => window.api.removeGroup(project, g))
@@ -278,6 +285,8 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
                     menu: [
                       {
                         label: 'Delete window',
+                        icon: 'close-line',
+                        danger: true,
                         run: () => {
                           if (confirm(`Delete "${nameOf(g)}"?`))
                             void run(() => window.api.removeGroup(project, g!))
@@ -356,11 +365,13 @@ export function Research({ project, frame }: { project: string; frame: Frame }):
           count: String(data.sites.length),
           x: -1640,
           y: 0,
-          w: 1490, // two columns of 720px pictures, the size they're captured at
+          w: libraryWidth(data.sites.length),
           body: (
             <Sites
               sites={data.sites}
+              cols={libraryCols(data.sites.length)}
               onAdd={(site) => run(() => window.api.addSite(site))}
+              onEdit={(url, site) => run(() => window.api.editSite(url, site))}
               onRemove={(url) => run(() => window.api.removeSite(url))}
             />
           )
@@ -609,27 +620,56 @@ function Remove({ onRemove }: { onRemove: () => void }): React.JSX.Element {
   )
 }
 
-/** The reference library: the sites worth looking through, each a tile with what it's for;
- * your own can be added. */
+const TILE = 448 // a site's picture, 16:9; wide enough that its right half holds the text
+const TILE_GAP = 8
+/** As many columns as rows (the Add tile counts), so 16:9 tiles make a library near 16:9. */
+const libraryCols = (sites: number): number =>
+  Math.min(6, Math.max(2, Math.ceil(Math.sqrt(sites + 1))))
+const libraryWidth = (sites: number): number => {
+  const cols = libraryCols(sites)
+  return cols * TILE + (cols - 1) * TILE_GAP + 32 // + the grid's padding
+}
+
+type SiteInput = { name: string; url: string; about: string; tags: string[] }
+type SiteRow = ResearchState['sites'][number]
+
+/** Whether a site matches what was typed in the library's search: every word, anywhere. */
+const siteMatches = (s: SiteRow, query: string): boolean => {
+  const text = [s.name, s.url, s.about ?? '', ...(s.tags ?? [])].join(' ').toLowerCase()
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => text.includes(w))
+}
+
+/** The reference library: the sites worth looking through, each a picture with its name, what
+ * it's for and its tags on the right half. Searchable; right-click a site to edit it. */
 function Sites({
   sites,
+  cols,
   onAdd,
+  onEdit,
   onRemove
 }: {
   sites: ResearchState['sites']
-  onAdd: (site: { name: string; url: string; about: string; tags: string[] }) => Promise<boolean>
+  cols: number
+  onAdd: (site: SiteInput) => Promise<boolean>
+  onEdit: (url: string, site: SiteInput) => Promise<boolean>
   onRemove: (url: string) => Promise<boolean>
 }): React.JSX.Element {
-  // the × on a site: kept inside the link's box, so it must not follow the link
-  const remove = (e: React.MouseEvent, s: { name: string; url: string }): void => {
-    e.preventDefault()
-    e.stopPropagation()
+  const askRemove = (s: SiteRow): void => {
     if (confirm(`Remove ${s.name} from the reference library?`)) void onRemove(s.url)
   }
-  const removeButton = (s: { name: string; url: string }, size: number): React.ReactNode => (
+  // the × on a site: kept inside the link's box, so it must not follow the link
+  const removeButton = (s: SiteRow, size: number): React.ReactNode => (
     <button
       type="button"
-      onClick={(e) => remove(e, s)}
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        askRemove(s)
+      }}
       aria-label={`Remove ${s.name} from the library`}
       title="Remove from the library"
       className="flex size-7 shrink-0 items-center justify-center rounded-full text-dim opacity-0 group-hover:opacity-100 hover:bg-[var(--color-glass-fill-strong)] hover:text-danger-fg focus-visible:opacity-100"
@@ -637,10 +677,19 @@ function Sites({
       <Icon name="close-line" size={size} />
     </button>
   )
+  const menu = (e: React.MouseEvent, s: SiteRow): void => {
+    e.preventDefault()
+    e.stopPropagation() // or the card's own menu takes it
+    void popMenu([
+      { label: 'Edit name, description and tags', run: () => setEditing(s.url) },
+      { label: 'Open in browser', run: () => window.open(s.url, '_blank') },
+      { label: '', separator: true },
+      { label: 'Remove from the library…', run: () => askRemove(s) }
+    ])
+  }
+  const [query, setQuery] = useState('')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
-  const [tagText, setTagText] = useState('')
   const allTags = [...new Set(sites.flatMap((s) => s.tags ?? []))].sort()
-  const showTags = sites.length >= SHOW_TAGS_FROM && allTags.length > 0
   // compact: one dense row per site, no screenshots; remembered between sessions
   const [compact, setCompactState] = useState(() => localStorage.getItem('library-compact') === '1')
   const setCompact = (on: boolean): void => {
@@ -651,37 +700,37 @@ function Sites({
       // the library works the same without it
     }
   }
-  const shown = showTags && tagFilter ? sites.filter((s) => s.tags?.includes(tagFilter)) : sites
+  const shown = sites.filter(
+    (s) => (!tagFilter || s.tags?.includes(tagFilter)) && siteMatches(s, query)
+  )
   const [adding, setAdding] = useState(false)
-  const [name, setName] = useState('')
-  const [url, setUrl] = useState('')
-  const [about, setAbout] = useState('')
-
-  async function submit(e: FormEvent): Promise<void> {
-    e.preventDefault()
-    const tags = tagText
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean)
-    if (await onAdd({ name, url, about, tags })) {
-      setTagText('')
-      setAdding(false)
-      setName('')
-      setUrl('')
-      setAbout('')
-    }
-  }
+  const [editing, setEditing] = useState<string | null>(null) // a site's url
 
   return (
-    <div className={`grid p-4 ${compact ? 'grid-cols-1 gap-1' : 'grid-cols-2 gap-3'}`}>
-      <div className="col-span-full flex flex-wrap items-center gap-1.5">
-        {showTags &&
+    <div
+      className={`grid p-4 ${compact ? 'gap-1' : 'gap-2'}`}
+      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+    >
+      <div className="col-span-full flex flex-wrap items-center gap-1.5 pb-1">
+        <label className="flex h-9 w-72 items-center gap-2 rounded-full border border-hair bg-[var(--color-glass-fill)] px-3 text-dim focus-within:border-focus">
+          <Icon name="search-line" size={14} />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+            placeholder="Search names, descriptions, tags"
+            aria-label="Search the reference library"
+            className="min-w-0 flex-1 bg-transparent type-body-s text-fg outline-none placeholder:text-fg-2"
+          />
+        </label>
+        {allTags.length > 0 &&
           [null, ...allTags].map((t) => (
             <button
               key={t ?? 'all'}
               aria-pressed={tagFilter === t}
               onClick={() => setTagFilter(t)}
-              className={`serif-on rounded-full border px-3 py-1 type-label-s ${
+              className={`rounded-full border px-3 py-1 type-label-s ${
                 tagFilter === t
                   ? 'border-brand bg-brand text-on-brand'
                   : 'border-card-line text-link hover:bg-selected'
@@ -700,14 +749,31 @@ function Sites({
           {compact ? 'Cards' : 'Compact'}
         </button>
       </div>
+      {shown.length === 0 && (
+        <p className="col-span-full py-6 text-center type-body-m text-dim">
+          No sites match{query ? ` “${query}”` : ''}
+          {tagFilter ? ` in ${tagFilter}` : ''}.
+        </p>
+      )}
       {shown.map((s) =>
-        compact ? (
+        editing === s.url ? (
+          <SiteForm
+            key={s.url}
+            site={s}
+            onSave={async (v) => {
+              const ok = await onEdit(s.url, v)
+              if (ok) setEditing(null)
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        ) : compact ? (
           <a
             key={s.url}
             data-port={`site-${host(s.url)}`}
             href={s.url}
             target="_blank"
             rel="noreferrer"
+            onContextMenu={(e) => menu(e, s)}
             title={s.about ? `${s.url}\n${s.about}` : s.url}
             className="group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-link transition-colors duration-150 hover:bg-[var(--color-glass-fill-strong)]"
           >
@@ -735,42 +801,50 @@ function Sites({
             href={s.url}
             target="_blank"
             rel="noreferrer"
-            title={s.url}
-            className="group flex flex-col gap-3 rounded-xl border border-hair bg-[var(--color-glass-fill)] p-2 text-link transition-colors duration-150 hover:border-line-strong hover:bg-[var(--color-glass-fill-strong)]"
+            onContextMenu={(e) => menu(e, s)}
+            title={`${s.url}\nRight-click to edit`}
+            className="group relative block aspect-video overflow-hidden rounded-lg border border-hair bg-[var(--color-glass-fill)] text-fg transition-colors duration-150 hover:border-line-strong"
           >
-            {s.shot && (
+            {s.shot ? (
               <img
                 alt=""
                 src={`orchestra://site/${host(s.url)}.png`}
-                className="aspect-video w-full rounded-lg object-cover object-top"
+                className="absolute inset-0 size-full object-cover object-top"
               />
+            ) : (
+              <span
+                aria-hidden
+                className="absolute inset-y-0 left-0 flex w-1/2 items-center justify-center font-display text-[72px] leading-none text-dim italic"
+              >
+                {s.name[0]}
+              </span>
             )}
-            <span className="flex flex-col gap-1.5 px-2 pb-2">
-              <span className="flex items-center gap-2.5">
-                <span
-                  aria-hidden
-                  className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-glass-fill-strong)] font-display text-[14px] leading-none text-fg italic"
-                >
-                  {s.name[0]}
-                </span>
-                <span className="min-w-0 flex-1 truncate type-heading-m">{s.name}</span>
-                <Icon
-                  name="arrow-right-up-line"
-                  size={16}
-                  className="shrink-0 text-link/50 group-hover:text-link"
+            {/* the right half: name, use and tags, big enough to read from afar. Under it, a
+                tiny copy of the picture stretched to the same place, which reads as a blur */}
+            <span className="absolute inset-y-0 right-0 flex w-1/2 flex-col gap-1.5 overflow-hidden p-4">
+              {s.shot && (
+                <img
+                  alt=""
+                  src={`orchestra://site/${host(s.url)}.png?soft`}
+                  className="absolute inset-y-0 right-0 h-full w-[200%] max-w-none object-cover object-top"
                 />
+              )}
+              {/* the site's brand colour (tint.ts), or plain dark for a colourless one */}
+              <span
+                className={`absolute inset-0 transition-opacity duration-150 ${s.tint ? 'opacity-100' : 'bg-overlay/50 group-hover:bg-overlay/65'}`}
+                style={s.tint ? { background: s.tint } : undefined}
+              />
+              <span className="relative flex items-start gap-1">
+                <span className="min-w-0 flex-1 type-heading-l break-words">{s.name}</span>
                 {removeButton(s, 14)}
               </span>
-              <span className="truncate font-mono text-[11px] text-dim">
-                {s.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
-              </span>
-              {s.about && <span className="type-body-s text-fg">{s.about}</span>}
+              {s.about && <span className="relative line-clamp-3 type-body-m">{s.about}</span>}
               {s.tags && s.tags.length > 0 && (
-                <span className="flex flex-wrap gap-1 pt-0.5">
+                <span className="relative mt-auto flex flex-wrap gap-1">
                   {s.tags.map((t) => (
                     <span
                       key={t}
-                      className="rounded-full bg-[var(--color-glass-fill)] px-2 py-0.5 type-caption text-dim"
+                      className="rounded-full bg-[var(--color-glass-fill-strong)] px-2 py-0.5 type-caption"
                     >
                       {t}
                     </span>
@@ -782,62 +856,98 @@ function Sites({
         )
       )}
       {adding ? (
-        <form onSubmit={submit} className="flex flex-col gap-2 rounded-xl border border-brand p-4">
-          <input
-            autoFocus
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Name"
-            aria-label="Site name"
-            className={`h-9 ${field}`}
-          />
-          <input
-            required
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="godly.website"
-            aria-label="Site address"
-            className={`h-9 ${field}`}
-          />
-          <input
-            value={about}
-            onChange={(e) => setAbout(e.target.value)}
-            placeholder="What it's good for"
-            aria-label="What the site is for"
-            className={`h-9 ${field}`}
-          />
-          <input
-            value={tagText}
-            onChange={(e) => setTagText(e.target.value)}
-            placeholder="Tags, with commas"
-            aria-label="Tags for the site"
-            className={`h-9 ${field}`}
-          />
-          <span className="flex gap-2">
-            <button type="submit" className={solidButton}>
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => setAdding(false)}
-              className="px-2 type-label-m text-dim"
-            >
-              Cancel
-            </button>
-          </span>
-        </form>
+        <SiteForm
+          onSave={async (v) => {
+            if (await onAdd(v)) setAdding(false)
+          }}
+          onCancel={() => setAdding(false)}
+        />
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-wire text-link hover:bg-selected"
+          className="flex aspect-video flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-wire text-link hover:bg-selected"
         >
           <span className="font-mono text-xl text-link/50">+</span>
-          <span className="serif-on type-label-m">Add a site</span>
+          <span className="type-label-m">Add a site</span>
           <span className="type-caption text-dim">One you keep going back to</span>
         </button>
       )}
     </div>
+  )
+}
+
+/** Adding a site, or editing one; an edited site keeps its address. */
+function SiteForm({
+  site,
+  onSave,
+  onCancel
+}: {
+  site?: SiteRow
+  onSave: (v: SiteInput) => Promise<void>
+  onCancel: () => void
+}): React.JSX.Element {
+  const [name, setName] = useState(site?.name ?? '')
+  const [url, setUrl] = useState(site?.url ?? '')
+  const [about, setAbout] = useState(site?.about ?? '')
+  const [tagText, setTagText] = useState((site?.tags ?? []).join(', '))
+  async function submit(e: FormEvent): Promise<void> {
+    e.preventDefault()
+    const tags = tagText
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+    await onSave({ name, url, about, tags })
+  }
+  return (
+    <form
+      onSubmit={submit}
+      onKeyDown={(e) => e.key === 'Escape' && onCancel()}
+      className="flex flex-col gap-2 rounded-lg border border-brand p-4"
+    >
+      <input
+        autoFocus
+        required
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Name"
+        aria-label="Site name"
+        className={`h-9 ${field}`}
+      />
+      {site ? (
+        <span className="truncate px-1 font-mono text-[11px] text-dim">{site.url}</span>
+      ) : (
+        <input
+          required
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="godly.website"
+          aria-label="Site address"
+          className={`h-9 ${field}`}
+        />
+      )}
+      <input
+        value={about}
+        onChange={(e) => setAbout(e.target.value)}
+        placeholder="What it's good for"
+        aria-label="What the site is for"
+        className={`h-9 ${field}`}
+      />
+      <input
+        value={tagText}
+        onChange={(e) => setTagText(e.target.value)}
+        placeholder="Tags, with commas"
+        aria-label="Tags for the site"
+        className={`h-9 ${field}`}
+      />
+      <span className="flex gap-2">
+        <button type="submit" className={solidButton}>
+          Save
+        </button>
+        <button type="button" onClick={onCancel} className="px-2 type-label-m text-dim">
+          Cancel
+        </button>
+      </span>
+    </form>
   )
 }
 

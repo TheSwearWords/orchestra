@@ -16,6 +16,7 @@ import type { Output } from '../main/outputs'
 import type { Proposal } from '../main/proposals'
 import type { Ask } from '../main/asks'
 import type { Groups, Kind, Reference, Site, Tag } from '../main/research'
+import type { PageState } from '../main/browser'
 
 export type {
   AgentState,
@@ -39,6 +40,7 @@ export type {
   Proposal,
   Reference,
   Role,
+  PageState,
   Site,
   Tag,
   Ask
@@ -116,9 +118,6 @@ const api = {
     ipcRenderer.on('tabs:adopt', listener)
     return () => ipcRenderer.removeListener('tabs:adopt', listener)
   },
-  menu: (
-    items: { id: string; label: string; enabled?: boolean; separator?: boolean }[]
-  ): Promise<string | null> => ipcRenderer.invoke('menu:popup', items),
   listProjects: (): Promise<Project[]> => ipcRenderer.invoke('projects:list'),
   editProject: (
     id: string,
@@ -126,11 +125,9 @@ const api = {
   ): Promise<Project> => ipcRenderer.invoke('projects:edit', id, change),
   renameProject: (id: string, name: string): Promise<Project> =>
     ipcRenderer.invoke('projects:rename', id, name),
-  projectMenu: (
-    id: string,
-    name: string,
-    groups: { id: string; label: string }[] = []
-  ): Promise<string | null> => ipcRenderer.invoke('projects:menu', id, name, groups),
+  openProjectWindow: (id: string): Promise<void> => ipcRenderer.invoke('projects:openWindow', id),
+  trashProject: (id: string, name: string): Promise<boolean> =>
+    ipcRenderer.invoke('projects:trash', id, name),
   setCover: (id: string, cover: Cover): Promise<Cover> =>
     ipcRenderer.invoke('projects:setCover', id, cover),
   loadStudio: (): Promise<StudioLayout> => ipcRenderer.invoke('studio:load'),
@@ -184,7 +181,27 @@ const api = {
     ipcRenderer.invoke('research:connectBox', project, id, group, on),
   readUsage: (): Promise<{ at: number; windows: Usage } | null> => ipcRenderer.invoke('usage:read'),
   addSite: (site: Site): Promise<Site[]> => ipcRenderer.invoke('sites:add', site),
+  editSite: (url: string, site: Site): Promise<Site[]> =>
+    ipcRenderer.invoke('sites:edit', url, site),
   removeSite: (url: string): Promise<Site[]> => ipcRenderer.invoke('sites:remove', url),
+  // the browser panel: one web page per window, placed over the panel's body
+  openPage: (url: string): Promise<void> => ipcRenderer.invoke('browser:open', url),
+  placePage: (r: { x: number; y: number; width: number; height: number }): Promise<void> =>
+    ipcRenderer.invoke('browser:place', r),
+  stepPage: (how: 'back' | 'forward' | 'reload' | 'external'): Promise<void> =>
+    ipcRenderer.invoke('browser:step', how),
+  closePage: (): Promise<void> => ipcRenderer.invoke('browser:close'),
+  onPageState: (cb: (s: PageState) => void): (() => void) => {
+    const listener = (_: unknown, s: PageState): void => cb(s)
+    ipcRenderer.on('browser:state', listener)
+    return () => ipcRenderer.removeListener('browser:state', listener)
+  },
+  // a link was clicked somewhere in the app: the panel opens on it
+  onPageRequest: (cb: (url: string) => void): (() => void) => {
+    const listener = (_: unknown, url: string): void => cb(url)
+    ipcRenderer.on('browser:request', listener)
+    return () => ipcRenderer.removeListener('browser:request', listener)
+  },
 
   loadCreate: (project: string): Promise<CreateState> => ipcRenderer.invoke('create:load', project),
   lockDeliverables: (project: string, ids: string[]): Promise<string[]> =>

@@ -1,4 +1,14 @@
-import { app, dialog, net, protocol, screen, shell, BrowserWindow, ipcMain, Menu } from 'electron'
+import {
+  app,
+  dialog,
+  net,
+  protocol,
+  screen,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  nativeImage
+} from 'electron'
 import { existsSync, mkdirSync } from 'fs'
 import { mkdir, readdir, readFile, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
@@ -30,7 +40,8 @@ import { providerStatus } from './connections'
 import { readCover, saveCover } from './covers'
 import { ensureServer, isLocal, readPreviews, saveThumbnail, stopServers } from './previews'
 import { forgetKey, loadKeys, savedKeys, saveKey } from './keys'
-import { captureSites, shotFile } from './siteshots'
+import { captureSites, shotFile, shotTint } from './siteshots'
+import { closePage, isWeb, openPage, placePage, stepPage } from './browser'
 import {
   addBox,
   connectBox,
@@ -65,6 +76,7 @@ import {
   addLink,
   addGroup,
   addSite,
+  editSite,
   removeSite,
   ensureSite,
   saveText,
@@ -175,9 +187,10 @@ function createWindow(
     mainWindow.show()
   })
 
-  // Links (reference sites, Figma files) open in the user's browser, never inside the app.
+  // Links (reference sites, Figma files) open in the browser panel (browser.ts), which has a
+  // button for the user's own browser. Nothing opens as a new app window.
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    if (/^https?:\/\//.test(details.url)) shell.openExternal(details.url)
+    if (isWeb(details.url)) mainWindow.webContents.send('browser:request', details.url)
     return { action: 'deny' }
   })
 
@@ -300,26 +313,6 @@ app.whenReady().then(async () => {
     return 'placed'
   })
 
-  // A native context menu built from the renderer's items; resolves to the chosen id, or null.
-  ipcMain.handle(
-    'menu:popup',
-    (e, items: { id: string; label: string; enabled?: boolean; separator?: boolean }[]) => {
-      const win = BrowserWindow.fromWebContents(e.sender)!
-      return new Promise<string | null>((resolve) => {
-        Menu.buildFromTemplate(
-          items.map((it) =>
-            it.separator
-              ? { type: 'separator' as const }
-              : {
-                  label: String(it.label),
-                  enabled: it.enabled !== false,
-                  click: () => resolve(String(it.id))
-                }
-          )
-        ).popup({ window: win, callback: () => setTimeout(() => resolve(null), 200) })
-      })
-    }
-  )
   ipcMain.handle('projects:list', async () =>
     Promise.all(
       (await listProjects(PROJECTS_DIR)).map(async (p) => ({
@@ -349,52 +342,26 @@ app.whenReady().then(async () => {
     return renameProject(PROJECTS_DIR, id, name)
   })
 
-  // Right-click on a cover. Opening a window and deleting happen here; Enter and Edit are
-  // answered so the Studio can play the opening or zoom into the cover editor.
-  ipcMain.handle('projects:menu', (e, id: string, name: string, groups: unknown) => {
+  // From a cover's right-click menu (Studio.tsx): a project in a window of its own, and
+  // deleting one, which asks first and only ever moves it to the Recycle Bin.
+  ipcMain.handle('projects:openWindow', (_, id: string) => {
+    projectDir(id)
+    createWindow(id)
+  })
+  ipcMain.handle('projects:trash', async (e, id: string, name: unknown) => {
     const dir = projectDir(id)
-    const win = BrowserWindow.fromWebContents(e.sender)!
-    const items = (Array.isArray(groups) ? groups : []) as { id: string; label: string }[]
-    return new Promise<string | null>((resolve) => {
-      Menu.buildFromTemplate([
-        { label: 'Enter project', click: () => resolve('enter') },
-        { label: 'Edit project', click: () => resolve('edit') },
-        {
-          label: 'Open in new window',
-          click: () => {
-            createWindow(id)
-            resolve('opened')
-          }
-        },
-        { type: 'separator' },
-        ...items.map((g) => ({
-          label: String(g.label),
-          click: () => resolve(`group:${String(g.id)}`)
-        })),
-        { type: 'separator' },
-        {
-          label: 'Delete…',
-          click: async () => {
-            const { response } = await dialog.showMessageBox(win, {
-              type: 'warning',
-              message: `Move “${name}” to the Recycle Bin?`,
-              detail:
-                'Its references, research and deliverables go with it. You can restore it from the Recycle Bin.',
-              buttons: ['Move to Recycle Bin', 'Cancel'],
-              defaultId: 1,
-              cancelId: 1
-            })
-            if (response !== 0) return resolve(null)
-            await shell.trashItem(dir)
-            resolve('deleted')
-          }
-        }
-      ]).popup({
-        window: win,
-        // closing without a choice; a click resolves first, so this is ignored then
-        callback: () => setTimeout(() => resolve(null), 200)
-      })
+    const { response } = await dialog.showMessageBox(BrowserWindow.fromWebContents(e.sender)!, {
+      type: 'warning',
+      message: `Move “${String(name)}” to the Recycle Bin?`,
+      detail:
+        'Its references, research and deliverables go with it. You can restore it from the Recycle Bin.',
+      buttons: ['Move to Recycle Bin', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1
     })
+    if (response !== 0) return false
+    await shell.trashItem(dir)
+    return true
   })
   // The Studio's arrangement: where each cover sits, and the free labels.
   const studioFile = join(ORCHESTRA_HOME, 'studio.json')
@@ -475,7 +442,10 @@ app.whenReady().then(async () => {
     return {
       references,
       interpretation,
-      sites: sites.map((s) => ({ ...s, shot: existsSync(shotFile(ORCHESTRA_HOME, s.url)) })),
+      sites: sites.map((s) => {
+        const shot = existsSync(shotFile(ORCHESTRA_HOME, s.url))
+        return { ...s, shot, ...(shot ? { tint: shotTint(ORCHESTRA_HOME, s.url) } : {}) }
+      }),
       groups,
       boxes
     }
@@ -538,10 +508,21 @@ app.whenReady().then(async () => {
     })
   })
   ipcMain.handle('sites:add', (_, site: Site) => addSite(ORCHESTRA_HOME, site))
+  ipcMain.handle('sites:edit', (_, url: unknown, site: Site) => {
+    if (typeof url !== 'string') throw new Error('Pick a site to edit.')
+    return editSite(ORCHESTRA_HOME, url, site)
+  })
   ipcMain.handle('sites:remove', (_, url: unknown) => {
     if (typeof url !== 'string') throw new Error('Pick a site to remove.')
     return removeSite(ORCHESTRA_HOME, url)
   })
+  // The browser panel (browser.ts): the page belongs to the window that asked
+  const asker = (e: Electron.IpcMainInvokeEvent): BrowserWindow =>
+    BrowserWindow.fromWebContents(e.sender)!
+  ipcMain.handle('browser:open', (e, url: unknown) => openPage(asker(e), String(url)))
+  ipcMain.handle('browser:place', (e, r: unknown) => placePage(asker(e), r))
+  ipcMain.handle('browser:step', (e, how: unknown) => stepPage(asker(e), how))
+  ipcMain.handle('browser:close', (e) => closePage(asker(e)))
   ipcMain.handle('research:addGroup', (_, project: string, name: unknown, kinds: unknown) =>
     addGroup(projectDir(project), name, kinds)
   )
@@ -865,8 +846,19 @@ app.whenReady().then(async () => {
       // pictures the Orchestrator offers in the Action box, from anywhere in the project
       if (host === 'file' && /\.(png|jpe?g|gif|webp|svg)$/i.test(file))
         return net.fetch(pathToFileURL(outputPath(projectDir(project), file)).href)
-      if (host === 'site' && /^[a-z0-9.-]+\.png$/.test(project))
-        return net.fetch(pathToFileURL(join(ORCHESTRA_HOME, 'sites', project)).href)
+      if (host === 'site' && /^[a-z0-9.-]+\.png$/.test(project)) {
+        const shot = join(ORCHESTRA_HOME, 'sites', project)
+        // ?soft: a tiny copy that reads as blurred when stretched, for the library's text
+        // panel; a live blur over the board would be redrawn every frame of a pan
+        if (new URL(req.url).searchParams.has('soft')) {
+          const img = nativeImage.createFromPath(shot)
+          if (img.isEmpty()) throw new Error()
+          return new Response(new Uint8Array(img.resize({ width: 40, quality: 'best' }).toPNG()), {
+            headers: { 'content-type': 'image/png' }
+          })
+        }
+        return net.fetch(pathToFileURL(shot).href)
+      }
       if (host !== 'ref') throw new Error()
       return net.fetch(pathToFileURL(referenceFilePath(projectDir(project), file)).href)
     } catch {

@@ -75,6 +75,7 @@ The main process splits into small modules:
 | `covers.ts` | A book's cover colour and artwork (`<project>/cover.json`). |
 | `previews.ts` | Where finished work lives (`.orchestra/previews.json`), its thumbnails, and starting local dev servers. `cleanPreview` is a trust boundary: agents supply the input. |
 | `work.ts`, `audits.ts`, `refine.ts` | Refine. `work.ts`: where a deliverable's finished work lives (`work.json`), and the trust boundary for those links (https and plain paths only). `audits.ts`: findings per deliverable (`audits/<deliverable>.json`), and `checkAudit`, the trust boundary for what an agent writes. `refine.ts`: which deliverables are ready or signed off (`refine.json`), and the view the Refine board draws. |
+| `browser.ts` | The browser panel: one sandboxed web page per window (`WebContentsView`), placed over the panel the renderer draws. The `browser:*` handlers in `index.ts`, `BrowserPanel.tsx` in the renderer. |
 | `keys.ts` | API keys from setup: tested with the provider, encrypted with `safeStorage`, kept in Electron's `userData`, never in the vault. Changing a key or signing out ends running agent sessions (`Conductor.restartAll`), because a session keeps the credentials it started with. |
 
 ## How the pieces talk
@@ -206,7 +207,7 @@ The renderer may import from `src/main/` only the three modules with no Node dep
 
 **A card on an existing board.** Add a `CardSpec` to that screen's `cards` array, and write its body as a component in a new file. Cards grow with their content. The exceptions are chats (`height`) and markdown files, capped at twice the Orchestrator's height (`DOC_BODY`).
 
-**A new board.** Render `<Board project board label crumbs pages preview cards />` with a new `board` name. Board names must match the slug rule. To add a right-click menu, pass `addMenu`, and use `popMenu` for card menus.
+**A new board.** Render `<Board project board label crumbs pages preview cards />` with a new `board` name. Board names must match the slug rule. To add a right-click menu, pass `addMenu`, and use `popMenu` for card menus. Every right-click menu goes through `popMenu`, which draws the app's own menu (`canvas/ContextMenu.tsx`) with optional `icon`, `heading`, `hint` and `danger` on each item; there are no native menus.
 
 **A Studio desk window.** Add it to `DESK`, `WINDOW` and the `Desk` type in `Studio.tsx`, then add a slash command.
 
@@ -303,7 +304,7 @@ Put logic that needs testing in a pure file, as `place.ts`, `camera.ts` and `sta
 - Agent drafts come from a model, so `draftProblems` in `proposals.ts` is a trust boundary. Likewise `askProblems` in `asks.ts`. Nothing reaches the library until the user approves it, and `adopt` never overwrites.
 - `board:save`, `studio:save` and `cleanSetup` keep only well-formed fields.
 - The `orchestra://` protocol serves uploaded references and nothing else.
-- External links open in the user's browser, never in the app.
+- External links open in the browser panel (`main/browser.ts`, `canvas/BrowserPanel.tsx`): a sandboxed page in its own session (`persist:browser`), http and https only, with no new windows and every permission refused. Its button sends a page to the user's own browser.
 - Giving agents `Bash` or widening their tools is a product decision for the maintainer.
 
 ## UI rules

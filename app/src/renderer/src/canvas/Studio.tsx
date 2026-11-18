@@ -257,29 +257,11 @@ export function Studio({
 
   const [leaving, setLeaving] = useState<string | null>(null) // a deleted project, shrinking
 
-  async function menu(p: Project, el: HTMLElement): Promise<void> {
+  function menu(p: Project, el: HTMLElement): void {
     const moving = with_(p.id) ? selected : [p.id]
     const mine = groups.find((g) => g.ids.includes(p.id))
-    const choice = await window.api.projectMenu(p.id, p.name, [
-      {
-        id: 'new',
-        label: moving.length > 1 ? `New group with ${moving.length} projects` : 'New group'
-      },
-      ...groups
-        .filter((g) => g !== mine)
-        .map((g) => ({ id: `to:${g.name}`, label: `Add to ${g.name}` })),
-      ...(mine ? [{ id: 'out', label: `Remove from ${mine.name}` }] : [])
-    ])
-    if (choice === 'group:new') {
-      let name = 'New group'
-      for (let n = 2; groups.some((g) => g.name === name); n++) name = `New group ${n}`
-      fileUnder(moving, name, true)
-    }
-    if (choice === 'group:out') fileUnder(moving, null, false)
-    if (choice?.startsWith('group:to:')) fileUnder(moving, choice.slice(9), false)
-    if (choice === 'enter') onEnter(p.id, el.getBoundingClientRect())
-    if (choice === 'edit') onEdit(p.id)
-    if (choice === 'deleted') {
+    const remove = async (): Promise<void> => {
+      if (!(await window.api.trashProject(p.id, p.name))) return
       // the cover shrinks away before the shelf closes up
       if (reducedMotion()) return onChanged()
       setLeaving(p.id)
@@ -288,6 +270,49 @@ export function Studio({
         onChanged()
       }, 400)
     }
+    void popMenu([
+      { label: p.name, heading: true },
+      {
+        label: 'Enter project',
+        icon: 'book-open-line',
+        run: () => onEnter(p.id, el.getBoundingClientRect())
+      },
+      { label: 'Edit project', icon: 'pen-nib-line', run: () => onEdit(p.id) },
+      {
+        label: 'Open in new window',
+        icon: 'arrow-right-up-line',
+        run: () => void window.api.openProjectWindow(p.id)
+      },
+      { label: '', separator: true },
+      { label: 'Groups', heading: true },
+      {
+        label: moving.length > 1 ? `New group with ${moving.length} projects` : 'New group',
+        icon: 'add-line',
+        run: () => {
+          let name = 'New group'
+          for (let n = 2; groups.some((g) => g.name === name); n++) name = `New group ${n}`
+          fileUnder(moving, name, true)
+        }
+      },
+      ...groups
+        .filter((g) => g !== mine)
+        .map((g) => ({
+          label: `Add to ${g.name}`,
+          icon: 'folder-line',
+          run: () => fileUnder(moving, g.name, false)
+        })),
+      ...(mine
+        ? [
+            {
+              label: `Remove from ${mine.name}`,
+              icon: 'close-line',
+              run: () => fileUnder(moving, null, false)
+            }
+          ]
+        : []),
+      { label: '', separator: true },
+      { label: 'Delete…', icon: 'close-line', danger: true, run: () => void remove() }
+    ])
   }
 
   return (
@@ -301,14 +326,17 @@ export function Studio({
       onMarquee={(r) =>
         setSelected(ids.filter((id) => touches({ x: place[id][0], y: place[id][1], ...COVER }, r)))
       }
-      onContextMenu={async () => {
-        const c = await window.api.menu([
-          { id: 'new', label: 'New project' },
-          { id: 'tidy', label: 'Tidy', enabled: Object.keys(layout.covers).length > 0 }
+      onContextMenu={() =>
+        void popMenu([
+          { label: 'New project', icon: 'add-line', hint: 'A blank cover', run: onNew },
+          {
+            label: 'Tidy',
+            icon: 'layout-grid-line',
+            hint: 'Line the covers up',
+            run: Object.keys(layout.covers).length > 0 ? tidy : undefined
+          }
         ])
-        if (c === 'new') onNew()
-        if (c === 'tidy') tidy()
-      }}
+      }
       chrome={
         <Shell
           right={
@@ -448,6 +476,7 @@ export function Studio({
                   void popMenu([
                     {
                       label: 'New group',
+                      icon: 'add-line',
                       run: () => {
                         let name = 'New group'
                         for (let n = 2; groups.some((g) => g.name === name); n++)
@@ -457,6 +486,7 @@ export function Studio({
                     },
                     ...groups.map((g) => ({
                       label: `Add to ${g.name}`,
+                      icon: 'folder-line',
                       run: () => fileUnder(selected, g.name, false)
                     }))
                   ])

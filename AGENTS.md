@@ -74,6 +74,7 @@ The main process splits into small modules:
 | `recipes.ts`, `onboard.ts` | How each setup item really connects, and running those steps. Main runs a step only by its id in `recipes.ts`. Pure data in `recipes.ts` is shared with the renderer. |
 | `covers.ts` | A book's cover colour and artwork (`<project>/cover.json`). |
 | `previews.ts` | Where finished work lives (`.orchestra/previews.json`), its thumbnails, and starting local dev servers. `cleanPreview` is a trust boundary: agents supply the input. |
+| `work.ts`, `audits.ts`, `refine.ts` | Refine. `work.ts`: where a deliverable's finished work lives (`work.json`), and the trust boundary for those links (https and plain paths only). `audits.ts`: findings per deliverable (`audits/<deliverable>.json`), and `checkAudit`, the trust boundary for what an agent writes. `refine.ts`: which deliverables are ready or signed off (`refine.json`), and the view the Refine board draws. |
 | `keys.ts` | API keys from setup: tested with the provider, encrypted with `safeStorage`, kept in Electron's `userData`, never in the vault. Changing a key or signing out ends running agent sessions (`Conductor.restartAll`), because a session keeps the credentials it started with. |
 
 ## How the pieces talk
@@ -161,6 +162,7 @@ Orchestra/
     research.md, deliverables.md           interpretation; chosen and locked-in ids, and the research notes picked for Create (research:), in front matter
     references/ (+ files/), prereqs/, exports/, audits/, notes/
     boards/<board>.json                    card positions
+    work.json, refine.json, audits/        Refine: work links, ready and signed-off ids, findings per deliverable
     graphify-out/                          the project's knowledge graph
     .orchestra/
       chats/<chat>/chat.jsonl, log.jsonl, session.json
@@ -186,6 +188,7 @@ Git will not flag a mismatch between these. Most of the bugs a clean merge can i
 | A reply marker or bracket prefix | Both sides in the section above, plus its test |
 | `GENERAL` or `STUDIO` | `main/conductor.ts` and `canvas/shared.ts`, which each define them because the renderer can't import the conductor |
 | The `t-` thread prefix | `newThread` in `OrchestratorBar.tsx`, `chats:threads` in `index.ts`, `orchestratorPrompt` in `prompts.ts` |
+| A Refine field or state (a work link, a finding, ready or signed off) | The module (`work.ts`, `audits.ts` or `refine.ts`), the `refine:*` handlers in `main/index.ts`, the methods in `preload/index.ts`, `Refine.tsx`. `Refine.tsx` cannot import `refine.ts` (it reads files), so its `stageOf` copy must change with the original. |
 | Create card ids (`orchestrator`, `chat-<id>`, `inst--…`) | `Create.tsx`, and `cardOf` in `NeedsYou.tsx` |
 | The areas | `AREAS` in `canvas/shared.ts`, `goto.ts`, `command()` and `area()` in `App.tsx`, the "Go to" text in `prompts.ts` |
 | The research notes picked for Create (`research:` in `deliverables.md`) | `cleanResearch` / `saveResearch` in `deliverables.ts`, `create:research` in `main/index.ts` and `preload/index.ts`, the `research` field of `CreateState`, the "research:" line in `prompts.ts`, and `CreateSetup.tsx` |
@@ -340,7 +343,7 @@ Tokens come from `Orchestra/projects/orchestra-brand/prereqs/tokens.json`, and `
 
 Also not built or only partly built:
 
-- **Refine** is a placeholder card in `App.tsx`.
+- **Refine** is partly built: the board, work links, manual findings, ready and sign-off. Not built: running audits, sending a finding back to its Musician (Fix this), the Musician recording the work link, and pins. The spec is `ideation/approval-and-showcase-spec.md` (section 11).
 - **MCP connections for agents** (Figma and others) don't exist, and `prompts.ts` tells agents so. Figma is the exception: Musicians and Instruments may use it if the user connected it (`FIGMA` in `conductor.ts`).
 - **Only Anthropic can run agents.** The other providers are listed but refused by `runnableOrThrow`.
 - **A packaged build can't find its vault** or ship a starter library. `paths.ts` depends on the working directory.

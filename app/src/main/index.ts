@@ -8,6 +8,16 @@ import icon from '../../resources/icon.png?asset'
 import { Conductor, GENERAL, STUDIO, readChat, readLog } from './conductor'
 import { agentPrompt, orchestratorPrompt, studioPrompt } from './prompts'
 import {
+  addManual,
+  readAudit,
+  saveAudit,
+  setStatus,
+  type FindingStatus,
+  type Severity
+} from './audits'
+import { approve, loadRefine, readRefine, reopen, saveRefine, signOff } from './refine'
+import { openTarget, readWork, setWork } from './work'
+import {
   lockDeliverables,
   readLocked,
   readResearch,
@@ -774,6 +784,73 @@ app.whenReady().then(async () => {
     if (!String(rel).endsWith('.md')) throw new Error('Only markdown files can be shown here.')
     return readFile(outputPath(projectDir(project), String(rel)), 'utf8')
   })
+  // Refine: the deliverables locked in, each pointing at the work it is made in. Every handler
+  // answers with the whole view, so the board redraws from one source.
+  const refineView = async (project: string): Promise<ReturnType<typeof loadRefine>> => {
+    const dir = projectDir(project)
+    return loadRefine(dir, await readLocked(dir))
+  }
+  const refineDir = async (project: string, id: unknown): Promise<string> => {
+    const dir = projectDir(project)
+    if (typeof id !== 'string' || !(await readLocked(dir)).includes(id))
+      throw new Error('Lock that deliverable in on the Create board first.')
+    return dir
+  }
+  ipcMain.handle('refine:load', (_, project: string) => refineView(project))
+  ipcMain.handle('refine:setWork', async (_, project: string, id: unknown, work: unknown) => {
+    await setWork(await refineDir(project, id), id as string, work)
+    return refineView(project)
+  })
+  ipcMain.handle('refine:approve', async (_, project: string, id: unknown) => {
+    const dir = await refineDir(project, id)
+    if (!((id as string) in (await readWork(dir))))
+      throw new Error('Add a link to where the work lives before marking it ready.')
+    await saveRefine(dir, approve(await readRefine(dir), id as string))
+    return refineView(project)
+  })
+  ipcMain.handle('refine:reopen', async (_, project: string, id: unknown) => {
+    const dir = await refineDir(project, id)
+    await saveRefine(dir, reopen(await readRefine(dir), id as string))
+    return refineView(project)
+  })
+  ipcMain.handle('refine:signOff', async (_, project: string, id: unknown) => {
+    const dir = await refineDir(project, id)
+    await saveRefine(dir, signOff(await readRefine(dir), id as string))
+    return refineView(project)
+  })
+  ipcMain.handle(
+    'refine:setFinding',
+    async (_, project: string, id: unknown, finding: unknown, status: unknown) => {
+      const dir = await refineDir(project, id)
+      if (typeof finding !== 'string' || !['open', 'fixed', 'dismissed'].includes(String(status)))
+        throw new Error('Pick a finding and a status.')
+      const audit = await readAudit(dir, id as string)
+      await saveAudit(dir, id as string, setStatus(audit, finding, status as FindingStatus))
+      return refineView(project)
+    }
+  )
+  ipcMain.handle(
+    'refine:addFinding',
+    async (_, project: string, id: unknown, note: unknown, severity: unknown) => {
+      const dir = await refineDir(project, id)
+      const level = ['high', 'medium', 'low'].includes(String(severity)) ? severity : 'medium'
+      const audit = await readAudit(dir, id as string)
+      await saveAudit(dir, id as string, addManual(audit, String(note ?? ''), level as Severity))
+      return refineView(project)
+    }
+  )
+  ipcMain.handle('refine:openWork', async (_, project: string, id: unknown) => {
+    const dir = await refineDir(project, id)
+    const work = (await readWork(dir))[id as string]
+    if (!work) throw new Error('This deliverable has no work link yet.')
+    const target = openTarget(work, dir)
+    if ('url' in target) await shell.openExternal(target.url)
+    else {
+      const error = await shell.openPath(target.path)
+      if (error) throw new Error(error)
+    }
+  })
+
   ipcMain.handle('create:openOutput', async (_, project: string, rel: string) => {
     const error = await shell.openPath(outputPath(projectDir(project), String(rel)))
     if (error) throw new Error(error)

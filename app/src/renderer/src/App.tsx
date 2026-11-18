@@ -2,8 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { Project, StudioLayout } from '../../preload'
 import { Create } from './components/Create'
 import { Icon } from './components/Icon'
+import { Refine } from './components/Refine'
 import { Research } from './components/Research'
-import { Board } from './canvas/Board'
 import { Book, type Frame } from './canvas/Book'
 import { Landscape } from './canvas/Landscape'
 import { AreaSwitch } from './canvas/Chrome'
@@ -278,31 +278,7 @@ function App(): React.JSX.Element {
   function area(p: Project, a: Area, frame: Frame): React.ReactNode {
     if (a === 'research') return <Research key={p.id} project={p.id} frame={frame} />
     if (a === 'create') return <Create key={p.id} project={p.id} frame={frame} />
-    return (
-      <Board
-        key={p.id}
-        project={p.id}
-        board="refine"
-        label="III · Refine"
-        pages={frame.pages}
-        preview={frame.preview}
-        cards={[
-          {
-            id: 'next',
-            title: 'Audit and sign-off',
-            x: 0,
-            y: 0,
-            w: 480,
-            body: (
-              <p className="p-5 type-body-m text-dim">
-                III Refine is next on the build plan: audit pins, the scorecard, and fixes sent back
-                to their seats.
-              </p>
-            )
-          }
-        ]}
-      />
-    )
+    return <Refine key={p.id} project={p.id} frame={frame} />
   }
 
   return (

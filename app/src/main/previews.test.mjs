@@ -4,7 +4,7 @@ import { mkdtempSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { cleanPreview, readPreviews, savePreview, saveThumbnail } from './previews.ts'
-import { addCoverImage, cleanCover, readCover, saveCover } from './covers.ts'
+import { cleanCover, readCover, saveCover } from './covers.ts'
 
 const temp = () => mkdtempSync(join(tmpdir(), 'orch-preview-'))
 const figma = 'https://www.figma.com/design/abc/Brand?node-id=1-2'
@@ -44,15 +44,13 @@ test('a preview with the same label is replaced and keeps its thumbnail', async 
   )
 })
 
-test('covers keep only known settings and uploads get a new name', async () => {
-  assert.deepEqual(cleanCover({ color: 'ink', art: 'violin', image: '../x.png', junk: 1 }), {
-    color: 'ink',
-    art: 'violin'
+test('covers keep only a known backdrop', async () => {
+  assert.deepEqual(cleanCover({ landscape: 'coast', color: 'ink', image: 'cover/a.png' }), {
+    landscape: 'coast'
   })
-  assert.deepEqual(cleanCover({ color: 'pink', image: 'cover/a.png' }), { image: 'cover/a.png' })
+  assert.deepEqual(cleanCover({ landscape: 'lava' }), {})
   const p = temp()
   assert.deepEqual(await readCover(p), {})
-  await saveCover(p, { color: 'blue' })
-  assert.equal((await readCover(p)).color, 'blue')
-  await assert.rejects(addCoverImage(p, 'C:/x/evil.exe'))
+  await saveCover(p, { landscape: 'hills' })
+  assert.equal((await readCover(p)).landscape, 'hills')
 })

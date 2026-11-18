@@ -9,7 +9,15 @@ import { Landscape } from './canvas/Landscape'
 import { AreaSwitch } from './canvas/Chrome'
 import { Tabs } from './canvas/Tabs'
 import { DRAFT, closeTab, moveTab, openTab } from './canvas/tabList'
-import { STUDIO, TOP_BAR, chip, coverInfo, requestFocus, type Area } from './canvas/shared'
+import {
+  STUDIO,
+  TOP_BAR,
+  chip,
+  coverInfo,
+  requestFocus,
+  requestNewInstrument,
+  type Area
+} from './canvas/shared'
 import { SessionDock } from './canvas/SessionDock'
 import { CoverEditor } from './canvas/CoverEditor'
 import { Opening } from './canvas/Opening'
@@ -257,8 +265,14 @@ function App(): React.JSX.Element {
     } else if (id === 'studio') go({ at: 'studio' })
     else if (id === 'new') go({ at: 'cover', id: null })
     else if (id === 'needs') dispatchEvent(new Event('orchestra:needs'))
-    else if (current && (id === 'research' || id === 'create' || id === 'refine'))
-      go({ at: 'book', id: current.id, area: id })
+    else if (current && id === 'create deliverable')
+      dispatchEvent(new CustomEvent('orchestra:ask', { detail: 'I need a new deliverable: ' }))
+    else if (current && id === 'create prerequisite')
+      dispatchEvent(new CustomEvent('orchestra:ask', { detail: 'I need a new prerequisite: ' }))
+    else if (current && id === 'create instrument') {
+      go({ at: 'book', id: current.id, area: 'create' })
+      requestNewInstrument(current.id)
+    }
   }
 
   function area(p: Project, a: Area, frame: Frame): React.ReactNode {
@@ -423,9 +437,21 @@ function App(): React.JSX.Element {
           { id: 'new', label: 'New project', hint: 'A blank cover' },
           ...(current
             ? [
-                { id: 'research', label: 'I Research', hint: current.name },
-                { id: 'create', label: 'II Create', hint: current.name },
-                { id: 'refine', label: 'III Refine', hint: current.name },
+                {
+                  id: 'create deliverable',
+                  label: 'Create deliverable',
+                  hint: 'Ask the Orchestrator for a new one'
+                },
+                {
+                  id: 'create prerequisite',
+                  label: 'Create prerequisite',
+                  hint: 'Ask the Orchestrator for a new one'
+                },
+                {
+                  id: 'create instrument',
+                  label: 'Create instrument',
+                  hint: 'Add one to a deliverable'
+                },
                 { id: 'needs', label: 'Needs you', hint: 'What is waiting in this project' }
               ]
             : [])

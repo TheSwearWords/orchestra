@@ -2,15 +2,16 @@
 // Pure matching, so it is tested in node; App decides which commands exist where you are.
 
 export interface Command {
-  id: string // what you type after the slash, e.g. "agents"
+  id: string // what you type after the slash, e.g. "agents" or "create deliverable"
   label: string
   hint: string
 }
 
 /** The commands a "/…" draft could mean: the ones starting with it first, then any whose name
- * or label contains it. Anything that isn't a slash command matches nothing. */
+ * or label contains it. A command can take two words ("/create deliverable"), so "/create" lists
+ * them all. Anything that isn't a slash command matches nothing. */
 export function matchCommands<T extends Command>(text: string, all: T[]): T[] {
-  const m = /^\/(\S*)$/.exec(text.trim())
+  const m = /^\/(\S*(?: \S*)?)$/.exec(text.trim())
   if (!m) return []
   const q = m[1].toLowerCase()
   const starts = all.filter((c) => c.id.startsWith(q))

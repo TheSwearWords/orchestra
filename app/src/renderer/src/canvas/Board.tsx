@@ -386,6 +386,21 @@ export function Board({
     setLayout(next)
     void window.api.saveBoard(project, board, next)
   }
+  /** The layout with every window hanging off `ids` pinned where it is now, so that moving a
+   * window doesn't drag the windows wired under it along (they only follow until you move one). */
+  function pinned(ids: string[]): BoardLayout {
+    const out: BoardLayout = { ...layout }
+    const down = (parent: string): void => {
+      for (const k of cards.filter((c) => c.link === parent && c.auto)) {
+        const at = placed.find((p) => p.id === k.id)
+        if (!at || ids.includes(k.id) || out[k.id]?.x !== undefined) continue
+        out[k.id] = { x: at.x, y: at.y, w: at.w, collapsed: at.collapsed }
+        down(k.id)
+      }
+    }
+    ids.forEach(down)
+    return out
+  }
   const change = (id: string, patch: Partial<BoardLayout[string]>): void => {
     const c = placed.find((p) => p.id === id)!
     const kept = layout?.[id]?.h
@@ -400,7 +415,10 @@ export function Board({
     // dropped on top of something: it moves to the nearest free spot beside it
     const others = [...placed.filter((p) => p.id !== id).map(rectOf), ...obstacles]
     const spot = freeSpot({ x: next.x, y: next.y, w: next.w, h: c.h }, others)
-    save({ ...layout, [id]: { ...next, x: spot.x, y: spot.y } })
+    save({
+      ...('x' in patch || 'y' in patch ? pinned([id]) : layout),
+      [id]: { ...next, x: spot.x, y: spot.y }
+    })
   }
   // the card you're working with: clicking a card selects it, clicking empty board or Escape
   // lets go; right-click on the board then offers what pertains to it
@@ -420,7 +438,7 @@ export function Board({
     return { ...rectOf(c), x: c.x + (d?.dx ?? 0), y: c.y + (d?.dy ?? 0) }
   }
   function moveBy(ids: string[], dx: number, dy: number): void {
-    const next = { ...layout }
+    const next = pinned(ids)
     for (const c of placed.filter((p) => ids.includes(p.id)))
       next[c.id] = {
         ...layout?.[c.id],

@@ -22,6 +22,7 @@ import {
   STUDIO,
   TOP_BAR,
   pendingFocus,
+  pendingInstrument,
   popMenu,
   type AgentFileRef,
   type MenuItem
@@ -52,6 +53,7 @@ import { OrchestratorFace } from '../canvas/OrchestratorFace'
 import type { FaceState } from '../canvas/faceState'
 import { Icon } from './Icon'
 import { DeliverableEditor } from './DeliverableEditor'
+import { InstrumentEditor } from './InstrumentEditor'
 import { DocWindow } from './DocWindow'
 import { PrereqTags } from './PrereqTags'
 import { Layers, type Layer } from './Layers'
@@ -96,6 +98,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   // a card to bring into view: one just opened, or one the Needs you list points at
   const [focus, setFocus] = useState<string | undefined>(() => takeFocus(project))
   const [editing, setEditing] = useState<string | null>(null) // the deliverable being edited
+  const [editingInst, setEditingInst] = useState<string | null>(null) // an Instrument or prerequisite
   const [openDocs, setOpenDocs] = useState<string[]>([]) // prerequisites open as windows
   const [spawn, setSpawn] = useState<{ windows: { id: string; dx: number; dy: number }[] }>()
   const openDoc = useRef<(id: string) => void>(() => {})
@@ -207,6 +210,28 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   // approval. The tools re-register as deliverables are
   // locked in, so the Instrument tool always offers the current ones
   const lockedNow = plan ? plan.locked.filter((id) => plan.selected.includes(id)) : []
+  /** Asks which locked-in deliverable a new Instrument is for (the tool and "/create instrument"). */
+  function pickInstrument(): void {
+    void popMenu(
+      lockedNow.length
+        ? lockedNow.map((d) => ({
+            label: `New Instrument for ${plan?.musicians.find((m) => m.id === d)?.name ?? d}`,
+            run: () => void addInstrument(d)
+          }))
+        : [{ label: 'Lock in your deliverables to add Instruments' }]
+    )
+  }
+  useEffect(() => {
+    const look = (): void => {
+      if (pendingInstrument.current !== project || !plan || frame.preview) return
+      pendingInstrument.current = null
+      pickInstrument()
+    }
+    look()
+    addEventListener('orchestra:new-instrument', look)
+    return () => removeEventListener('orchestra:new-instrument', look)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-read when the plan loads
+  }, [project, !!plan, frame.preview])
   useToolbar(
     [
       {
@@ -227,16 +252,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         id: 'instrument',
         label: 'Instrument',
         icon: 'pencil-ruler-2-line',
-        run: () => {
-          void popMenu(
-            lockedNow.length
-              ? lockedNow.map((d) => ({
-                  label: `New Instrument for ${plan?.musicians.find((m) => m.id === d)?.name ?? d}`,
-                  run: () => void addInstrument(d)
-                }))
-              : [{ label: 'Lock in your deliverables to add Instruments' }]
-          )
-        }
+        run: pickInstrument
       }
     ],
     !!plan && !frame.preview,
@@ -562,6 +578,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           <button
             key={f.id}
             onDoubleClick={() => openPrereq(f.id)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              void popMenu([
+                { label: 'Edit prerequisite…', run: () => setEditingInst(f.id) },
+                { label: 'Open its file', run: () => openPrereq(f.id) }
+              ])
+            }}
             onPointerEnter={() => on && setHover(f.id)}
             onPointerLeave={() => setHover(null)}
             title={`${f.job}\n→ ${f.output}`}
@@ -712,6 +736,15 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           {!ready ? 'Turn on your deliverables' : `${chosen.length} on`}
         </span>
       </button>
+      {editingInst && plan.instruments.some((i) => i.id === editingInst) && (
+        <InstrumentEditor
+          instrument={plan.instruments.find((i) => i.id === editingInst)!}
+          foundations={foundations}
+          prerequisite={foundations.some((f) => f.id === editingInst)}
+          onClose={() => setEditingInst(null)}
+          onSaved={() => setEditingInst(null)}
+        />
+      )}
       {editing && musician(editing) && (
         <DeliverableEditor
           musician={musician(editing)!}
@@ -945,6 +978,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               w: INST_W,
               link: `chat-${id}`,
               menu: [
+                ...(inst ? [{ label: 'Edit Instrument…', run: () => setEditingInst(iid) }] : []),
                 { label: 'Open its file', run: () => openFile(file, card) },
                 { label: `Remove from ${m.name}`, run: () => void removeFromCrew(m, iid) },
                 ...modelItems('instrument', inst)
@@ -1036,12 +1070,9 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       onClose: () => setOpenDocs((o) => o.filter((x) => x !== d.id)),
       body: <DocWindow project={project} path={d.path} stamp={d.stamp} />
     }))
-  const cards = [
-    // the research rides along with the stage, and its own move comes on top of that
-    ...researchCards.map((c) => shifted(c, { x: so.x + ro.x, y: so.y + ro.y })),
-    ...openedDocs.map((c) => shifted(c, so)),
-    ...work.map((c) => shifted(c, so))
-  ]
+  // each group moves on its own: the stage, the research, and every window (the Orchestrator,
+  // the deliverables' chats, files, previews) are separate, so a drag moves only what it grabbed
+  const cards = [...researchCards.map((c) => shifted(c, ro)), ...openedDocs, ...work]
   const byId = new Map(cards.map((c) => [c.id, c]))
   const ownerOf = (id: string): string | undefined => {
     for (let c = byId.get(id); c; c = c.link ? byId.get(c.link) : undefined)

@@ -17,27 +17,29 @@ export const AREAS: { id: Area; numeral: string; name: string }[] = [
 
 export const COVER = { w: 300, h: 400 }
 
-export type CoverColor = 'blue' | 'white' | 'ink'
+/** The backdrops a cover can use: the plates in assets/landscapes (see Landscape.tsx). */
+export const LANDSCAPE_NAMES = ['sunset', 'alpine', 'desert', 'hills', 'coast'] as const
+export type Landscape = (typeof LANDSCAPE_NAMES)[number]
+/** The longest a project description may be; main/projects.ts enforces the same number. */
+export const MAX_CONCEPT = 300
 
 function hash(s: string): number {
   let h = 0
   for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0
   return Math.abs(h)
 }
-// shortcut: colour is picked from the id until project.json holds the Auto/manual
-// cover settings (canvas spec §2.3); upgrade when the cover editor gets its Cover settings.
-export const coverColor = (id: string): CoverColor =>
-  (['blue', 'ink', 'white'] as const)[hash(id) % 3]
-/** Which landscape plate a cover borrows its light from: the same one every time. */
-export const coverLandscape = (id: string): 'sunset' | 'alpine' | 'desert' | 'hills' | 'coast' =>
-  (['sunset', 'alpine', 'desert', 'hills', 'coast'] as const)[hash(id + 'land') % 5]
+/** Which backdrop a cover uses: the one chosen, or else the same one every time for the id. */
+export const coverLandscape = (id: string, chosen?: string): Landscape =>
+  LANDSCAPE_NAMES.includes(chosen as Landscape)
+    ? (chosen as Landscape)
+    : LANDSCAPE_NAMES[hash(id + 'land') % LANDSCAPE_NAMES.length]
 /** A slight tilt, ±4°, the same every time for the same project. */
 export const coverTilt = (id: string): number => ((hash(id + 'tilt') % 81) - 40) / 10
 
 export interface CoverInfo {
   id: string
   name: string
-  client: string
+  concept: string
   no: number
   cover?: Cover
 }
@@ -60,7 +62,7 @@ export function studioPlace(
 export const coverInfo = (p: Project, all: Project[]): CoverInfo => ({
   id: p.id,
   name: p.name,
-  client: p.client,
+  concept: p.concept,
   cover: p.cover,
   // shortcut: issue numbers follow the alphabetical list until project.json stores `no`
   no: all.findIndex((q) => q.id === p.id) + 1
@@ -103,6 +105,14 @@ export const pendingFocus: { current: { project: string; card: string } | null }
 export function requestFocus(project: string, card: string): void {
   pendingFocus.current = { project, card }
   dispatchEvent(new Event('orchestra:focus'))
+}
+
+/** "/create instrument" in the bar: App sets it and goes to Create, which takes it once mounted
+ * (or hears 'orchestra:new-instrument' if it already is) and asks which deliverable it is for. */
+export const pendingInstrument: { current: string | null } = { current: null }
+export function requestNewInstrument(project: string): void {
+  pendingInstrument.current = project
+  dispatchEvent(new Event('orchestra:new-instrument'))
 }
 
 /** Opens an agent's markdown file as a window on the artboard (the Studio provides it); with

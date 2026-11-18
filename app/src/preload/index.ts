@@ -130,7 +130,6 @@ const api = {
   ): Promise<string | null> => ipcRenderer.invoke('projects:menu', id, name, groups),
   setCover: (id: string, cover: Cover): Promise<Cover> =>
     ipcRenderer.invoke('projects:setCover', id, cover),
-  pickCover: (id: string): Promise<string | null> => ipcRenderer.invoke('projects:pickCover', id),
   loadStudio: (): Promise<StudioLayout> => ipcRenderer.invoke('studio:load'),
   saveStudio: (layout: StudioLayout): Promise<void> => ipcRenderer.invoke('studio:save', layout),
   loadBoard: (project: string, board: string): Promise<BoardLayout> =>
@@ -255,6 +254,8 @@ const api = {
     key: 'prerequisites' | 'tools',
     value: string[]
   ): Promise<void> => ipcRenderer.invoke('agents:set', 'musician', musician, key, value),
+  setInstrumentNeeds: (instrument: string, needs: string[]): Promise<void> =>
+    ipcRenderer.invoke('agents:set', 'instrument', instrument, 'needs', needs),
   setCrew: (musician: string, instruments: string[]): Promise<void> =>
     ipcRenderer.invoke('agents:set', 'musician', musician, 'instruments', instruments),
   listOutputs: (project: string): Promise<Output[]> =>

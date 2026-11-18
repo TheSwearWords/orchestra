@@ -1,35 +1,7 @@
-// A project's cover, generated from its name, client and art, like a concert programme
+// A project's cover: its name and description over a backdrop, like a concert programme
 // (brand spec §5.4 Book/Cover, canvas spec §2.3).
 import { PLATES } from './Landscape'
-import {
-  AREAS,
-  coverColor,
-  coverLandscape,
-  type Area,
-  type CoverColor,
-  type CoverInfo
-} from './shared'
-
-const LOOK: Record<CoverColor, { face: string; spine: string; plate: string; dim: string }> = {
-  blue: {
-    face: 'bg-poster-dots text-on-brand',
-    spine: 'bg-brand-pressed',
-    plate: '',
-    dim: 'text-poster-dim'
-  },
-  ink: {
-    face: 'bg-terminal text-on-brand',
-    spine: 'bg-white/15',
-    plate: 'bg-brand',
-    dim: 'text-white/70'
-  },
-  white: {
-    face: 'bg-dots text-link border border-card-line',
-    spine: 'bg-brand/15',
-    plate: 'bg-brand',
-    dim: 'text-dim'
-  }
-}
+import { AREAS, coverLandscape, type Area, type CoverInfo } from './shared'
 
 /** The front of the book. `movement` is the area it was last left in, shown as a ribbon. */
 export function CoverFace({
@@ -43,55 +15,34 @@ export function CoverFace({
   playing?: boolean
   className?: string
 }): React.JSX.Element {
-  const color = info.cover?.color ?? coverColor(info.id)
-  const look = LOOK[color]
   const m = AREAS.find((a) => a.id === movement)
   return (
     <div
-      className={`cover-face cover-${color} relative isolate flex h-full w-full flex-col overflow-hidden py-6 pr-6 pl-[42px] ${look.face} ${className}`}
+      className={`cover-face relative isolate flex h-full w-full flex-col overflow-hidden bg-terminal py-6 pr-6 pl-[42px] text-on-brand ${className}`}
     >
       {/* Nocturne only: the same soft plates as the home screens, hidden under the v2 theme */}
       <span aria-hidden className="cover-landscape">
-        <img src={PLATES[coverLandscape(info.id)]} alt="" />
+        <img src={PLATES[coverLandscape(info.id, info.cover?.landscape)]} alt="" />
       </span>
-      <span
-        aria-hidden
-        className={`cover-spine absolute inset-y-0 left-0 w-[18px] ${look.spine}`}
-      />
+      <span aria-hidden className="cover-spine absolute inset-y-0 left-0 w-[18px] bg-white/15" />
       <div className="cover-meta flex justify-between type-label-s">
         <span>Orchestra presents</span>
         <span>No. {String(info.no).padStart(2, '0')}</span>
       </div>
-      {/* only an uploaded picture goes on the cover; the light does the rest */}
-      {info.cover?.image && (
-        <div
-          className={`cover-plate absolute top-[64px] right-6 size-[150px] text-white ${look.plate}`}
-        >
-          <img
-            alt=""
-            src={`orchestra://file/${info.id}/${encodeURIComponent(info.cover.image)}`}
-            className="size-full object-cover"
-          />
-        </div>
-      )}
       <div className="mt-auto">
         <h3 className="type-heading-l [overflow-wrap:anywhere]">{info.name || 'Untitled'}</h3>
-        {info.client && <p className={`mt-2 type-label-s ${look.dim}`}>{info.client}</p>}
+        {info.concept && (
+          <p className="mt-2 line-clamp-6 type-body-s text-white/70 [overflow-wrap:anywhere]">
+            {info.concept}
+          </p>
+        )}
         {m && (
-          <span
-            className={`mt-3 inline-flex rounded-full px-2.5 py-1 type-label-s ${
-              color === 'blue' ? 'bg-white text-link' : 'bg-brand text-on-brand'
-            }`}
-          >
+          <span className="mt-3 inline-flex rounded-full bg-brand px-2.5 py-1 type-label-s text-on-brand">
             {m.numeral} {m.name}
             {playing && ' · playing'}
           </span>
         )}
-        <div
-          className={`cover-meta mt-4 flex justify-between border-t pt-3 type-label-s whitespace-nowrap [font-stretch:100%] ${
-            color === 'white' ? 'border-rule' : 'border-white/70'
-          }`}
-        >
+        <div className="cover-meta mt-4 flex justify-between border-t border-white/70 pt-3 type-label-s whitespace-nowrap [font-stretch:100%]">
           {AREAS.map((a) => (
             <span key={a.id}>
               {a.numeral} · {a.name}

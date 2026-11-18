@@ -42,6 +42,9 @@ export function parseConcept(id: string, md: string): Project {
   }
 }
 
+/** The most a project description may hold: it goes on the cover. */
+export const MAX_CONCEPT = 300
+
 export function conceptMarkdown(p: Omit<Project, 'id'>): string {
   // one line per field: strip newlines so a pasted value can't break the front matter
   const line = (s: string): string => s.replace(/\s*\r?\n\s*/g, ' ').trim()
@@ -115,7 +118,7 @@ export async function editProject(
   }
 
   if (change.concept !== undefined) {
-    const body = change.concept.trim()
+    const body = change.concept.trim().slice(0, MAX_CONCEPT)
     const section = /(## Concept[^\S\r\n]*\r?\n)([\s\S]*?)(?=\r?\n## |$)/
     md = section.test(md)
       ? md.replace(section, (_, heading: string) => `${heading}\n${body}\n`)
@@ -136,7 +139,11 @@ export async function createProject(dir: string, input: Omit<Project, 'id'>): Pr
 
   const root = join(dir, id)
   await Promise.all(SUBFOLDERS.map((f) => mkdir(join(root, f), { recursive: true })))
-  const project = { name, client: input.client.trim(), concept: input.concept }
+  const project = {
+    name,
+    client: input.client.trim(),
+    concept: input.concept.trim().slice(0, MAX_CONCEPT)
+  }
   await writeFile(join(root, 'concept.md'), conceptMarkdown(project))
   return { id, ...project, concept: project.concept.trim() }
 }

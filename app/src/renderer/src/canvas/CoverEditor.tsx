@@ -10,7 +10,7 @@ import { CoverFace } from './Cover'
 type Field = 'name' | 'concept'
 const QUESTIONS: { field: Field; ask: string; label: string }[] = [
   { field: 'name', ask: "What's it called?", label: 'Title' },
-  { field: 'concept', ask: 'What is this project trying to say?', label: 'Description' }
+  { field: 'concept', ask: 'Description', label: 'Description' }
 ]
 
 const underline =

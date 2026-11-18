@@ -158,7 +158,7 @@ Orchestra/
   studio/                                  the _studio chat's home, and boards/setup.json
   projects/<id>/
     concept.md                             name and client in front matter, "## Concept" section
-    research.md, deliverables.md           interpretation; chosen and locked-in ids in front matter
+    research.md, deliverables.md           interpretation; chosen and locked-in ids, and the research notes picked for Create (research:), in front matter
     references/ (+ files/), prereqs/, exports/, audits/, notes/
     boards/<board>.json                    card positions
     graphify-out/                          the project's knowledge graph
@@ -188,6 +188,7 @@ Git will not flag a mismatch between these. Most of the bugs a clean merge can i
 | The `t-` thread prefix | `newThread` in `OrchestratorBar.tsx`, `chats:threads` in `index.ts`, `orchestratorPrompt` in `prompts.ts` |
 | Create card ids (`orchestrator`, `chat-<id>`, `inst--…`) | `Create.tsx`, and `cardOf` in `NeedsYou.tsx` |
 | The areas | `AREAS` in `canvas/shared.ts`, `goto.ts`, `command()` and `area()` in `App.tsx`, the "Go to" text in `prompts.ts` |
+| The research notes picked for Create (`research:` in `deliverables.md`) | `cleanResearch` / `saveResearch` in `deliverables.ts`, `create:research` in `main/index.ts` and `preload/index.ts`, the `research` field of `CreateState`, the "research:" line in `prompts.ts`, and `CreateSetup.tsx` |
 | An agent front-matter field | `library.ts`, both files in `library/templates/`, `toMarkdown` and `draftProblems` in `proposals.ts`, the input schema in `orchestra-mcp.ts`, `newInstrument` |
 | Model names | `providers.ts`, the `z.enum` in `orchestra-mcp.ts`, `MODELS` in `proposals.ts` |
 | A setup field | `Setup` and `cleanSetup` in `setup.ts`, `SLOTS` in `canvas/Setup.tsx` |
@@ -197,6 +198,8 @@ The renderer may import from `src/main/` only the three modules with no Node dep
 ## How to add common things
 
 **An IPC call.** Write the logic in a module under `src/main/`. In `index.ts`, add a short handler that validates ids with `projectDir()` and delegates. Add the method to `api` in preload.
+
+**The Create start modal.** `components/CreateSetup.tsx` opens on first entry to Create and again from the Add deliverable tool or a right-click in the Deliverables group. Its choices (research notes, deliverables grouped by category, tick and pin rules) live in `canvas/setupPick.ts`, which is pure and tested. A deliverable with work started is pinned on. The theme rounds a bordered box only for the border colours it knows, so a row that changes its border colour must also say `rounded-lg`.
 
 **A card on an existing board.** Add a `CardSpec` to that screen's `cards` array, and write its body as a component in a new file. Cards grow with their content. The exceptions are chats (`height`) and markdown files, capped at twice the Orchestrator's height (`DOC_BODY`).
 

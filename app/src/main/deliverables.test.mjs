@@ -72,3 +72,42 @@ test('lock-in only adds, only chosen deliverables, and survives a new selection'
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('research picks are kept, cleaned, and survive choosing and locking', async () => {
+  const { cleanResearch, readResearch, saveResearch } = await import('./deliverables.ts')
+  assert.deepEqual(
+    cleanResearch([
+      'research/art-direction.md',
+      'research.md',
+      'research/art-direction.md',
+      '../secrets.md',
+      'research/a,b.md',
+      'research/sub/x.md',
+      'notes/x.md',
+      42
+    ]),
+    ['research/art-direction.md', 'research.md']
+  )
+  assert.deepEqual(cleanResearch('research.md'), [])
+
+  const dir = await mkdtemp(join(tmpdir(), 'orchestra-research-picks-'))
+  try {
+    await saveSelection(dir, lib, ['kit'])
+    assert.deepEqual(await readResearch(dir), [])
+    assert.deepEqual(await saveResearch(dir, lib, ['research/art-direction.md', 'nope']), [
+      'research/art-direction.md'
+    ])
+    assert.deepEqual(await readSelection(dir), ['kit'])
+    // choosing again, and locking in, must not drop the picks
+    await saveSelection(dir, lib, ['kit', 'site'])
+    await lockDeliverables(dir, lib, ['kit'])
+    assert.deepEqual(await readResearch(dir), ['research/art-direction.md'])
+    assert.deepEqual(await readLocked(dir), ['kit'])
+    assert.match(await readFile(join(dir, 'deliverables.md'), 'utf8'), /^research: \[research\//m)
+    // clearing them leaves no line behind
+    await saveResearch(dir, lib, [])
+    assert.deepEqual(await readResearch(dir), [])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})

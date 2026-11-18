@@ -662,7 +662,7 @@ function ShelfCover({
         <button
           tabIndex={open ? 0 : -1}
           onClick={onEdit}
-          className="serif-on h-10 w-[150px] border-[1.5px] border-brand type-label-s text-link hover:bg-brand hover:text-on-brand"
+          className="serif-on h-10 w-[150px] border border-chip-line type-label-s text-link"
         >
           Edit project
         </button>

@@ -47,6 +47,8 @@ import {
 } from '../canvas/stage'
 import { splitDecision, waitingOnUser, type Decision } from '../decide'
 import { splitSuggestion } from '../suggest'
+import { CreateSetup } from './CreateSetup'
+import { researchChoices, startingResearch } from '../canvas/setupPick'
 import { OpenQuestion } from './OpenQuestion'
 import { splitGoTo, type Place } from '../goto'
 import { OrchestratorFace } from '../canvas/OrchestratorFace'
@@ -178,6 +180,8 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     if (ids.length)
       void window.api.lockDeliverables(project, ids).then((locked) => setPlan({ ...plan, locked }))
   }, [plan, project])
+  // null: open by itself the first time in, before anything is built; true or false: the user chose
+  const [setupOpen, setSetupOpen] = useState<boolean | null>(null)
   useEffect(() => {
     const load = (): void => {
       void window.api.listChats(project).then(setChats, () => {})
@@ -235,8 +239,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
   useToolbar(
     [
       {
+        id: 'setup',
+        label: 'Add deliverable',
+        icon: 'settings-3-line',
+        run: () => setSetupOpen(true)
+      },
+      {
         id: 'deliverable',
-        label: 'Deliverable',
+        label: 'New type',
         icon: 'box-3-line',
         run: () =>
           dispatchEvent(new CustomEvent('orchestra:ask', { detail: 'I need a new deliverable: ' }))
@@ -261,30 +271,29 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
 
   if (!plan) return <div className="bg-dots h-full" />
 
-  /** Locks in what's on and not yet locked. It only ever adds: nothing locked in comes back out. */
-  function lockIn(): void {
-    const fresh = plan!.selected.filter((id) => !lockedIn.includes(id))
-    if (!fresh.length) return
-    setPlan({ ...plan!, locked: [...lockedIn, ...fresh] })
-    void window.api.lockDeliverables(project, fresh).catch((e) => setError(reason(e)))
-    setFocus('orchestrator')
-    // the Orchestrator takes it from here: it asks which deliverable to start with
-    const names = fresh.map((id) => musician(id)?.name ?? id).join(', ')
-    void window.api
-      .sendChat(
-        project,
-        GENERAL,
-        confirmed
-          ? `I have added to my deliverables: ${names}. Walk me through these too.`
-          : `I have confirmed my deliverables: ${names}. Walk me through making them.`
-      )
-      .catch((e) => setError(reason(e)))
-  }
-  async function choose(ids: string[]): Promise<void> {
+  /** The modal's Confirm: saves the research and deliverables picked, and locks in the new ones,
+   * which opens their windows. Locking only ever adds: nothing locked in comes back out. */
+  async function confirmSetup(ids: string[], research: string[]): Promise<void> {
     setError('')
     try {
+      await window.api.saveResearch(project, research)
       const saved = await window.api.saveDeliverables(project, ids)
-      setPlan({ ...plan!, selected: saved })
+      const fresh = saved.filter((id) => !lockedIn.includes(id))
+      if (fresh.length) await window.api.lockDeliverables(project, fresh)
+      setPlan(await window.api.loadCreate(project))
+      setSetupOpen(false)
+      if (!fresh.length) return
+      setFocus('orchestrator')
+      // the Orchestrator takes it from here: it asks which deliverable to start with
+      const names = fresh.map((id) => musician(id)?.name ?? id).join(', ')
+      const notes = research.length ? ` Use these research notes: ${research.join(', ')}.` : ''
+      await window.api.sendChat(
+        project,
+        GENERAL,
+        (confirmed
+          ? `I have added to my deliverables: ${names}. Walk me through these too.`
+          : `I have confirmed my deliverables: ${names}. Walk me through making them.`) + notes
+      )
     } catch (e) {
       setError(reason(e))
     }
@@ -295,26 +304,14 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     !!chats.find((x) => x.id === id)?.count ||
     Object.keys(agents).some((k) => k === id || k.startsWith(`${id}--`))
   async function seatMenu(id: string): Promise<void> {
-    const chosen = plan!.selected.includes(id)
-    const locked = startedOn(id)
     const c = await window.api.menu([
-      {
-        id: 'toggle',
-        label: locked ? 'Locked in' : chosen ? 'Turn off' : 'Turn on',
-        enabled: !locked
-      },
+      { id: 'add', label: 'Add deliverable…' },
       { id: 'edit', label: 'Edit deliverable…' },
       ...(lockedIn.includes(id) ? [{ id: 'instrument', label: 'Add an Instrument' }] : [])
     ])
+    if (c === 'add') return setSetupOpen(true)
     if (c === 'instrument') return void addInstrument(id)
     if (c === 'edit') return setEditing(id)
-    if (c === 'toggle') seat(id)
-  }
-  /** A seat click turns the deliverable on or off, until work on it has started. */
-  function seat(id: string): void {
-    if (startedOn(id)) return
-    const on = plan!.selected.includes(id)
-    void choose(on ? plan!.selected.filter((s) => s !== id) : [...plan!.selected, id])
   }
 
   const instCard = (m: string, i: string): string => `inst--${m}--${i}`
@@ -349,23 +346,28 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     setFocus(`file-${ref.role}-${ref.id}`)
   }
 
-  const seats = seatColumns(plan.musicians)
+  const showSetup =
+    setupOpen ??
+    (!frame.preview &&
+      outputsRead &&
+      plan.locked.length === 0 &&
+      researchChoices(outputs).length > 0)
+  const seats = seatColumns(plan.musicians.filter((m) => plan.selected.includes(m.id)))
   const at = new Map(seats.map((s) => [s.id, s]))
   const musician = (id: string): Musician | undefined => plan.musicians.find((m) => m.id === id)
   const chosen = plan.selected.filter((id) => at.has(id))
   const lockedIn = plan.locked // kept in deliverables.md
   const confirmed = lockedIn.length > 0
   const spawned = chosen.filter((id) => lockedIn.includes(id))
-  const waitingToLock = chosen.filter((id) => !lockedIn.includes(id))
   const foundations = plan.instruments.filter((i) =>
     plan.musicians.some((m) => m.prerequisites.includes(i.id))
   )
   const lit = new Set(foundationOrder(plan.musicians, plan.instruments, chosen).map((i) => i.id))
-  const lockY = Math.max(...seats.map((s) => s.y)) / 2 // the middle of the columns
+  const lockY = seats.length ? Math.max(...seats.map((s) => s.y)) / 2 : 0 // the middle of the columns
   const spots = prereqSpots(foundations.length, lockY)
   const lockX = PREREQ.x + PREREQ.w / 2 + LANE + LOCK_R
   // the group around all of it, and the windows start clear of it
-  const stageLeft = Math.min(...seats.map((s) => s.x)) - SEAT.w / 2 - 56
+  const stageLeft = (seats.length ? Math.min(...seats.map((s) => s.x)) : 0) - SEAT.w / 2 - 56
   const stageTop =
     Math.min(-SEAT.h / 2, lockY - LOCK_R, ...spots.map((s) => s.y - PREREQ.h / 2)) - 56
   const stageBottom =
@@ -645,18 +647,12 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         return (
           <button
             key={m.id}
-            onClick={() => seat(m.id)}
             onContextMenu={(e) => {
               e.preventDefault()
               e.stopPropagation()
               void seatMenu(m.id)
             }}
-            aria-pressed={on}
-            title={
-              locked
-                ? `${m.name} is locked on: work has started. Right-click to edit it.`
-                : `${on ? 'Turn off' : 'Turn on'} ${m.name}: ${m.deliverable}`
-            }
+            title={`${m.name}: ${m.deliverable}\nRight-click to edit it.`}
             className={`absolute flex flex-col items-center px-4 pt-5 pb-4 text-center transition-[background-color,color] duration-200 ease-(--ease) ${
               on
                 ? 'seat-on'
@@ -702,17 +698,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         )
       })}
 
-      {/* lock in: opens the windows for what's on */}
+      {/* the circle opens the picker: research and deliverables, to start or to change */}
       <button
-        onClick={lockIn}
-        disabled={waitingToLock.length === 0}
-        title={
-          !ready
-            ? 'Turn on the deliverables this project needs'
-            : waitingToLock.length
-              ? 'Lock in the deliverables that are on'
-              : 'Turn on another deliverable to add it'
-        }
+        onClick={() => setSetupOpen(true)}
+        title="Choose the research and deliverables to build from"
         className={`group absolute flex flex-col items-center justify-center gap-1 rounded-md px-4 text-center transition-colors duration-200 ease-(--ease) ${
           ready ? 'seat-on' : 'border border-card-line bg-card text-link shadow-card'
         }`}
@@ -723,17 +712,11 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           height: LOCK_R * 2
         }}
       >
-        <span className="type-accent">
-          {waitingToLock.length
-            ? confirmed
-              ? `Add ${waitingToLock.length}`
-              : 'Lock in'
-            : confirmed
-              ? 'Locked in'
-              : 'Lock in'}
-        </span>
+        <span className="type-accent">{confirmed ? 'Change' : 'Choose'}</span>
         <span className={`type-label-mono ${ready ? 'text-poster-dim' : 'text-dim'}`}>
-          {!ready ? 'Turn on your deliverables' : `${chosen.length} on`}
+          {!ready
+            ? 'Research and deliverables'
+            : `${chosen.length} deliverable${chosen.length === 1 ? '' : 's'}`}
         </span>
       </button>
       {editingInst && plan.instruments.some((i) => i.id === editingInst) && (
@@ -743,6 +726,20 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           prerequisite={foundations.some((f) => f.id === editingInst)}
           onClose={() => setEditingInst(null)}
           onSaved={() => setEditingInst(null)}
+        />
+      )}
+      {showSetup && (
+        <CreateSetup
+          project={project}
+          musicians={plan.musicians}
+          instruments={plan.instruments}
+          research={researchChoices(outputs)}
+          pickedResearch={startingResearch(plan.research, researchChoices(outputs))}
+          selected={chosen}
+          pinned={plan.selected.filter(startedOn)}
+          first={!confirmed}
+          onConfirm={confirmSetup}
+          onClose={() => setSetupOpen(false)}
         />
       )}
       {editing && musician(editing) && (
@@ -901,7 +898,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
                   <Suggestion
                     items={plan.musicians.filter((m) => suggested.includes(m.id))}
                     added={false}
-                    onAdd={() => choose([...plan.selected, ...suggested])}
+                    onAdd={() => confirmSetup([...plan.selected, ...suggested], plan.research)}
                   />
                 </div>
               )}
@@ -1154,7 +1151,15 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
         )
       }
       addMenu={(at, sel): MenuItem[] => {
-        if (!confirmed) return [{ label: 'Lock in your deliverables to add Instruments' }]
+        const g = {
+          x: deliverablesGroup.x + so.x,
+          y: deliverablesGroup.y + so.y,
+          w: deliverablesGroup.w,
+          h: deliverablesGroup.h
+        }
+        if (at.x >= g.x && at.x <= g.x + g.w && at.y >= g.y && at.y <= g.y + g.h)
+          return [{ label: 'Add deliverable…', run: () => setSetupOpen(true) }]
+        if (!confirmed) return [{ label: 'Add deliverable…', run: () => setSetupOpen(true) }]
         // a deliverable's window, or one of its Instruments, selected: the menu is about it
         const id = /^chat-(.+)$/.exec(sel ?? '')?.[1] ?? /^inst--(.+?)--/.exec(sel ?? '')?.[1]
         const m = id && spawned.includes(id) ? musician(id) : undefined
@@ -1232,7 +1237,13 @@ function remember(key: string, value: string[]): void {
   }
 }
 
-const NO_PLAN: CreateState = { musicians: [], instruments: [], selected: [], locked: [] }
+const NO_PLAN: CreateState = {
+  musicians: [],
+  instruments: [],
+  selected: [],
+  locked: [],
+  research: []
+}
 // the Orchestrator's chat can run forever, so it alone scrolls: capped at 1920×3240's shape
 const ASK_W = 432
 const INST_W = 288 // two Instrument windows sit under each deliverable's

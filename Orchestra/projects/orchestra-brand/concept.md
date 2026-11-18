@@ -1,7 +1,14 @@
-﻿# Orchestration brand: concept
+# Orchestration brand: concept
 
 ## Concept
 
+The branding and guidelines for the Orchestra application
+
+## Confirmed from Figma (Oct 30)
+
+- Logo: white ∫ inside a thin white circle, transparent background (Brand > Orchestration Logo).
+- Wordmark: Orchestration Type Mark, outlined vector.
+- Imagery: Violin ASCII, built from rawpixel image 3282518 (check its license: CC0 or paid).
 
 ## Confirmed from Figma (Oct 30)
 

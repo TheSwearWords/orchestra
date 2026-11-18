@@ -16,7 +16,7 @@ import {
   type CoverInfo
 } from './shared'
 import { Minimap, NewCard, Shell, ZoomChip, barButton } from './Chrome'
-import { popMenu } from './shared'
+import { popMenu, reducedMotion } from './shared'
 import { CoverFace } from './Cover'
 import { BookStatus } from './BookStatus'
 import { useNeeds } from './NeedsYou'
@@ -255,6 +255,8 @@ export function Studio({
     onLayout({ ...layout, groups: groups.map((g) => (g.name === from ? { ...g, name: to } : g)) })
   }
 
+  const [leaving, setLeaving] = useState<string | null>(null) // a deleted project, shrinking
+
   async function menu(p: Project, el: HTMLElement): Promise<void> {
     const moving = with_(p.id) ? selected : [p.id]
     const mine = groups.find((g) => g.ids.includes(p.id))
@@ -277,7 +279,15 @@ export function Studio({
     if (choice?.startsWith('group:to:')) fileUnder(moving, choice.slice(9), false)
     if (choice === 'enter') onEnter(p.id, el.getBoundingClientRect())
     if (choice === 'edit') onEdit(p.id)
-    if (choice === 'deleted') onChanged()
+    if (choice === 'deleted') {
+      // the cover shrinks away before the shelf closes up
+      if (reducedMotion()) return onChanged()
+      setLeaving(p.id)
+      setTimeout(() => {
+        setLeaving(null)
+        onChanged()
+      }, 400)
+    }
   }
 
   return (
@@ -411,6 +421,7 @@ export function Studio({
           onEnter={(el) => onEnter(p.id, el.getBoundingClientRect())}
           onEdit={() => onEdit(p.id)}
           onMenu={(el) => void menu(p, el)}
+          leaving={leaving === p.id}
         />
       ))}
 
@@ -555,7 +566,8 @@ function ShelfCover({
   onDrop,
   onEnter,
   onEdit,
-  onMenu
+  onMenu,
+  leaving
 }: {
   info: CoverInfo
   at: [number, number, number]
@@ -573,6 +585,7 @@ function ShelfCover({
   onEnter: (el: HTMLElement) => void
   onEdit: () => void
   onMenu: (el: HTMLElement) => void
+  leaving: boolean // being deleted: shrinks to nothing
 }): React.JSX.Element {
   const [dragging, setDragging] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -628,7 +641,12 @@ function ShelfCover({
         width: COVER.w,
         height: COVER.h,
         transform: `translate(${x}px, ${y}px) rotate(${dragging ? rot - 0.6 : rot}deg)`,
-        transition: tidying ? 'transform 450ms var(--ease)' : undefined
+        transition: leaving
+          ? 'scale 380ms var(--ease), opacity 300ms var(--ease)'
+          : tidying
+            ? 'transform 450ms var(--ease)'
+            : undefined,
+        ...(leaving ? { scale: '0', opacity: 0, pointerEvents: 'none' as const } : {})
       }}
     >
       {/* the first page, under the cover */}

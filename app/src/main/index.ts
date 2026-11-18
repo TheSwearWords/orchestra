@@ -10,7 +10,7 @@ import { agentPrompt, orchestratorPrompt, studioPrompt } from './prompts'
 import { lockDeliverables, readLocked, readSelection, saveSelection } from './deliverables'
 import { interpret, readInterpretation } from './interpret'
 import { providerStatus } from './connections'
-import { addCoverImage, COVER_TYPES, readCover, saveCover } from './covers'
+import { readCover, saveCover } from './covers'
 import { ensureServer, isLocal, readPreviews, saveThumbnail, stopServers } from './previews'
 import { forgetKey, loadKeys, savedKeys, saveKey } from './keys'
 import { captureSites, shotFile } from './siteshots'
@@ -314,14 +314,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('projects:setCover', (_, id: string, cover: unknown) =>
     saveCover(projectDir(id), cover)
   )
-  ipcMain.handle('projects:pickCover', async (e, id: string) => {
-    const win = BrowserWindow.fromWebContents(e.sender)!
-    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
-      properties: ['openFile'],
-      filters: [{ name: 'Images', extensions: COVER_TYPES }]
-    })
-    return canceled || !filePaths[0] ? null : addCoverImage(projectDir(id), filePaths[0])
-  })
   ipcMain.handle(
     'projects:edit',
     (_, id: string, change: { name?: string; client?: string; concept?: string }) => {
@@ -604,7 +596,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('agents:set', async (_, role: Role, id: string, key: string, value: unknown) => {
     const file = agentFile(ORCHESTRA_HOME, role, id)
     const md = await readFile(file, 'utf8')
-    if (['instruments', 'prerequisites', 'tools'].includes(key)) {
+    if (['instruments', 'prerequisites', 'tools', 'needs'].includes(key)) {
       if (!Array.isArray(value) || !value.every((v) => /^[\w-]+$/.test(String(v))))
         throw new Error('Not a list of ids.')
       return writeFile(file, setField(md, key, value.map(String)))

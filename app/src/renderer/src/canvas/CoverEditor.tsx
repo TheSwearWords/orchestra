@@ -2,14 +2,15 @@
 // at once). The cover on the left is the result, updating as you type.
 import { useEffect, useRef, useState } from 'react'
 import type { Cover, Project } from '../../../preload'
+import { PLATES } from './Landscape'
+import { LANDSCAPE_NAMES, MAX_CONCEPT } from './shared'
 import { Shell } from './Chrome'
 import { CoverFace } from './Cover'
 
-type Field = 'name' | 'client' | 'concept'
-const QUESTIONS: { field: Field; ask: string; label: string; optional?: boolean }[] = [
-  { field: 'name', ask: "What's it called?", label: 'Name' },
-  { field: 'client', ask: 'Who is it for?', label: 'Client', optional: true },
-  { field: 'concept', ask: 'What is this project trying to say?', label: 'Concept' }
+type Field = 'name' | 'concept'
+const QUESTIONS: { field: Field; ask: string; label: string }[] = [
+  { field: 'name', ask: "What's it called?", label: 'Title' },
+  { field: 'concept', ask: 'What is this project trying to say?', label: 'Description' }
 ]
 
 const underline =
@@ -38,7 +39,6 @@ export function CoverEditor({
 }: Props): React.JSX.Element {
   const [v, setV] = useState({
     name: project?.name ?? '',
-    client: project?.client ?? '',
     concept: project?.concept ?? ''
   })
   const [step, setStep] = useState(0)
@@ -56,16 +56,6 @@ export function CoverEditor({
       setError(reason(err))
     }
   }
-  async function upload(): Promise<void> {
-    if (!project) return
-    try {
-      const image = await window.api.pickCover(project.id)
-      if (image) await changeCover({ ...cover, image })
-    } catch (err) {
-      setError(reason(err))
-    }
-  }
-
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
       if (e.key === 'Escape' && !e.defaultPrevented) onDone()
@@ -98,7 +88,7 @@ export function CoverEditor({
   async function create(open: boolean): Promise<void> {
     setBusy(true)
     try {
-      onCreated(await window.api.createProject(v), open)
+      onCreated(await window.api.createProject({ ...v, client: '' }), open)
     } catch (err) {
       setError(reason(err))
       setBusy(false)
@@ -109,7 +99,7 @@ export function CoverEditor({
   const last = step === QUESTIONS.length - 1
   function next(e: React.FormEvent): void {
     e.preventDefault()
-    if (!q.optional && !v[q.field].trim()) return setError(`${q.label} first.`)
+    if (!v[q.field].trim()) return setError(`${q.label} first.`)
     if (last) void create(false)
     else setStep(step + 1)
   }
@@ -129,7 +119,7 @@ export function CoverEditor({
           style={{ width: 300, height: 400, transform: 'scale(1.7)' }}
         >
           <CoverFace
-            info={{ id: project?.id ?? 'new', name: v.name, client: v.client, no, cover }}
+            info={{ id: project?.id ?? 'new', name: v.name, concept: v.concept, no, cover }}
           />
         </div>
       </div>
@@ -140,10 +130,18 @@ export function CoverEditor({
             <p className="type-label-mono text-link">Edit project</p>
             {QUESTIONS.map((x) => (
               <label key={x.field} className="mt-8 flex flex-col gap-2">
-                <span className="type-label-s text-dim">{x.label}</span>
+                <span className="flex justify-between type-label-s text-dim">
+                  {x.label}
+                  {x.field === 'concept' && (
+                    <span>
+                      {v.concept.length} / {MAX_CONCEPT}
+                    </span>
+                  )}
+                </span>
                 {x.field === 'concept' ? (
                   <textarea
-                    rows={3}
+                    rows={4}
+                    maxLength={MAX_CONCEPT}
                     value={v.concept}
                     onChange={(e) => change('concept', e.target.value)}
                     className={`${underline} resize-none type-body-l`}
@@ -161,49 +159,30 @@ export function CoverEditor({
               {error ? <span className="text-danger-fg">{error}</span> : saved && 'Saved'}
             </p>
             <div className="mt-6 flex flex-col gap-2">
-              <span className="type-label-s text-dim">Cover colour</span>
-              <div className="flex gap-2">
-                {(
-                  [
-                    [undefined, 'Auto', 'bg-card'],
-                    ['blue', 'Blue', 'bg-brand'],
-                    ['ink', 'Ink', 'bg-terminal'],
-                    ['white', 'White', 'bg-card']
-                  ] as const
-                ).map(([value, name, swatch]) => (
-                  <button
-                    key={name}
-                    aria-pressed={cover.color === value}
-                    onClick={() => void changeCover({ ...cover, color: value })}
-                    title={name}
-                    className={`flex h-9 items-center gap-2 border px-2.5 type-label-s text-link ${
-                      cover.color === value ? 'border-brand bg-selected' : 'border-chip-line'
-                    }`}
-                  >
-                    {value && <span className={`size-4 border border-chip-line ${swatch}`} />}
-                    {name}
-                  </button>
-                ))}
-              </div>
-              <span className="mt-3 type-label-s text-dim">Artwork</span>
+              <span className="type-label-s text-dim">Backdrop</span>
               <div className="flex flex-wrap gap-2">
                 <button
-                  aria-pressed={!cover.image}
-                  onClick={() => void changeCover({ color: cover.color })}
-                  className={`flex size-16 items-center justify-center border type-label-s text-link ${
-                    !cover.image ? 'border-brand bg-selected' : 'border-chip-line'
+                  aria-pressed={!cover.landscape}
+                  onClick={() => void changeCover({})}
+                  className={`flex h-12 w-16 items-center justify-center border type-label-s text-link ${
+                    !cover.landscape ? 'border-brand bg-selected' : 'border-chip-line'
                   }`}
                 >
-                  None
+                  Auto
                 </button>
-                <button
-                  onClick={() => void upload()}
-                  className={`flex size-16 items-center justify-center border border-dashed text-center type-label-s text-link hover:bg-selected ${
-                    cover.image ? 'border-brand' : 'border-wire'
-                  }`}
-                >
-                  Upload
-                </button>
+                {LANDSCAPE_NAMES.map((name) => (
+                  <button
+                    key={name}
+                    aria-pressed={cover.landscape === name}
+                    onClick={() => void changeCover({ landscape: name })}
+                    title={name}
+                    className={`h-12 w-16 overflow-hidden border ${
+                      cover.landscape === name ? 'border-brand' : 'border-chip-line'
+                    }`}
+                  >
+                    <img src={PLATES[name]} alt={name} className="size-full object-cover" />
+                  </button>
+                ))}
               </div>
             </div>
             <div className="mt-6 flex gap-2.5">
@@ -238,19 +217,39 @@ export function CoverEditor({
             </div>
             <p className="mt-6 type-label-mono text-link">
               {String(step + 1).padStart(2, '0')} / {String(QUESTIONS.length).padStart(2, '0')}
-              {q.optional && ' · optional'}
             </p>
             <label htmlFor="cover-q" className="mt-3 type-display-l text-link">
               {q.ask}
             </label>
-            <input
-              id="cover-q"
-              key={q.field}
-              autoFocus
-              value={v[q.field]}
-              onChange={(e) => change(q.field, e.target.value)}
-              className={`${underline} mt-8 type-heading-m`}
-            />
+            {q.field === 'concept' ? (
+              <textarea
+                id="cover-q"
+                key={q.field}
+                autoFocus
+                rows={4}
+                maxLength={MAX_CONCEPT}
+                value={v.concept}
+                onChange={(e) => change('concept', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) next(e) // Shift+Enter is a new line
+                }}
+                className={`${underline} mt-8 resize-none type-body-l`}
+              />
+            ) : (
+              <input
+                id="cover-q"
+                key={q.field}
+                autoFocus
+                value={v[q.field]}
+                onChange={(e) => change(q.field, e.target.value)}
+                className={`${underline} mt-8 type-heading-m`}
+              />
+            )}
+            {q.field === 'concept' && (
+              <p className="mt-2 type-caption text-dim">
+                {v.concept.length} / {MAX_CONCEPT}
+              </p>
+            )}
             <p role="status" className="mt-3 h-5 type-caption text-danger-fg">
               {error}
             </p>
@@ -268,7 +267,7 @@ export function CoverEditor({
                     type="button"
                     disabled={busy}
                     onClick={() =>
-                      v.concept.trim() ? void create(true) : setError('Concept first.')
+                      v.concept.trim() ? void create(true) : setError('Description first.')
                     }
                     className="serif-on h-11 bg-brand px-5 type-label-m text-on-brand hover:bg-inverse"
                   >
@@ -280,7 +279,7 @@ export function CoverEditor({
                   type="submit"
                   className="serif-on h-11 bg-brand px-5 type-label-m text-on-brand hover:bg-inverse"
                 >
-                  {q.optional && !v[q.field].trim() ? 'Skip' : 'Next'}
+                  Next
                 </button>
               )}
               <button

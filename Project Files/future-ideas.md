@@ -33,50 +33,27 @@ Already customizable today:
 3. **Plan approaches.** For each pain point, pick how to open it up: config or data files instead of code, clear extension points (agents, deliverables, sites, providers), a theme layer driven by tokens, docs or a contributor guide, and the Advanced mode / self-editing flow above.
 4. Fold the fixes into the build plan before distribution (see section 1).
 
-## 3. Onboarding flow (first launch)
-
-**Welcome / landing screen**
-- A cool landing page, something like "Welcome".
-- Maybe the Orchestrator speaks to you.
-- ASCII art animation, for example music, sound waves, or a rotating statue (ties in with the existing violin ASCII brand asset).
-
-**Step 1: Name**
-- "What should we call you?"
-
-**Step 2: Compute**
-- "What are you using?" Claude, ChatGPT, or something else.
-
-**Step 3: Tools you use / MCPs**
-- Ask what the user uses most, rather than asking about MCPs directly. For example Figma, Adobe Creative Cloud, Blender, and so on.
-- If a picked tool has an MCP connection, recommend connecting it (e.g. Figma MCP).
-- Optional now, can be done later.
-
-**Step 4: File path setup**
-- The Orchestrator creates a folder on the Desktop where everything lives.
-
-**Step 5: Dependencies**
-- Install everything needed: Obsidian, and so on.
-- Idea: bundle it all as one install (a skill package or plugin that compiles everything).
-
-## 4. Usage meter in the logo
-
-- The Orchestra logo in the top-left fills up as you use your plan's usage.
-- Hover it for a quick readout: what percent you have left.
-- With mix-and-match models, the hover could list each connected provider separately (Claude 62% left, ChatGPT 80% left).
-
-## 5. Product site: video walkthrough instead of screenshots
+## 3. Product site: video walkthrough instead of screenshots
 
 - Replace the UI screenshots on the product site with a video walkthrough of the app.
 - How: rebuild the UI in a Figma design file, animate it with **Figma Motion**, and export the video.
 
+## 4. Inter-file communication
+
+- Idea: files in a project can talk to each other, so a change in one is known to, or carried into, the others. Example: a color changes in the Brand Kit and the Deck, Website and Logo files that use it find out.
+- Not sure yet what this looks like. Options to explore:
+  - Visible links between files on the canvas, drawn like the existing wires.
+  - A "changed upstream" flag on a file whose source changed, with a button to pull the update.
+  - Agents noticing the change and proposing the follow-up edits through the Orchestrator.
+  - Files referencing each other by name in the markdown, which the knowledge graph already picks up.
+- Open: how this relates to prerequisites (Brand Spec, Deck Outline), which already share output across deliverables.
+
 ---
 
 ## Open questions
-- Usage data source: where the numbers come from per provider (CLI output, API rate-limit headers, the provider's own usage page), and whether "fill" means used or remaining.
 - Exact compute adapters: how ChatGPT and other providers hook into the Orchestrator/Musician/Instrument model.
-- Per-agent model assignment: where it's set (agent file? settings?), what happens if a provider isn't connected (fall back to the default?), and whether onboarding Step 2 lets you pick several providers.
+- Per-agent model assignment: where it's set (agent file? settings?), what happens if a provider isn't connected (fall back to the default?).
 - Self-editing safety: does a shipped (packaged) build need to switch into a source/dev copy before Advanced mode can edit it? How does the user recover if an edit breaks the app?
 - Update path for users who've customized: separate app vs. fork vs. merge.
-- Which tools map to which MCPs (the recommendation list).
-- Installer format: one bundled installer vs. guided step-by-step installs.
 - Walkthrough video: build it in the existing Orchestration Figma file (on its own page) or in a separate file? How will it stay in sync as the live UI changes?
+- Inter-file communication: what counts as a connection between files, and does it push changes automatically or only flag them?

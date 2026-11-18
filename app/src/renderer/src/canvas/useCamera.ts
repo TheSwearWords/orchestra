@@ -26,16 +26,34 @@ export function useCamera(initial: Camera): {
     return () => ro.disconnect()
   }, [])
 
-  const set = useCallback((c: Camera) => {
+  // the flight in progress settles when anything cuts it short (a pan, a wheel, another
+  // flight), so whoever waits on it (the book opening an area) is never left hanging
+  const landing = useRef<(() => void) | null>(null)
+  const stop = useCallback(() => {
     cancelAnimationFrame(frame.current)
-    current.current = c
-    setCamera(c)
+    const land = landing.current
+    landing.current = null
+    land?.()
   }, [])
+
+  const set = useCallback(
+    (c: Camera) => {
+      stop()
+      current.current = c
+      setCamera(c)
+    },
+    [stop]
+  )
 
   const fly = useCallback(
     (to: Camera, ms = 550) =>
-      new Promise<void>((done) => {
-        cancelAnimationFrame(frame.current)
+      new Promise<void>((resolve) => {
+        stop()
+        const done = (): void => {
+          landing.current = null
+          resolve()
+        }
+        landing.current = resolve
         const from = current.current
         const box = ref.current?.getBoundingClientRect()
         const w = box?.width ?? innerWidth
@@ -57,7 +75,7 @@ export function useCamera(initial: Camera): {
         }
         frame.current = requestAnimationFrame(step)
       }),
-    []
+    [stop]
   )
 
   useEffect(() => () => cancelAnimationFrame(frame.current), [])

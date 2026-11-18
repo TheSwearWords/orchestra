@@ -1,10 +1,11 @@
 // Pictures of the reference library's sites: each landing page, loaded in a window nobody sees,
 // in <home>/sites/<host>.png. One at a time, because each is a whole web page.
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, nativeImage } from 'electron'
 import { existsSync } from 'fs'
 import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { siteHost, type Site } from './research.ts'
+import { brandTint } from './tint.ts'
 
 const SETTLE_MS = 2500 // for images and fonts after the page says it has loaded
 const LOAD_MS = 15_000
@@ -57,4 +58,20 @@ export async function captureSites(home: string, sites: Site[]): Promise<boolean
     running = false
   }
   return made
+}
+
+// a picture never changes once taken, so its colour is worked out once per run
+const tints = new Map<string, string | undefined>()
+
+/** The colour for a site's text panel, from its picture; undefined without one. */
+export function shotTint(home: string, url: string): string | undefined {
+  const file = shotFile(home, url)
+  if (!tints.has(file)) {
+    const img = nativeImage.createFromPath(file)
+    tints.set(
+      file,
+      img.isEmpty() ? undefined : brandTint(img.resize({ width: 32 }).toBitmap())
+    )
+  }
+  return tints.get(file)
 }

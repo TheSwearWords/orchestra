@@ -2,6 +2,7 @@
 import { createContext } from 'react'
 import type { Cover, Project, Role, StudioLayout } from '../../../preload'
 import { fit, type Camera, type Rect } from './camera'
+import { openMenu } from './menuStore'
 
 export const reducedMotion = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -130,18 +131,21 @@ export interface MenuItem {
   run?: () => void
   enabled?: boolean
   separator?: boolean
+  heading?: boolean // a small caps title over the entries that follow; not clickable
+  icon?: string // an icon from assets/icons
+  hint?: string // a word on the right: a shortcut, or what it leads to
+  danger?: boolean // removes or deletes something, so it reads red
 }
-/** Shows a native right-click menu and runs whatever is picked. */
-export async function popMenu(items: MenuItem[]): Promise<void> {
-  const id = await window.api.menu(
-    items.map((it, i) => ({
-      id: String(i),
-      label: it.label,
-      enabled: it.enabled ?? !!it.run,
-      separator: it.separator
-    }))
-  )
-  if (id !== null) items[Number(id)]?.run?.()
+// where the pointer last went down, so a menu opens beside it wherever popMenu is called from
+let pointer = { x: innerWidth / 2, y: innerHeight / 2 }
+const track = (e: MouseEvent): void => {
+  pointer = { x: e.clientX, y: e.clientY }
+}
+addEventListener('pointerdown', track, true)
+addEventListener('contextmenu', track, true)
+/** Shows the app's right-click menu (ContextMenu.tsx) and runs whatever is picked. */
+export function popMenu(items: MenuItem[]): Promise<void> {
+  return openMenu(items, pointer.x, pointer.y)
 }
 /** The Orchestrator bar's field, when this screen has the bar. */
 export const barInput = (): HTMLInputElement | null =>

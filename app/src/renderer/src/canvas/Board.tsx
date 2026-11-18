@@ -510,14 +510,18 @@ export function Board({
             sel?.id
           )
           // the menu says what it's for: the selected card's name, greyed, on top
-          if (sel) items.unshift({ label: sel.title }, { label: '', separator: true })
+          if (sel)
+            items.unshift({ label: sel.title, heading: true }, { label: '', separator: true })
           else if (selected.length > 1)
-            items.unshift({ label: `${selected.length} windows` }, { label: '', separator: true })
+            items.unshift(
+              { label: `${selected.length} windows`, heading: true },
+              { label: '', separator: true }
+            )
           const field = barInput()
           if (field)
             items.push(
               { label: '', separator: true },
-              { label: 'Ask the Orchestrator…', run: () => field.focus() }
+              { label: 'Ask the Orchestrator…', icon: 'chat-3-line', run: () => field.focus() }
             )
           void popMenu(items)
         })
@@ -886,7 +890,9 @@ export function Card({
       aria-label={card.title}
       onContextMenu={(e) => {
         const items = [
-          ...(card.onRename ? [{ label: 'Rename', run: () => setRenaming(true) }] : []),
+          ...(card.onRename
+            ? [{ label: 'Rename', icon: 'pen-nib-line', run: () => setRenaming(true) }]
+            : []),
           ...(card.menu ?? [])
         ]
         if (!items.length) return

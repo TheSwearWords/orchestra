@@ -220,6 +220,7 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
       lockedNow.length
         ? lockedNow.map((d) => ({
             label: `New Instrument for ${plan?.musicians.find((m) => m.id === d)?.name ?? d}`,
+            icon: 'box-3-line',
             run: () => void addInstrument(d)
           }))
         : [{ label: 'Lock in your deliverables to add Instruments' }]
@@ -303,15 +304,21 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     lockedIn.includes(id) ||
     !!chats.find((x) => x.id === id)?.count ||
     Object.keys(agents).some((k) => k === id || k.startsWith(`${id}--`))
-  async function seatMenu(id: string): Promise<void> {
-    const c = await window.api.menu([
-      { id: 'add', label: 'Add deliverable…' },
-      { id: 'edit', label: 'Edit deliverable…' },
-      ...(lockedIn.includes(id) ? [{ id: 'instrument', label: 'Add an Instrument' }] : [])
+  function seatMenu(id: string): void {
+    void popMenu([
+      { label: plan?.musicians.find((m) => m.id === id)?.name ?? id, heading: true },
+      { label: 'Edit deliverable…', icon: 'pen-nib-line', run: () => setEditing(id) },
+      ...(lockedIn.includes(id)
+        ? [{ label: 'Add an Instrument', icon: 'box-3-line', run: () => void addInstrument(id) }]
+        : []),
+      { label: '', separator: true },
+      {
+        label: 'Add deliverable…',
+        icon: 'add-line',
+        hint: 'Choose more',
+        run: () => setSetupOpen(true)
+      }
     ])
-    if (c === 'add') return setSetupOpen(true)
-    if (c === 'instrument') return void addInstrument(id)
-    if (c === 'edit') return setEditing(id)
   }
 
   const instCard = (m: string, i: string): string => `inst--${m}--${i}`
@@ -422,9 +429,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
     const p = provider(a.provider) ?? PROVIDERS[0]
     return [
       { label: '', separator: true },
-      { label: `Model · ${p.name}` },
+      { label: `Model · ${p.name}`, heading: true },
       ...p.models.map((m) => ({
-        label: `${m.id === a.model ? '✓ ' : '    '}${m.name}`,
+        label: m.name,
+        icon: m.id === a.model ? 'check-line' : undefined,
         run: () =>
           void window.api.editAgent(role, a.id, 'runsOn', `${p.id}/${m.id}`).then(
             () => dispatchEvent(new Event('orchestra:agents-changed')),
@@ -584,8 +592,12 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               e.preventDefault()
               e.stopPropagation()
               void popMenu([
-                { label: 'Edit prerequisite…', run: () => setEditingInst(f.id) },
-                { label: 'Open its file', run: () => openPrereq(f.id) }
+                {
+                  label: 'Edit prerequisite…',
+                  icon: 'pen-nib-line',
+                  run: () => setEditingInst(f.id)
+                },
+                { label: 'Open its file', icon: 'file-text-line', run: () => openPrereq(f.id) }
               ])
             }}
             onPointerEnter={() => on && setHover(f.id)}
@@ -937,9 +949,10 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           ),
           needsYou: pending(id),
           menu: [
-            { label: 'Add an Instrument', run: () => void addInstrument(id) },
+            { label: 'Add an Instrument', icon: 'box-3-line', run: () => void addInstrument(id) },
             {
               label: 'Open its file',
+              icon: 'file-text-line',
               run: () => openFile({ role: 'musician', id, name: musician(id)!.name }, `chat-${id}`)
             },
             ...modelItems('musician', musician(id))
@@ -975,9 +988,22 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
               w: INST_W,
               link: `chat-${id}`,
               menu: [
-                ...(inst ? [{ label: 'Edit Instrument…', run: () => setEditingInst(iid) }] : []),
-                { label: 'Open its file', run: () => openFile(file, card) },
-                { label: `Remove from ${m.name}`, run: () => void removeFromCrew(m, iid) },
+                ...(inst
+                  ? [
+                      {
+                        label: 'Edit Instrument…',
+                        icon: 'pen-nib-line',
+                        run: () => setEditingInst(iid)
+                      }
+                    ]
+                  : []),
+                { label: 'Open its file', icon: 'file-text-line', run: () => openFile(file, card) },
+                {
+                  label: `Remove from ${m.name}`,
+                  icon: 'close-line',
+                  danger: true,
+                  run: () => void removeFromCrew(m, iid)
+                },
                 ...modelItems('instrument', inst)
               ],
               body: (
@@ -1158,21 +1184,28 @@ export function Create({ project, frame }: { project: string; frame: Frame }): R
           h: deliverablesGroup.h
         }
         if (at.x >= g.x && at.x <= g.x + g.w && at.y >= g.y && at.y <= g.y + g.h)
-          return [{ label: 'Add deliverable…', run: () => setSetupOpen(true) }]
-        if (!confirmed) return [{ label: 'Add deliverable…', run: () => setSetupOpen(true) }]
+          return [{ label: 'Add deliverable…', icon: 'add-line', run: () => setSetupOpen(true) }]
+        if (!confirmed)
+          return [{ label: 'Add deliverable…', icon: 'add-line', run: () => setSetupOpen(true) }]
         // a deliverable's window, or one of its Instruments, selected: the menu is about it
         const id = /^chat-(.+)$/.exec(sel ?? '')?.[1] ?? /^inst--(.+?)--/.exec(sel ?? '')?.[1]
         const m = id && spawned.includes(id) ? musician(id) : undefined
         if (m)
           return [
-            { label: `New Instrument for ${m.name}`, run: () => void addInstrument(m.id, at) },
+            {
+              label: `New Instrument for ${m.name}`,
+              icon: 'box-3-line',
+              run: () => void addInstrument(m.id, at)
+            },
             {
               label: `Open ${m.name}'s file`,
+              icon: 'file-text-line',
               run: () => openFile({ role: 'musician', id: m.id, name: m.name }, `chat-${m.id}`)
             }
           ]
         return spawned.map((d) => ({
           label: `New Instrument for ${musician(d)!.name}`,
+          icon: 'box-3-line',
           run: () => void addInstrument(d, at)
         }))
       }}

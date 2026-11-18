@@ -24,6 +24,8 @@ import { Opening } from './canvas/Opening'
 import { OrchestratorBar, type BarTarget } from './canvas/OrchestratorBar'
 import { Studio } from './canvas/Studio'
 import { Setup } from './canvas/Setup'
+import { ContextMenuHost } from './canvas/ContextMenu'
+import { BrowserPanel } from './canvas/BrowserPanel'
 
 // Per-viewer UI memory; storage can be unavailable, so every access is guarded.
 function rememberedJson<T>(key: string, fallback: T): T {
@@ -239,6 +241,7 @@ function App(): React.JSX.Element {
         <Landscape name="sunset" />
         <Setup onDone={() => setSetUp(true)} />
         <SetupHome />
+        <ContextMenuHost />
       </div>
     )
 
@@ -382,6 +385,8 @@ function App(): React.JSX.Element {
           Back
         </button>
       )}
+      <ContextMenuHost />
+      <BrowserPanel />
       <SessionDock
         key={current?.id ?? 'studio'}
         project={current}

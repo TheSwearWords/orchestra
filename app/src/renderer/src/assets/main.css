@@ -166,6 +166,29 @@ body {
   }
 }
 
+/* The right-click menu (ContextMenu.tsx) grows out of the pointer. */
+.menu-in {
+  animation: menu-in 140ms var(--ease) both;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+/* The browser panel (BrowserPanel.tsx) comes in from the right. The page joins it at the end,
+   since Electron draws the page and it can't move with CSS. */
+.panel-in {
+  animation: panel-in 220ms var(--ease) both;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    translate: 24px 0;
+  }
+}
+
 /* Reduced motion keeps fades (they aid comprehension) and drops movement. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -174,6 +197,12 @@ body {
     transition-property: opacity, color, background-color, border-color !important;
   }
   .stagger > :not(:has(.stagger)) {
+    animation-name: stagger-fade;
+  }
+  .menu-in {
+    animation-name: stagger-fade;
+  }
+  .panel-in {
     animation-name: stagger-fade;
   }
 }

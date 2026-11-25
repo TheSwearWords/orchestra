@@ -2,6 +2,52 @@
 
 What changed in Orchestra, newest first. Add to the top section with each push.
 
+## 2026-11-24
+
+### Planned
+
+- Orchestra is moving to a plugin architecture. Orchestra becomes a host, like a music app, and each deliverable becomes a plugin, like an instrument you load into it. Orchestra keeps the project, Research, the brief, Refine and the Orchestrator; a plugin owns one craft (audio, decks, interfaces, 3D) end to end, including its own interface when it needs one.
+- Create will be rebuilt as a rack of plugin slots, wired together by what each plugin needs and what it makes, such as brand tokens in and audio stems out. Research, Refine and the Studio stay as they are, and every deliverable that exists today carries over as a plugin.
+- A plugin can run inside Create or on its own in its own window, can work in tools such as Figma and Blender, and installs from a GitHub repository. It follows one small open standard, so anyone can build one, including a better one for a deliverable that already exists.
+- None of this is in the app yet: this is the direction the next releases build toward.
+
+## 2026-11-17
+
+### Added
+
+- Web links open in a browser panel beside the board instead of your own browser. It has back, forward, reload, open in my browser and close; drag its header to move it, double-click the header to send it home. Pages run sandboxed, http and https only, with no pop-up windows and every permission refused.
+- Orchestra has its own right-click menu everywhere in the app, with icons, headings, hints, red danger items and keyboard control. It replaces the system menus.
+- Right-click a site in the reference library to edit its name, description and tags, open it, or remove it. Editing a built-in site makes it your own copy.
+- Search the reference library across names, addresses, descriptions and tags.
+- An Instrument editor: right-click an Instrument or a prerequisite on Create to edit its name, its job and which prerequisites it waits on.
+- The command bar offers Create deliverable, Create prerequisite and Create instrument.
+
+### Changed
+
+- The reference library is reworked: each site is a 16:9 picture with a panel on its right half showing its name, description and tags in the site's own brand colour. The window lays its tiles out so it stays close to 16:9, and the tag filter shows whenever any site has tags.
+- A cover picks one of the landscape backdrops, instead of a colour, artwork or uploaded image.
+- The command bar's I / II / III area jumps are replaced by the Create commands above.
+- On a new cover, "What is this project trying to say?" now reads "Description".
+
+### Fixed
+
+- Interrupting the zoom into an area (with a pan, the scroll wheel or another jump) left the camera on the area without opening its page. The area now always opens.
+
+## 2026-11-16
+
+### Added
+
+- Create starts with a modal the first time you enter it: research notes on the left, each with a tick and a preview, and deliverables on the right, grouped by category with the prerequisites they need listed underneath. Confirm saves both, locks the deliverables in and tells the Orchestrator which notes to use. Open it again from the Add deliverable tool or by right-clicking the Deliverables group or a deliverable.
+- Refine, first version. Flag a locked-in deliverable as ready by linking the work it is made in (a Figma page, a Blender file, a folder). Ready deliverables get a work window and a findings window on the Refine board, and you sign them off when you're happy. Running audits and sending findings back to Musicians are not built yet.
+
+### Changed
+
+- The Create stage shows only the deliverables you chose; the toggle cards are gone, and the circle reads Choose or Change.
+- The old Deliverable tool, which asks the Orchestrator for a new type of deliverable, is now called New type.
+- Deliverables whose work has started stay on and are tinted differently from a plain tick.
+- Accepting the Orchestrator's suggested deliverables now locks them in.
+- Edit project is a glass pill like the other secondary buttons.
+
 ## 2026-11-12
 
 ### Added
